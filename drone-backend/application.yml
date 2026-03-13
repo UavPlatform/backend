@@ -1,0 +1,16 @@
+server:
+  port: 8080
+jwt:
+  secret: "jfaklsddjfklsdgklsdghsdfklghsdfklhskfldhs"
+  # Access Token 过期时间：1 小时
+  expiration: 3600000
+  # Refresh Token 过期时间：7 天
+  refresh-expiration: 604800000
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+    database-platform: org.hibernate.dialect.MySQLDialect

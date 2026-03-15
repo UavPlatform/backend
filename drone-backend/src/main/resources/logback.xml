@@ -1,0 +1,50 @@
+<configuration>
+    <!-- 定义日志文件保存目录 -->
+    <property name="LOG_DIR" value="logs"/>
+
+    <!-- 应用程序日志 -->
+    <appender name="APPLICATION" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 活动日志文件 -->
+        <file>${LOG_DIR}/application.log</file>
+        <!-- 按天滚动 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 文件名格式 -->
+            <fileNamePattern>${LOG_DIR}/application-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- 保留30天 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 用户操作日志 -->
+    <appender name="USER_OPERATION" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 活动日志文件 -->
+        <file>${LOG_DIR}/user-operation.log</file>
+        <!-- 按天滚动 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- 文件名格式 -->
+            <fileNamePattern>${LOG_DIR}/user-operation-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <!-- 保留30天 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- 应用日志 -->
+    <root level="warn">
+        <appender-ref ref="APPLICATION"/>
+    </root>
+
+    <!-- 操作日志 -->
+    <logger name="com.drone.controller" level="info" additivity="false">
+        <appender-ref ref="USER_OPERATION"/>
+    </logger>
+    <logger name="com.drone.service" level="info" additivity="false">
+        <appender-ref ref="USER_OPERATION"/>
+    </logger>
+
+</configuration>

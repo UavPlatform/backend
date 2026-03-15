@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8081
 jwt:
   secret: "jfaklsddjfklsdgklsdghsdfklghsdfklhskfldhs"
   # Access Token 过期时间：1 小时

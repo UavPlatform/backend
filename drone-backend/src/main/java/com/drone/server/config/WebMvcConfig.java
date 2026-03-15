@@ -22,7 +22,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/user/refresh-token",  // 刷新token接口
                         "/error",               // 错误路径
                         "/swagger-ui/**", "/v3/api-docs/**",
-                        "/user/refresh"
+                        "/user/refresh",
+                        "/swagger-ui.html"
                 );
     }
 }

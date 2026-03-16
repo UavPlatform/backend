@@ -20,11 +20,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.Map;
 
-@Tag(name = "Login API")
+@Tag(name = "Authentication and Authorization API")
 @RestController
 @RequestMapping("/user")
 @Slf4j
-public class UserController {
+public class WebUserController {
 
     @Autowired
     private LoginService loginService;

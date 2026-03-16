@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/webUav")
 @Slf4j
-public class WebDroneController {
+public class WebUavController {
 
 
 }

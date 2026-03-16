@@ -19,11 +19,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/user/login",
                         "/user/register",
-                        "/user/refresh-token",  // 刷新token接口
-                        "/error",               // 错误路径
+                        "/user/refresh-token",
+                        "/error",
                         "/swagger-ui/**", "/v3/api-docs/**",
                         "/user/refresh",
-                        "/swagger-ui.html"
+                        "/swagger-ui.html",
+                        "/user/register"
                 );
     }
 }

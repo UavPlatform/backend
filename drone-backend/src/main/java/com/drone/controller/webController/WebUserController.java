@@ -1,8 +1,11 @@
-package com.drone.controller;
+package com.drone.controller.webController;
 
 import com.drone.pojo.dto.UserLoginDto;
+import com.drone.pojo.dto.UserRegisterDto;
+import com.drone.pojo.vo.RegisterVo;
 import com.drone.service.LoginService;
 import com.drone.server.util.JwtUtil;
+import com.drone.service.RegisterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,11 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,10 +24,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("/user")
 @Slf4j
-public class LoginController {
+public class UserController {
 
     @Autowired
     private LoginService loginService;
+
+    @Autowired
+    private RegisterService registerService;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -68,6 +70,7 @@ public class LoginController {
     )
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody UserLoginDto userLoginDto) {
+        //暂时未加密密码，后期添加
         log.info("用户登录请求: ID={}", userLoginDto.getId());
         Map<String, Object> result = new HashMap<>();
         boolean success = loginService.tryToLogin(userLoginDto);
@@ -138,7 +141,74 @@ public class LoginController {
             return ResponseEntity.status(401).body(result);
         }
     }
+    /**
+     * 用户注册接口
+     * @param userRegisterDto 注册信息
+     * @return 注册结果
+     */
+    @Operation(
+            summary = "用户注册",
+            description = "用户注册，返回结果和用户信息",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "注册成功",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": true, \"userId\": 123, \"userName\": \"test\"}"
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "注册失败",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": false, \"message\": \"用户名已存在\"}"
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "参数错误",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": false, \"message\": \"ID或密码为空\"}"
+                                    )
+                            )
+                    )
+            }
+    )
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> registerUser(@RequestBody UserRegisterDto userRegisterDto) {
+        log.info("注册请求: userName={}", userRegisterDto.getUserName());
+        Map<String, Object> result = new HashMap<>();
+        try {
+            if (userRegisterDto.getPassword() == null || userRegisterDto.getUserName() == null) {
+                result.put("success", false);
+                result.put("message", "用户名或密码为空");
+                return ResponseEntity.status(401).body(result);
+            }
 
+            RegisterVo registerVo = registerService.tryToRegister(userRegisterDto);
+            log.info("用户注册成功 ID：{} Name:{}", registerVo.getId(), registerVo.getUserName());
+            result.put("success", true);
+            result.put("userId", registerVo.getId());
+            result.put("userName", registerVo.getUserName());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("注册失败:{}", e.getMessage());
+            result.put("success", false);
+            result.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(result);
+        }
+    }
 
 
 }

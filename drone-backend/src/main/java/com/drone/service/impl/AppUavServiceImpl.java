@@ -9,7 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
+
 
 @Service
 public class AppUavServiceImpl implements AppUavService {
@@ -30,13 +31,14 @@ public class AppUavServiceImpl implements AppUavService {
             } else {
                 Uav uav = new Uav();
                 uav.setId(uavRepository.findMaxId() + 1);
-                uav.setUavName(name); // 正确设置无人机名称
-                uav.setOnlineStatus((char) 0); // 默认直接设置离线
+                uav.setUavName(name);
+                uav.setUavCreateTime(LocalDateTime.now());
+                uav.setOnlineStatus(status);
                 uavRepository.save(uav);
-                return new UavVo(uav.getId(), uav.getUavName()); // 返回结果
+                return new UavVo(uav.getId(), uav.getUavName());
             }
         }
-        throw new RuntimeException("无人机名称或在线状态为空"); // 修正异常信息
+        throw new RuntimeException("无人机名称或在线状态为空");
     }
 
     @Override

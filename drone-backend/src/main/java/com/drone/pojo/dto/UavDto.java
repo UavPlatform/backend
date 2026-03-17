@@ -1,8 +1,6 @@
 package com.drone.pojo.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
-import jakarta.persistence.Id;
 import lombok.Data;
 
 @Data

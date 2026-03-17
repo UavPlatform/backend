@@ -3,6 +3,8 @@ package com.drone.pojo.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "uav")
 @Data
@@ -16,4 +18,7 @@ public class Uav {
 
     @Column(name = "online_status")
     private Character onlineStatus; // 0离线, 1在线
+
+    @Column(name = "uav_create_time")
+    private LocalDateTime uavCreateTime;
 }

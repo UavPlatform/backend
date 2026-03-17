@@ -131,12 +131,11 @@ public class AppUavController {
             if (uavVos == null || uavVos.length == 0) {
                 result.put("success", false);
                 result.put("message", "暂时没有无人机");
-                return ResponseEntity.ok(result);
             } else {
                 result.put("success", true);
                 result.put("uav", uavVos);
-                return ResponseEntity.ok(result);
             }
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("查询无人机失败:{}", e.getMessage());
             result.put("success", false);

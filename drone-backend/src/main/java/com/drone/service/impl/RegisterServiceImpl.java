@@ -27,7 +27,6 @@ public class RegisterServiceImpl implements RegisterService {
                 throw new RuntimeException("用户名已存在");
             } else {
                 User user = new User();
-                user.setId(userRepository.findMaxId() + 1);
                 user.setUserName(name);
                 user.setPassWord(password); 
                 user.setStatus(1);

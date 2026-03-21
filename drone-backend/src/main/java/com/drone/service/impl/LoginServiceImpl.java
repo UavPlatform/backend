@@ -14,14 +14,13 @@ public class LoginServiceImpl implements LoginService {
     private UserRepository userRepository;
 
     @Override
-    public boolean tryToLogin(UserLoginDto userLoginDto) {
-        Long id = userLoginDto.getId();
+    public User tryToLogin(UserLoginDto userLoginDto) {
+        String userName = userLoginDto.getUserName();
         String passWord = userLoginDto.getPassword();
 
-        if (id != null && passWord != null) {
-            User user = userRepository.findByIdAndPassWord(id, passWord);
-            return user != null;
+        if (userName != null && passWord != null) {
+            return userRepository.findByUserNameAndPassWord(userName, passWord);
         }
-        return false;
+        return null;
     }
 }

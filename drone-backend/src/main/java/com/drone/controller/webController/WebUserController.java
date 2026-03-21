@@ -2,6 +2,7 @@ package com.drone.controller.webController;
 
 import com.drone.pojo.dto.UserLoginDto;
 import com.drone.pojo.dto.UserRegisterDto;
+import com.drone.pojo.entity.User;
 import com.drone.pojo.vo.RegisterVo;
 import com.drone.service.LoginService;
 import com.drone.server.util.JwtUtil;
@@ -42,7 +43,7 @@ public class WebUserController {
      */
     @Operation(
             summary = "用户登录",
-            description = "验证用户ID和密码，成功返回JWT令牌，失败返回错误信息",
+            description = "验证用户名和密码，成功返回JWT令牌，失败返回错误信息",
             responses = {
                     @ApiResponse(
                             responseCode = "200",
@@ -62,7 +63,7 @@ public class WebUserController {
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            example = "{\"success\": false, \"message\": \"ID或密码错误\"}"
+                                            example = "{\"success\": false, \"message\": \"用户名或密码错误\"}"
                                     )
                             )
                     )
@@ -71,22 +72,22 @@ public class WebUserController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody UserLoginDto userLoginDto) {
         //暂时未加密密码，后期添加
-        log.info("用户登录请求: ID={}", userLoginDto.getId());
+        log.info("用户登录请求: userName={}", userLoginDto.getUserName());
         Map<String, Object> result = new HashMap<>();
-        boolean success = loginService.tryToLogin(userLoginDto);
-        if (success) {
-            String idStr = userLoginDto.getId().toString();
+        User user = loginService.tryToLogin(userLoginDto);
+        if (user != null) {
+            String idStr = user.getId().toString();
             String token = jwtUtil.generateToken(idStr);
             String refreshToken = jwtUtil.generateRefreshToken(idStr);
             result.put("success", true);
             result.put("token", token);
             result.put("refreshToken", refreshToken);
-            log.info("用户登录成功: ID={}", userLoginDto.getId());
+            log.info("用户登录成功: userName={}, id={}", user.getUserName(), user.getId());
             return ResponseEntity.ok(result);
         } else {
             result.put("success", false);
-            result.put("message", "ID或密码错误");
-            log.warn("用户登录失败: ID={}, 原因: 密码错误", userLoginDto.getId());
+            result.put("message", "用户名或密码错误");
+            log.warn("用户登录失败: userName={}, 原因: 密码错误", userLoginDto.getUserName());
             return ResponseEntity.status(401).body(result);
         }
     }

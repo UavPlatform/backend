@@ -5,6 +5,8 @@ import com.drone.pojo.dto.UserRegisterDto;
 import com.drone.pojo.entity.User;
 import com.drone.pojo.vo.RegisterVo;
 import com.drone.service.RegisterService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +16,9 @@ public class RegisterServiceImpl implements RegisterService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -26,11 +31,14 @@ public class RegisterServiceImpl implements RegisterService {
             if (registerVo != null && registerVo.getId() != null) {
                 throw new RuntimeException("用户名已存在");
             } else {
+                Long maxId = userRepository.findMaxId();
                 User user = new User();
+                user.setId(maxId == null ? 1L : maxId + 1);
                 user.setUserName(name);
                 user.setPassWord(password); 
                 user.setStatus(1);
-                userRepository.save(user);
+                entityManager.persist(user);
+                entityManager.flush();
                 
                 RegisterVo result = new RegisterVo();
                 result.setId(user.getId());

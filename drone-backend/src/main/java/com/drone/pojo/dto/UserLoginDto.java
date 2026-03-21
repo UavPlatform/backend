@@ -9,8 +9,8 @@ import java.io.Serializable;
 @Schema(description = "Parameters for Login Request(登录参数)")
 public class UserLoginDto implements Serializable {
 
-    @Schema(description = "id")
-    private Long id;
+    @Schema(description = "userName")
+    private String userName;
     @Schema(description = "password")
     private String password;
 }

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    User findByIdAndPassWord(Long id, String passWord);
+    User findByUserNameAndPassWord(String userName, String passWord);
 
     @Query("SELECT new com.drone.pojo.vo.RegisterVo(u.id, u.userName) FROM User u WHERE u.userName = :name")
     RegisterVo findByUserName(@Param("name") String name);

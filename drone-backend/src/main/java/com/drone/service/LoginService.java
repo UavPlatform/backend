@@ -1,8 +1,9 @@
 package com.drone.service;
 
 import com.drone.pojo.dto.UserLoginDto;
+import com.drone.pojo.entity.User;
 
 public interface LoginService {
 
-    boolean tryToLogin(UserLoginDto userLoginDto);
+    User tryToLogin(UserLoginDto userLoginDto);
 }

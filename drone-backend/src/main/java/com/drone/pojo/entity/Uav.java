@@ -1,5 +1,6 @@
 package com.drone.pojo.entity;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -21,4 +22,11 @@ public class Uav {
 
     @Column(name = "uav_create_time")
     private LocalDateTime uavCreateTime;
+
+    @Column(name = "dji_id")
+    private String djiId;
+
+    @Column(name = "controller_model")
+    private String controllerModel;
+
 }

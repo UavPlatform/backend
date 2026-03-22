@@ -1,5 +1,6 @@
 package com.drone.server.util;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 
 import javax.crypto.Mac;
@@ -10,6 +11,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 public class TRTCSignatureUtil {
 
     private static final String ALGORITHM = "HmacSHA256";
@@ -52,7 +54,7 @@ public class TRTCSignatureUtil {
 
             return com.alibaba.fastjson.JSON.toJSONString(result);
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
-            e.printStackTrace();
+            log.info(e.getMessage());
             return null;
         }
     }

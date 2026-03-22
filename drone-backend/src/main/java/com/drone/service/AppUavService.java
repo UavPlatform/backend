@@ -8,4 +8,6 @@ public interface AppUavService {
     UavVo tryToAddUav(UavDto uavDto);
 
     UavVo[] getAllUav();
+
+    String updateUav(UavDto uavDto);
 }

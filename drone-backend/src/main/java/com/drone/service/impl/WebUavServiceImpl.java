@@ -13,7 +13,7 @@ public class WebUavServiceImpl implements WebUavService {
     private UavRepository uavRepository;
 
     @Override
-    public UavVo[] getOnlineUav() {
-            return uavRepository.findUavByOnlineStatus('1');//1在线，只要在线的
+    public UavVo[] getUav() {
+        return uavRepository.getAll();
     }
 }

@@ -5,6 +5,7 @@ import com.drone.pojo.dto.UserRegisterDto;
 import com.drone.pojo.entity.User;
 import com.drone.pojo.vo.RegisterVo;
 import com.drone.service.LoginService;
+import com.drone.server.annotation.SkipJwt;
 import com.drone.server.util.JwtUtil;
 import com.drone.service.RegisterService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,7 @@ public class WebUserController {
      * @param userLoginDto
      * @return
      */
+    @SkipJwt
     @Operation(
             summary = "用户登录",
             description = "验证用户名和密码，成功返回JWT令牌，失败返回错误信息",
@@ -97,6 +99,7 @@ public class WebUserController {
      * @param refreshToken
      * @return
      */
+    @SkipJwt
     @Operation(
             summary = "刷新令牌",
             description = "使用Refresh-Token刷新获取新的Access-Token"
@@ -147,6 +150,7 @@ public class WebUserController {
      * @param userRegisterDto 注册信息
      * @return 注册结果
      */
+    @SkipJwt
     @Operation(
             summary = "用户注册",
             description = "用户注册，返回结果和用户信息",

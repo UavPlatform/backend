@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import javax.servlet.http.HttpServletRequest;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -141,7 +142,7 @@ public class  WebLiveController {
             }
     )
     @PostMapping("/get")
-    public ResponseEntity<Map<String, Object>> getPullCredentials(@RequestParam String deviceId, @RequestParam String webUserId) {
+    public ResponseEntity<Map<String, Object>> getPullCredentials(@RequestParam String deviceId, @RequestParam String webUserId, HttpServletRequest request) {
         Map<String, Object> result = new HashMap<>();
         try {
             //TRTC拉流凭证
@@ -152,6 +153,7 @@ public class  WebLiveController {
             result.put("roomId", roomId);
             result.put("userId", webUserId);
             result.put("userSig", userSig);
+            result.put("wsUrl", "ws://" + request.getServerName() + ":" + request.getServerPort() + "/ws/web?deviceId=" + deviceId);
             log.info("为Web用户 {} 生成拉流凭证，设备ID：{}", webUserId, deviceId);
             return ResponseEntity.ok(result);
         } catch (Exception e) {

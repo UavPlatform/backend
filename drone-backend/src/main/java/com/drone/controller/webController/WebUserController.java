@@ -1,9 +1,12 @@
 package com.drone.controller.webController;
 
+import com.drone.mapper.UserRecordRepository;
 import com.drone.pojo.dto.UserLoginDto;
 import com.drone.pojo.dto.UserRegisterDto;
 import com.drone.pojo.entity.User;
+import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.vo.RegisterVo;
+import com.drone.server.util.UserContext;
 import com.drone.service.LoginService;
 import com.drone.server.annotation.SkipJwt;
 import com.drone.server.util.JwtUtil;
@@ -16,10 +19,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "Authentication and Authorization API")
@@ -36,6 +43,9 @@ public class WebUserController {
 
     @Autowired
     private JwtUtil jwtUtil;
+    
+    @Autowired
+    private UserRecordRepository userRecordRepository;
 
     /**
      * 登录接口
@@ -215,5 +225,73 @@ public class WebUserController {
         }
     }
 
+    /**
+     * 查询用户直播记录
+     * @param page 页码，从0开始
+     * @param size 每页记录数
+     * @return 用户的直播记录列表
+     */
+    @Operation(
+            summary = "查询用户直播记录",
+            description = "获取当前登录用户的直播观看记录，支持分页",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "查询成功",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": true, \"records\": [{\"id\": 1, \"userName\": \"test\", \"djiId\": \"123456\", \"start_time\": \"2026-03-27T10:00:00\", \"end_time\": \"2026-03-27T11:00:00\"}], \"total\": 10, \"page\": 0, \"size\": 5, \"totalPages\": 2}"
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "401",
+                            description = "未登录",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": false, \"message\": \"用户未登录\"}"
+                                    )
+                            )
+                    )
+            }
+    )
+    @GetMapping("/records")
+    public ResponseEntity<Map<String, Object>> getLiveRecords(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
+        log.info("查询用户直播记录: page={}, size={}", page, size);
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // 获取当前登录用户
+            String userName = UserContext.getUsername();
+            if (userName == null) {
+                result.put("success", false);
+                result.put("message", "用户未登录");
+                return ResponseEntity.status(401).body(result);
+            }
+            
+            // 创建分页参数
+            Pageable pageable = PageRequest.of(page, size);
+            
+            // 查询用户直播记录
+            Page<UserRecord> recordPage = userRecordRepository.findAllByUserName(userName, pageable);
+            result.put("success", true);
+            result.put("records", recordPage.getContent());
+            result.put("total", recordPage.getTotalElements());
+            result.put("page", recordPage.getNumber());
+            result.put("size", recordPage.getSize());
+            result.put("totalPages", recordPage.getTotalPages());
+            log.info("查询用户直播记录成功: userName={}, 记录数={}, 总记录数={}", userName, recordPage.getContent().size(), recordPage.getTotalElements());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("查询用户直播记录失败: {}", e.getMessage());
+            result.put("success", false);
+            result.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(result);
+        }
+    }
 
 }

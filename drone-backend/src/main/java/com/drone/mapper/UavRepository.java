@@ -23,8 +23,11 @@ public interface UavRepository extends JpaRepository<Uav, Long> {
     @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName) FROM Uav u WHERE u.onlineStatus = :status")
     UavVo[] findUavByOnlineStatus(@Param("status") Character status);
 
-    Uav findByDjiId(String djiId);
+    @Query("SELECT u FROM Uav u WHERE u.djiId = :djiId")
+    Uav findByDjiId(@Param("djiId") String djiId);
 
+    //按照id查询，已废弃
+    @Deprecated
     @Query("SELECT u FROM Uav u WHERE u.id = :id")
     Uav findUavById(@Param("id") Long id);
 

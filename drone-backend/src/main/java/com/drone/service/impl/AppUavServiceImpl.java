@@ -23,28 +23,30 @@ public class AppUavServiceImpl implements AppUavService {
     public UavVo tryToAddUav(UavDto uavDto) {
         String name = uavDto.getUavName();
         Character status = uavDto.getOnlineStatus();
+        String djiId = uavDto.getDjiId();
 
-        if (name != null && status != null) {
-            UavVo uavVo = uavRepository.findUavByUavName(name);
-            if (uavVo != null && uavVo.getId() != null) {
-                throw new RuntimeException("无人机名字已存在");
-            } else {
-                Uav uav = new Uav();
-                if(uavRepository.findByDjiId(uavDto.getDjiId())==null){
-                    uav.setId(uavRepository.findMaxId() + 1);
-                    uav.setUavName(name);
-                    uav.setUavCreateTime(LocalDateTime.now());
-                    uav.setOnlineStatus(status);
-                    uav.setDjiId(uavDto.getDjiId());
-                    uav.setControllerModel(uavDto.getControllerModel());
-                    uavRepository.save(uav);
-                    return new UavVo(uav.getId(), uav.getUavName());
-                }else {
-                    throw new RuntimeException("无人机已注册");
-                }
-            }
+        // 验证参数
+        if (name == null || status == null || djiId == null) {
+            throw new RuntimeException("无人机名称、在线状态或DjiId为空");
         }
-        throw new RuntimeException("无人机名称或在线状态为空");
+        if (uavRepository.findByDjiId(djiId) != null) {
+            throw new RuntimeException("无人机DjiId已注册");
+        }
+        UavVo uavVo = uavRepository.findUavByUavName(name);
+        if (uavVo != null && uavVo.getId() != null) {
+            throw new RuntimeException("无人机名字已存在");
+        }
+
+
+
+        Uav uav = new Uav();
+        uav.setUavName(name);
+        uav.setUavCreateTime(LocalDateTime.now());
+        uav.setOnlineStatus(status);
+        uav.setDjiId(djiId);
+        uav.setControllerModel(uavDto.getControllerModel());
+        uavRepository.save(uav);
+        return new UavVo(uav.getId(), uav.getUavName());
     }
 
     @Override

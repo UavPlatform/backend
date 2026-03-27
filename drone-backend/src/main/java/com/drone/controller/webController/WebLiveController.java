@@ -1,7 +1,10 @@
 package com.drone.controller.webController;
 
 import com.alibaba.fastjson.JSON;
+import com.drone.mapper.UserRecordRepository;
+import com.drone.pojo.entity.UserRecord;
 import com.drone.server.handler.DroneWebSocketHandler;
+import com.drone.server.util.UserContext;
 import com.drone.service.TRTCService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -14,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,6 +31,8 @@ public class  WebLiveController {
     private TRTCService trtcService;
     @Autowired
     private DroneWebSocketHandler webSocketHandler;
+    @Autowired
+    private UserRecordRepository userRecordRepository;
 
     /**
      * 请求app开播
@@ -148,6 +154,18 @@ public class  WebLiveController {
             //TRTC拉流凭证
             String roomId = trtcService.generateRoomId(deviceId);
             String userSig = trtcService.generateUserSig(webUserId);
+            
+            // 记录用户直播观看记录
+            String userName = UserContext.getUsername();
+            if (userName != null) {
+                UserRecord record = new UserRecord();
+                record.setUserName(userName);
+                record.setDjiId(deviceId);
+                record.setStart_time(LocalDateTime.now());
+                //结束时间暂时设为null
+                userRecordRepository.save(record);
+                log.info("记录用户直播观看记录: userName={}, deviceId={}", userName, deviceId);
+            }
             
             result.put("success", true);
             result.put("roomId", roomId);

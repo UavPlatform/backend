@@ -37,8 +37,6 @@ public class AppUavServiceImpl implements AppUavService {
             throw new RuntimeException("无人机名字已存在");
         }
 
-
-
         Uav uav = new Uav();
         uav.setUavName(name);
         uav.setUavCreateTime(LocalDateTime.now());

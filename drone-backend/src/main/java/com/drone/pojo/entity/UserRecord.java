@@ -18,7 +18,7 @@ public class UserRecord {
     @Column(name = "user_name")
     private String userName;
 
-    @Column(name = "djiId")
+    @Column(name = "dji_Id")
     private String djiId;
 
     @Column(name = "start_time")

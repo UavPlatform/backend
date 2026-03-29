@@ -2,6 +2,7 @@ package com.drone.controller.webController;
 
 import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.vo.UavVo;
+import com.drone.pojo.vo.WebUavStatusVo;
 import com.drone.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -87,6 +88,38 @@ public class WebUavController {
             result.put("message", e.getMessage());
             return ResponseEntity.status(400).body(result);
         }
+    }
+
+    @Operation(
+            summary = "查询单台无人机实时状态",
+            description = "根据设备ID查询平台侧最近一次收到的无人机状态",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "查询成功",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            example = "{\"success\": true, \"code\": \"OK\", \"status\": {\"djiId\": \"123456\", \"wsConnected\": true, \"liveState\": \"RUNNING\", \"latestStatus\": {\"battery\": 85}}}"
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "无人机或状态不存在"
+                    )
+            }
+    )
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getUavStatus(@RequestParam String deviceId) {
+        log.info("平台端查询无人机状态，deviceId={}", deviceId);
+        WebUavStatusVo status = webUavService.getUavStatus(deviceId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("code", "OK");
+        result.put("status", status);
+        return ResponseEntity.ok(result);
     }
 
 

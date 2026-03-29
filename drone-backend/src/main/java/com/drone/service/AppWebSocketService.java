@@ -8,4 +8,6 @@ public interface AppWebSocketService {
     void markAsConnected(String deviceId);
 
     void markAsDisconnected(String deviceId);
+
+    boolean isConnected(String deviceId);
 }

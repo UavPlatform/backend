@@ -1,11 +1,17 @@
 package com.drone.controller.webController;
 
-import com.alibaba.fastjson.JSON;
 import com.drone.mapper.UserRecordRepository;
 import com.drone.pojo.entity.UserRecord;
+import com.drone.server.exception.ApiErrorCode;
+import com.drone.server.exception.BusinessException;
+import com.drone.server.exception.UnauthorizedException;
 import com.drone.server.handler.DroneWebSocketHandler;
+import com.drone.server.handler.WsCommandAckResult;
 import com.drone.server.util.UserContext;
+import com.drone.service.AppWebSocketService;
+import com.drone.service.LiveSessionService;
 import com.drone.service.TRTCService;
+import com.drone.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,12 +19,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "Web Live API")
@@ -26,6 +34,8 @@ import java.util.Map;
 @RequestMapping("/live")
 @Slf4j
 public class  WebLiveController {
+    private static final long LIVE_ACK_TIMEOUT_MILLIS = 5000;
+    private static final long LIVE_STARTING_TTL_MILLIS = 15000;
 
     @Autowired
     private TRTCService trtcService;
@@ -33,6 +43,12 @@ public class  WebLiveController {
     private DroneWebSocketHandler webSocketHandler;
     @Autowired
     private UserRecordRepository userRecordRepository;
+    @Autowired
+    private WebUavService webUavService;
+    @Autowired
+    private AppWebSocketService appWebSocketService;
+    @Autowired
+    private LiveSessionService liveSessionService;
 
     /**
      * 请求app开播
@@ -80,35 +96,63 @@ public class  WebLiveController {
     )
     @PostMapping("/req")
     public ResponseEntity<Map<String, Object>> startLive(@RequestParam String deviceId) {
+        webUavService.getRegisteredUav(deviceId);
+        if (!appWebSocketService.isConnected(deviceId)) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.UAV_NOT_CONNECTED);
+        }
+
+        if (liveSessionService.isRunning(deviceId)) {
+            Map<String, Object> running = new HashMap<>();
+            running.put("success", true);
+            running.put("code", ApiErrorCode.LIVE_ALREADY_RUNNING.getCode());
+            running.put("message", ApiErrorCode.LIVE_ALREADY_RUNNING.getDefaultMessage());
+            running.put("ackConfirmed", true);
+            running.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
+            running.put("roomId", liveSessionService.getSnapshot(deviceId).getRoomId());
+            return ResponseEntity.ok(running);
+        }
+        if (liveSessionService.isStarting(deviceId)) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.LIVE_ALREADY_STARTING);
+        }
+
         Map<String, Object> result = new HashMap<>();
         log.info("请求ID为：{}的无人机开播",deviceId);//可加userid写入日志
         try {
-            // 生成TRTC凭证
             String roomId = trtcService.generateRoomId(deviceId);
             String userSig = trtcService.generateUserSig(deviceId);
+            WsCommandAckResult ackResult = webSocketHandler.sendStartLiveCommand(
+                    deviceId,
+                    roomId,
+                    deviceId,
+                    userSig,
+                    LIVE_ACK_TIMEOUT_MILLIS,
+                    LIVE_STARTING_TTL_MILLIS
+            );
 
-            //开播命令
-            Map<String, Object> command = new HashMap<>();
-            command.put("type", "START_LIVE");
-            command.put("roomId", roomId);
-            command.put("userId", deviceId);
-            command.put("userSig", userSig);
-
-            //发送命令
-            boolean success = webSocketHandler.sendMessage(deviceId, JSON.toJSONString(command));
-            if (success) {
-                result.put("success", true);
-                result.put("message", "开播请求已发送");
-                return ResponseEntity.ok(result);
-            } else {
-                result.put("success", false);
-                result.put("message", "设备未连接");
-                return ResponseEntity.status(400).body(result);
+            if (!ackResult.isSuccess() && !ackResult.isTimedOut()) {
+                throwStartLiveFailure(ackResult);
             }
+
+            result.put("success", true);
+            result.put("requestId", ackResult.getRequestId());
+            result.put("roomId", roomId);
+            result.put("ackConfirmed", !ackResult.isTimedOut());
+            if (ackResult.isTimedOut()) {
+                result.put("code", "LIVE_START_PENDING");
+                result.put("message", "开播命令已发送，等待设备确认");
+                result.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(result);
+            }
+
+            result.put("code", "LIVE_STARTED");
+            result.put("message", "设备已确认启动图传");
+            result.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
+            return ResponseEntity.ok(result);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "发送失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(result);
+            liveSessionService.markFailed(deviceId);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.TRTC_CREDENTIAL_FAILED, "发送图传启动命令失败: " + e.getMessage());
         }
     }
 
@@ -149,38 +193,94 @@ public class  WebLiveController {
     )
     @PostMapping("/get")
     public ResponseEntity<Map<String, Object>> getPullCredentials(@RequestParam String deviceId, @RequestParam String webUserId, HttpServletRequest request) {
+        webUavService.getRegisteredUav(deviceId);
+        if (!appWebSocketService.isConnected(deviceId)) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.UAV_NOT_CONNECTED);
+        }
+
         Map<String, Object> result = new HashMap<>();
         try {
-            //TRTC拉流凭证
             String roomId = trtcService.generateRoomId(deviceId);
             String userSig = trtcService.generateUserSig(webUserId);
-            
-            // 记录用户直播观看记录
+
             String userName = UserContext.getUsername();
             if (userName != null) {
-                UserRecord record = new UserRecord();
-                record.setUserName(userName);
-                record.setDjiId(deviceId);
-                record.setStart_time(LocalDateTime.now());
-                //结束时间暂时设为null
-                userRecordRepository.save(record);
-                log.info("记录用户直播观看记录: userName={}, deviceId={}", userName, deviceId);
+                ensureOpenRecord(userName, deviceId);
             }
-            
+
             result.put("success", true);
+            result.put("code", "OK");
             result.put("roomId", roomId);
             result.put("userId", webUserId);
             result.put("userSig", userSig);
-            result.put("wsUrl", "ws://" + request.getServerName() + ":" + request.getServerPort() + "/ws/web?deviceId=" + deviceId);
+            result.put("wsUrl", buildWebSocketUrl(request, deviceId));
+            result.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
+            result.put("ackConfirmed", liveSessionService.isRunning(deviceId));
             log.info("为Web用户 {} 生成拉流凭证，设备ID：{}", webUserId, deviceId);
             return ResponseEntity.ok(result);
+        } catch (BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "生成拉流凭证失败: " + e.getMessage());
             log.error("生成拉流凭证失败: {}", e.getMessage());
-            return ResponseEntity.status(500).body(result);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.TRTC_CREDENTIAL_FAILED, "生成拉流凭证失败: " + e.getMessage());
         }
     }
 
+    @Operation(
+            summary = "结束观看会话",
+            description = "当前用户退出图传观看时，补齐观看记录结束时间"
+    )
+    @PostMapping("/close")
+    public ResponseEntity<Map<String, Object>> closeLive(@RequestParam String deviceId) {
+        webUavService.getRegisteredUav(deviceId);
+        String userName = UserContext.getUsername();
+        if (userName == null || userName.isBlank()) {
+            throw new UnauthorizedException("当前用户未登录");
+        }
+
+        List<UserRecord> openRecords = userRecordRepository.findOpenRecords(userName, deviceId);
+        if (openRecords.isEmpty()) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "当前没有待关闭的观看记录");
+        }
+
+        UserRecord record = openRecords.get(0);
+        record.setEnd_time(LocalDateTime.now());
+        userRecordRepository.save(record);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("code", "OK");
+        result.put("message", "观看记录已结束");
+        return ResponseEntity.ok(result);
+    }
+
+    private void ensureOpenRecord(String userName, String deviceId) {
+        List<UserRecord> openRecords = userRecordRepository.findOpenRecords(userName, deviceId);
+        if (!openRecords.isEmpty()) {
+            return;
+        }
+
+        UserRecord record = new UserRecord();
+        record.setUserName(userName);
+        record.setDjiId(deviceId);
+        record.setStart_time(LocalDateTime.now());
+        userRecordRepository.save(record);
+        log.info("记录用户直播观看记录: userName={}, deviceId={}", userName, deviceId);
+    }
+
+    private void throwStartLiveFailure(WsCommandAckResult ackResult) {
+        if (ApiErrorCode.LIVE_REQUEST_SEND_FAILED.getCode().equals(ackResult.getCode())) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.LIVE_REQUEST_SEND_FAILED, ackResult.getMessage());
+        }
+        if (ApiErrorCode.UAV_NOT_CONNECTED.getCode().equals(ackResult.getCode())) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.UAV_NOT_CONNECTED, ackResult.getMessage());
+        }
+        throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.LIVE_START_REJECTED, ackResult.getMessage());
+    }
+
+    private String buildWebSocketUrl(HttpServletRequest request, String deviceId) {
+        String protocol = request.isSecure() ? "wss" : "ws";
+        return protocol + "://" + request.getServerName() + ":" + request.getServerPort() + "/ws/web?deviceId=" + deviceId;
+    }
 
 }

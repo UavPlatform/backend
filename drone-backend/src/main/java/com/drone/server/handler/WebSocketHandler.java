@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.util.UriComponentsBuilder;
 import lombok.extern.slf4j.Slf4j;
 
 @Component
@@ -16,11 +17,8 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        // 从URL参数中获取设备ID
-        String query = session.getUri().getQuery();
-        if (query != null && query.contains("deviceId")) {
-            String deviceId = query.split("=")[1];
-            // 注册为开播的Web端连接
+        String deviceId = getDeviceId(session);
+        if (deviceId != null && !deviceId.isBlank()) {
             droneWebSocketHandler.registerLiveWebSession(deviceId, session);
         }
         log.info("Web端连接已建立");
@@ -28,13 +26,20 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        // 从URL参数中获取设备ID
-        String query = session.getUri().getQuery();
-        if (query != null && query.contains("deviceId")) {
-            String deviceId = query.split("=")[1];
-            // 移除开播的Web端连接
+        String deviceId = getDeviceId(session);
+        if (deviceId != null && !deviceId.isBlank()) {
             droneWebSocketHandler.removeLiveWebSession(deviceId);
         }
         log.info("Web端连接已关闭");
+    }
+
+    private String getDeviceId(WebSocketSession session) {
+        if (session.getUri() == null) {
+            return null;
+        }
+        return UriComponentsBuilder.fromUri(session.getUri())
+                .build()
+                .getQueryParams()
+                .getFirst("deviceId");
     }
 }

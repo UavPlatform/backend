@@ -11,6 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class UavStatusServiceImpl implements UavStatusService {
     // 存储无人机状态（无人机ID -> 状态）
     private final Map<Long, UavStatusDto> uavStatusMap = new ConcurrentHashMap<>();
+    // 存储无人机状态（设备ID -> 状态）
+    private final Map<String, UavStatusDto> deviceStatusMap = new ConcurrentHashMap<>();
 
     /**
      * 更新无人机状态
@@ -18,7 +20,27 @@ public class UavStatusServiceImpl implements UavStatusService {
      */
     @Override
     public void updateUavStatus(UavStatusDto status) {
-        uavStatusMap.put(status.getUavId(), status);
+        if (status == null) {
+            return;
+        }
+        if (status.getUavId() != null) {
+            uavStatusMap.put(status.getUavId(), status);
+        }
+        if (status.getDeviceId() != null && !status.getDeviceId().isBlank()) {
+            deviceStatusMap.put(status.getDeviceId(), status);
+        }
+    }
+
+    @Override
+    public void updateUavStatus(String deviceId, UavStatusDto status) {
+        if (status == null) {
+            return;
+        }
+        status.setDeviceId(deviceId);
+        if (status.getReceivedAt() <= 0) {
+            status.setReceivedAt(System.currentTimeMillis());
+        }
+        updateUavStatus(status);
     }
 
     /**
@@ -31,6 +53,11 @@ public class UavStatusServiceImpl implements UavStatusService {
         return uavStatusMap.get(uavId);
     }
 
+    @Override
+    public UavStatusDto getUavStatus(String deviceId) {
+        return deviceStatusMap.get(deviceId);
+    }
+
     /**
      * 获取所有无人机状态
      * @return 所有无人机状态
@@ -38,5 +65,10 @@ public class UavStatusServiceImpl implements UavStatusService {
     @Override
     public Map<Long, UavStatusDto> getAllUavStatus() {
         return uavStatusMap;
+    }
+
+    @Override
+    public Map<String, UavStatusDto> getAllUavStatusByDeviceId() {
+        return deviceStatusMap;
     }
 }

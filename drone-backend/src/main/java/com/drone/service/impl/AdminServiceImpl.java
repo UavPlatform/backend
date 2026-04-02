@@ -78,7 +78,7 @@ public class AdminServiceImpl implements AdminService {
     public Uav[] getUav() {
         try {
             List<Uav> uavs = uavRepository.findAllUav();
-            return (Uav[]) uavs.toArray();
+            return uavs.toArray(new Uav[0]);
         } catch (Exception e) {
             log.error("查询所有无人机失败: {}", e.getMessage());
             throw new RuntimeException("查询失败，请稍后重试");

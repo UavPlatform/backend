@@ -18,6 +18,17 @@ public class UavVo {
     @Schema(description = "控制器型号")
     private String controllerModel;
 
+    @Schema(description = "是否可用(1可用,0禁用)")
+    private Character isAvailable;
+
+    public UavVo(Long id, String uavName, String djiId, String controllerModel, Character isAvailable) {
+        this.id = id;
+        this.uavName = uavName;
+        this.djiId = djiId;
+        this.controllerModel = controllerModel;
+        this.isAvailable = isAvailable;
+    }
+
     public UavVo(Long id, String uavName, String djiId, String controllerModel) {
         this.id = id;
         this.uavName = uavName;

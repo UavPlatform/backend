@@ -3,6 +3,7 @@ package com.drone.service.impl;
 import com.drone.service.LiveSessionService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -73,5 +74,12 @@ public class LiveSessionServiceImpl implements LiveSessionService {
         snapshot.setDeviceId(deviceId);
         snapshot.setUpdatedAt(System.currentTimeMillis());
         return snapshot;
+    }
+
+    @Override
+    public List<LiveSessionSnapshot> getAllRunningSessions() {
+        return sessions.values().stream()
+                .filter(snapshot -> snapshot.getState() == LiveSessionState.RUNNING)
+                .collect(java.util.stream.Collectors.toList());
     }
 }

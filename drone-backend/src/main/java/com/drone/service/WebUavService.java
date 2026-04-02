@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 public interface WebUavService {
     UavVo[] getUav();
 
+    UavVo[] getOnlineUav();
+
     WebUavStatusVo getUavStatus(String deviceId);
 
     Uav getRegisteredUav(String deviceId);

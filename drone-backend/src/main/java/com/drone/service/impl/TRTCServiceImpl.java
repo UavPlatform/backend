@@ -34,4 +34,12 @@ public class TRTCServiceImpl implements TRTCService {
     public String generateRoomId(String deviceId) {
         return "drone_" + deviceId;
     }
+
+    /**
+     * 获取SDK AppId
+     * @return SDK AppId
+     */
+    public long getSdkAppId() {
+        return sdkAppId;
+    }
 }

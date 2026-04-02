@@ -213,6 +213,7 @@ public class  WebLiveController {
             result.put("roomId", roomId);
             result.put("userId", webUserId);
             result.put("userSig", userSig);
+            result.put("sdkAppId", trtcService.getSdkAppId());
             result.put("wsUrl", buildWebSocketUrl(request, deviceId));
             result.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
             result.put("ackConfirmed", liveSessionService.isRunning(deviceId));

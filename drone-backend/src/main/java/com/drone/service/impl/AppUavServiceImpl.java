@@ -61,6 +61,7 @@ public class AppUavServiceImpl implements AppUavService {
             uav.setUavName(uavDto.getUavName());
             uav.setOnlineStatus(uavDto.getOnlineStatus());
             uav.setDjiId(uavDto.getDjiId());
+            uav.setIsAvailable('1');
             uav.setControllerModel(uavDto.getControllerModel());
             uavRepository.save(uav);
         }

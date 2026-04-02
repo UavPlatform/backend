@@ -1,6 +1,7 @@
 package com.drone.service;
 
 import com.drone.service.impl.LiveSessionSnapshot;
+import java.util.List;
 
 public interface LiveSessionService {
     LiveSessionSnapshot getSnapshot(String deviceId);
@@ -16,4 +17,6 @@ public interface LiveSessionService {
     void markFailed(String deviceId);
 
     void markStopped(String deviceId);
+    
+    List<LiveSessionSnapshot> getAllRunningSessions();
 }

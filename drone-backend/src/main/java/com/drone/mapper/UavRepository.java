@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 
 public interface UavRepository extends JpaRepository<Uav, Long> {
@@ -35,4 +36,12 @@ public interface UavRepository extends JpaRepository<Uav, Long> {
     @Modifying
     @Transactional
     void updateUavOnlineStatus(@Param("id") Long id, @Param("status") Character status);
+
+    @Query("UPDATE Uav u SET u.isAvailable = :isAvailable WHERE u.djiId = :djiId")
+    @Modifying
+    @Transactional
+    int updateUavAvailableByDjiId(@Param("djiId") String djiId, @Param("isAvailable") Character isAvailable);
+
+    @Query("SELECT u FROM Uav u")
+    List<Uav> findAllUav();
 }

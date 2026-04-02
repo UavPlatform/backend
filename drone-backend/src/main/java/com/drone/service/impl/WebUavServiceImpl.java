@@ -51,6 +51,11 @@ public class WebUavServiceImpl implements WebUavService {
     }
 
     @Override
+    public UavVo[] getOnlineUav() {
+        return uavRepository.findUavByOnlineStatus('1');
+    }
+
+    @Override
     public WebUavStatusVo getUavStatus(String deviceId) {
         Uav uav = getRegisteredUav(deviceId);
         UavStatusDto status = uavStatusService.getUavStatus(deviceId);

@@ -69,18 +69,28 @@ public class WebUavController {
             }
     )
     @GetMapping("/getUav")
-    public ResponseEntity<Map<String, Object>> getUav(){
-        log.info("web端查询目前所有的无人机");
+    public ResponseEntity<Map<String, Object>> getUav(@RequestParam(required = false, defaultValue = "false") Boolean onlineOnly){
+        log.info("web端查询无人机, 仅在线: {}", onlineOnly);
         Map<String, Object> result = new HashMap<>();
         try {
-            UavVo[] onlineUavVos = webUavService.getUav();
-            if (onlineUavVos == null || onlineUavVos.length == 0) {
-                result.put("success", false);
-                result.put("message", "系统暂时没有录入无人机");
+            UavVo[] uavVos;
+            if (onlineOnly != null && onlineOnly) {
+                uavVos = webUavService.getOnlineUav();
+                if (uavVos == null || uavVos.length == 0) {
+                    result.put("success", false);
+                    result.put("message", "暂时没有无人机在线");
+                    return ResponseEntity.ok(result);
+                }
             } else {
-                result.put("success", true);
-                result.put("uav", onlineUavVos);
+                uavVos = webUavService.getUav();
+                if (uavVos == null || uavVos.length == 0) {
+                    result.put("success", false);
+                    result.put("message", "系统暂时没有录入无人机");
+                    return ResponseEntity.ok(result);
+                }
             }
+            result.put("success", true);
+            result.put("uav", uavVos);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("查询无人机失败:{}", e.getMessage());

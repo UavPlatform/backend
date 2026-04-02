@@ -29,4 +29,7 @@ public class Uav {
     @Column(name = "controller_model")
     private String controllerModel;
 
+    @Column(name ="is_available")
+    private Character isAvailable;
+
 }

@@ -44,7 +44,7 @@ public class AppUavServiceImpl implements AppUavService {
         uav.setDjiId(djiId);
         uav.setControllerModel(uavDto.getControllerModel());
         uavRepository.save(uav);
-        return new UavVo(uav.getId(), uav.getUavName());
+        return new UavVo(uav.getId(), uav.getUavName(), uav.getDjiId(), uav.getControllerModel());
     }
 
     @Override

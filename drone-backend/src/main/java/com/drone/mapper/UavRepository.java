@@ -11,16 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface UavRepository extends JpaRepository<Uav, Long> {
 
-    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName) FROM Uav u WHERE u.uavName = :name")
+    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName, u.djiId, u.controllerModel) FROM Uav u WHERE u.uavName = :name")
     UavVo findUavByUavName(@Param("name") String uavName);
 
     @Query("SELECT MAX(u.id) FROM Uav u")
     Long findMaxId();
 
-    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName) FROM Uav u")
+    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName, u.djiId, u.controllerModel) FROM Uav u")
     UavVo[] getAll();
 
-    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName) FROM Uav u WHERE u.onlineStatus = :status")
+    @Query("SELECT new com.drone.pojo.vo.UavVo(u.id, u.uavName, u.djiId, u.controllerModel) FROM Uav u WHERE u.onlineStatus = :status")
     UavVo[] findUavByOnlineStatus(@Param("status") Character status);
 
     @Query("SELECT u FROM Uav u WHERE u.djiId = :djiId")

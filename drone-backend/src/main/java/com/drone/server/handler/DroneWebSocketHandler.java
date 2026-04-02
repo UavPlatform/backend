@@ -2,12 +2,14 @@ package com.drone.server.handler;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.drone.pojo.dto.UavStatusDto;
 import com.drone.pojo.dto.WsEnvelope;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.server.ws.handler.WsCommandAckResult;
+import com.drone.server.ws.handler.WsCommandResponseHandler;
+import com.drone.server.ws.handler.WsMessageHandler;
+import com.drone.server.ws.handler.WsMessageRouter;
+import com.drone.server.ws.service.WsMessageService;
 import com.drone.service.AppWebSocketService;
 import com.drone.service.LiveSessionService;
-import com.drone.service.UavStatusService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -27,6 +29,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import com.drone.server.exception.ApiErrorCode;
+import com.drone.server.ws.service.LiveWebSessionProvider;
+import com.drone.server.ws.service.LiveWebSessionService;
+
 @Component
 @Slf4j
 public class DroneWebSocketHandler extends TextWebSocketHandler {
@@ -35,14 +41,21 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
     private AppWebSocketService appWebSocketService;
 
     @Autowired
-    private UavStatusService uavStatusService;
-
-    @Autowired
     private LiveSessionService liveSessionService;
 
+    @Autowired
+    private WsMessageRouter messageRouter;
+
+    @Autowired
+    private WsMessageService messageService;
+
+    @Autowired
+    private WsCommandResponseHandler commandResponseHandler;
+
+    @Autowired
+    private LiveWebSessionService liveWebSessionService;
+
     private final Map<String, SessionInfo> sessions = new ConcurrentHashMap<>();
-    private final Map<String, WebSocketSession> liveWebSessions = new ConcurrentHashMap<>();
-    private final Map<String, PendingCommand> pendingCommands = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     private static final long TIMEOUT = 60000;
@@ -50,6 +63,10 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
 
     public DroneWebSocketHandler() {
         scheduler.scheduleAtFixedRate(this::checkSessions, HEARTBEAT_INTERVAL, HEARTBEAT_INTERVAL, TimeUnit.MILLISECONDS);
+    }
+
+    public Map<String, SessionInfo> getSessions() {
+        return sessions;
     }
 
     @Override
@@ -78,7 +95,7 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
         envelope.setTimestamp(System.currentTimeMillis());
         envelope.setSuccess(true);
         envelope.setMessage("连接成功");
-        sendEnvelope(session, envelope);
+        messageService.send(session, envelope);
     }
 
     @Override
@@ -87,162 +104,24 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
         updateActiveTime(session);
 
         try {
-            if ("ping".equalsIgnoreCase(payload.trim())) {
-                session.sendMessage(new TextMessage("pong"));
-                return;
-            }
 
             JSONObject json = JSON.parseObject(payload);
             if (json == null) {
-                sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "消息体不能为空");
+                messageService.sendError(session, ApiErrorCode.INVALID_MESSAGE, "消息体不能为空");
                 return;
             }
 
             String type = json.getString("type");
             if (type == null || type.isBlank()) {
-                sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "消息缺少 type");
+                messageService.sendError(session, ApiErrorCode.INVALID_MESSAGE, "消息缺少 type");
                 return;
             }
 
-            switch (type.toLowerCase()) {
-                case "event" -> handleEvent(json, session);
-                case "response", "error" -> handleCommandResponse(json, session);
-                default -> handleLegacyMessage(type, json, session);
-            }
+            messageRouter.route(json, session);
         } catch (Exception e) {
             log.warn("处理 App WebSocket 消息失败: {}", e.getMessage());
-            sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "无法解析 WebSocket 消息");
+            messageService.sendError(session, ApiErrorCode.INVALID_MESSAGE, "无法解析 WebSocket 消息");
         }
-    }
-
-    private void handleEvent(JSONObject json, WebSocketSession session) throws IOException {
-        String eventName = json.getString("name");
-        if (eventName == null || eventName.isBlank()) {
-            sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "event 消息缺少 name");
-            return;
-        }
-
-        switch (eventName.toUpperCase()) {
-            case "PING" -> handleEnvelopePing(json, session);
-            case "PONG" -> {
-                // 心跳已收到，activeTime 在入口已刷新
-            }
-            case "UAV_STATUS" -> handleUavStatus(json, session);
-            case "LIVE_STARTED" -> handleLiveStarted(json, session);
-            case "LIVE_STOPPED" -> handleLiveStopped(session);
-            default -> sendWsError(session, ApiErrorCode.UNSUPPORTED_MESSAGE, "暂不支持的 event: " + eventName);
-        }
-    }
-
-    private void handleLegacyMessage(String type, JSONObject json, WebSocketSession session) throws IOException {
-        if (isLegacyAckType(type, json)) {
-            handleCommandResponse(json, session);
-            return;
-        }
-
-        switch (type.toUpperCase()) {
-            case "PING" -> session.sendMessage(new TextMessage("pong"));
-            case "PONG" -> {
-                // 兼容旧协议心跳消息
-            }
-            case "UAV_STATUS" -> handleUavStatus(json, session);
-            case "LIVE_STARTED" -> handleLiveStarted(json, session);
-            case "LIVE_STOPPED" -> handleLiveStopped(session);
-            default -> sendWsError(session, ApiErrorCode.UNSUPPORTED_MESSAGE, "暂不支持的消息类型: " + type);
-        }
-    }
-
-    private void handleEnvelopePing(JSONObject json, WebSocketSession session) {
-        WsEnvelope pong = new WsEnvelope();
-        pong.setType("event");
-        pong.setName("PONG");
-        pong.setReplyTo(json.getString("id"));
-        pong.setDeviceId(getDeviceIdFromSession(session));
-        pong.setTimestamp(System.currentTimeMillis());
-        pong.setSuccess(true);
-        pong.setMessage("pong");
-        sendEnvelope(session, pong);
-    }
-
-    private void handleUavStatus(JSONObject json, WebSocketSession session) {
-        try {
-            String deviceId = getDeviceIdFromSession(session);
-            if (deviceId == null) {
-                return;
-            }
-
-            JSONObject data = extractData(json);
-            if (data == null) {
-                sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "UAV_STATUS 缺少 data");
-                return;
-            }
-
-            UavStatusDto status = data.toJavaObject(UavStatusDto.class);
-            status.setDeviceId(deviceId);
-            status.setReceivedAt(System.currentTimeMillis());
-            uavStatusService.updateUavStatus(deviceId, status);
-
-            sendToLiveWebClient(deviceId, status);
-            log.info("收到无人机 {} 的状态信息，操作：{}", status.getUavName(), status.getOperation());
-        } catch (Exception e) {
-            log.warn("处理无人机状态消息失败: {}", e.getMessage());
-            sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "无人机状态消息格式错误");
-        }
-    }
-
-    private void handleCommandResponse(JSONObject json, WebSocketSession session) {
-        String requestId = firstNonBlank(json.getString("replyTo"), json.getString("requestId"));
-        if (requestId == null || requestId.isBlank()) {
-            sendWsError(session, ApiErrorCode.INVALID_MESSAGE, "响应消息缺少 replyTo");
-            return;
-        }
-
-        PendingCommand pendingCommand = pendingCommands.remove(requestId);
-        if (pendingCommand == null) {
-            log.info("收到未知命令应答，requestId={}", requestId);
-            return;
-        }
-
-        WsCommandAckResult ackResult = new WsCommandAckResult();
-        ackResult.setRequestId(requestId);
-        ackResult.setSuccess(resolveAckSuccess(json));
-        ackResult.setCode(firstNonBlank(
-                json.getString("code"),
-                ackResult.isSuccess() ? "OK" : ApiErrorCode.LIVE_START_REJECTED.getCode()
-        ));
-        ackResult.setMessage(firstNonBlank(
-                json.getString("message"),
-                ackResult.isSuccess() ? "设备已确认命令" : "设备拒绝执行命令"
-        ));
-        pendingCommand.future.complete(ackResult);
-
-        if ("START_LIVE".equalsIgnoreCase(pendingCommand.commandName)) {
-            if (ackResult.isSuccess()) {
-                liveSessionService.markRunning(pendingCommand.deviceId, pendingCommand.roomId, requestId);
-            } else {
-                liveSessionService.markFailed(pendingCommand.deviceId);
-            }
-        }
-    }
-
-    private void handleLiveStarted(JSONObject json, WebSocketSession session) {
-        String deviceId = getDeviceIdFromSession(session);
-        if (deviceId == null) {
-            return;
-        }
-
-        JSONObject data = extractData(json);
-        String roomId = data != null ? data.getString("roomId") : json.getString("roomId");
-        String requestId = firstNonBlank(json.getString("replyTo"), json.getString("requestId"));
-        liveSessionService.markRunning(deviceId, roomId, requestId);
-    }
-
-    private void handleLiveStopped(WebSocketSession session) {
-        String deviceId = getDeviceIdFromSession(session);
-        if (deviceId == null) {
-            return;
-        }
-        liveSessionService.markStopped(deviceId);
     }
 
     public WsCommandAckResult sendStartLiveCommand(String deviceId, String roomId, String userId, String userSig, long ackTimeoutMillis, long startingTtlMillis) {
@@ -262,18 +141,18 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
         payload.setData(data);
 
         CompletableFuture<WsCommandAckResult> future = new CompletableFuture<>();
-        PendingCommand pendingCommand = new PendingCommand(
+        WsCommandResponseHandler.PendingCommand pendingCommand = new WsCommandResponseHandler.PendingCommand(
                 deviceId,
                 "START_LIVE",
                 roomId,
                 System.currentTimeMillis() + startingTtlMillis,
                 future
         );
-        pendingCommands.put(requestId, pendingCommand);
+        commandResponseHandler.addPendingCommand(requestId, pendingCommand);
         liveSessionService.markStarting(deviceId, roomId, requestId, startingTtlMillis);
 
         if (!sendMessage(deviceId, JSON.toJSONString(payload))) {
-            pendingCommands.remove(requestId);
+            commandResponseHandler.removePendingCommand(requestId);
             liveSessionService.markFailed(deviceId);
             WsCommandAckResult failed = new WsCommandAckResult();
             failed.setRequestId(requestId);
@@ -294,7 +173,7 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
             timeoutResult.setMessage(ApiErrorCode.LIVE_ACK_TIMEOUT.getDefaultMessage());
             return timeoutResult;
         } catch (Exception e) {
-            pendingCommands.remove(requestId);
+            commandResponseHandler.removePendingCommand(requestId);
             WsCommandAckResult failed = new WsCommandAckResult();
             failed.setRequestId(requestId);
             failed.setSuccess(false);
@@ -303,32 +182,21 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
             return failed;
         } finally {
             if (future.isDone()) {
-                pendingCommands.remove(requestId);
+                commandResponseHandler.removePendingCommand(requestId);
             }
         }
     }
 
-    private void sendToLiveWebClient(String deviceId, UavStatusDto status) {
-        WebSocketSession webSession = liveWebSessions.get(deviceId);
-        if (webSession != null && webSession.isOpen()) {
-            WsEnvelope envelope = new WsEnvelope();
-            envelope.setType("event");
-            envelope.setName("UAV_STATUS_UPDATE");
-            envelope.setDeviceId(deviceId);
-            envelope.setTimestamp(System.currentTimeMillis());
-            envelope.setData(status);
-            sendEnvelope(webSession, envelope);
-        }
-    }
-
     public void registerLiveWebSession(String deviceId, WebSocketSession session) {
-        liveWebSessions.put(deviceId, session);
-        log.info("Web端已注册为设备 {} 的直播客户端", deviceId);
+        liveWebSessionService.registerSession(deviceId, session);
     }
 
     public void removeLiveWebSession(String deviceId) {
-        liveWebSessions.remove(deviceId);
-        log.info("Web端已取消注册为设备 {} 的直播客户端", deviceId);
+        liveWebSessionService.removeSession(deviceId);
+    }
+
+    public Map<String, WebSocketSession> getLiveWebSessions() {
+        return null;
     }
 
     @Override
@@ -338,7 +206,7 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
             sessions.remove(deviceId);
             appWebSocketService.markAsDisconnected(deviceId);
             liveSessionService.markStopped(deviceId);
-            failPendingCommands(deviceId);
+            commandResponseHandler.failPendingCommands(deviceId);
             log.info("设备 {} 已断开连接", deviceId);
         }
     }
@@ -355,7 +223,7 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
                 sessions.remove(deviceId);
                 appWebSocketService.markAsDisconnected(deviceId);
                 liveSessionService.markStopped(deviceId);
-                failPendingCommands(deviceId);
+                commandResponseHandler.failPendingCommands(deviceId);
                 return false;
             }
         }
@@ -375,27 +243,10 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
                 }
                 appWebSocketService.markAsDisconnected(entry.getKey());
                 liveSessionService.markStopped(entry.getKey());
-                failPendingCommands(entry.getKey());
+                commandResponseHandler.failPendingCommands(entry.getKey());
                 return true;
             }
             return false;
-        });
-
-        pendingCommands.entrySet().removeIf(entry -> {
-            PendingCommand pendingCommand = entry.getValue();
-            if (currentTime <= pendingCommand.expiresAt) {
-                return false;
-            }
-
-            WsCommandAckResult timeoutResult = new WsCommandAckResult();
-            timeoutResult.setRequestId(entry.getKey());
-            timeoutResult.setSuccess(false);
-            timeoutResult.setTimedOut(true);
-            timeoutResult.setCode(ApiErrorCode.LIVE_ACK_TIMEOUT.getCode());
-            timeoutResult.setMessage(ApiErrorCode.LIVE_ACK_TIMEOUT.getDefaultMessage());
-            pendingCommand.future.complete(timeoutResult);
-            liveSessionService.markFailed(pendingCommand.deviceId);
-            return true;
         });
     }
 
@@ -428,102 +279,13 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
                 .getFirst("deviceId");
     }
 
-    private JSONObject extractData(JSONObject json) {
-        JSONObject data = json.getJSONObject("data");
-        if (data != null) {
-            return data;
-        }
-        return json.containsKey("uavId") ? json : null;
-    }
+    public static class SessionInfo {
+        public WebSocketSession session;
+        public long lastActiveTime;
 
-    private boolean resolveAckSuccess(JSONObject json) {
-        Boolean success = json.getBoolean("success");
-        if (success != null) {
-            return success;
-        }
-        return !"error".equalsIgnoreCase(json.getString("type"));
-    }
-
-    private String firstNonBlank(String... candidates) {
-        for (String candidate : candidates) {
-            if (candidate != null && !candidate.isBlank()) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    private void sendWsError(WebSocketSession session, ApiErrorCode errorCode, String message) {
-        if (session == null || !session.isOpen()) {
-            return;
-        }
-        WsEnvelope error = new WsEnvelope();
-        error.setType("error");
-        error.setName("ERROR");
-        error.setDeviceId(getDeviceIdFromSession(session));
-        error.setTimestamp(System.currentTimeMillis());
-        error.setSuccess(false);
-        error.setCode(errorCode.getCode());
-        error.setMessage(message);
-        sendEnvelope(session, error);
-    }
-
-    private void failPendingCommands(String deviceId) {
-        pendingCommands.entrySet().removeIf(entry -> {
-            PendingCommand pendingCommand = entry.getValue();
-            if (!pendingCommand.deviceId.equals(deviceId)) {
-                return false;
-            }
-
-            WsCommandAckResult failed = new WsCommandAckResult();
-            failed.setRequestId(entry.getKey());
-            failed.setSuccess(false);
-            failed.setCode(ApiErrorCode.UAV_NOT_CONNECTED.getCode());
-            failed.setMessage(ApiErrorCode.UAV_NOT_CONNECTED.getDefaultMessage());
-            pendingCommand.future.complete(failed);
-            return true;
-        });
-    }
-
-    private void sendEnvelope(WebSocketSession session, WsEnvelope envelope) {
-        try {
-            session.sendMessage(new TextMessage(JSON.toJSONString(envelope)));
-        } catch (IOException e) {
-            log.warn("发送 WebSocket 消息失败: {}", e.getMessage());
-        }
-    }
-
-    private boolean isLegacyAckType(String type, JSONObject json) {
-        if ("START_LIVE_ACK".equalsIgnoreCase(type) || "START_LIVE_RESPONSE".equalsIgnoreCase(type)) {
-            return true;
-        }
-        return (json.containsKey("replyTo") || json.containsKey("requestId"))
-                && (json.containsKey("success") || json.containsKey("code") || json.containsKey("message"));
-    }
-
-    private static class SessionInfo {
-        WebSocketSession session;
-        long lastActiveTime;
-
-        SessionInfo(WebSocketSession session, long lastActiveTime) {
+        public SessionInfo(WebSocketSession session, long lastActiveTime) {
             this.session = session;
             this.lastActiveTime = lastActiveTime;
-        }
-    }
-
-    private static class PendingCommand {
-        final String deviceId;
-        final String commandName;
-        final String roomId;
-        final long expiresAt;
-        final CompletableFuture<WsCommandAckResult> future;
-
-        PendingCommand(String deviceId, String commandName, String roomId, long expiresAt, CompletableFuture<WsCommandAckResult> future) {
-            this.deviceId = deviceId;
-            this.commandName = commandName;
-            this.roomId = roomId;
-            this.expiresAt = expiresAt;
-            this.future = future;
         }
     }
 }

@@ -70,7 +70,7 @@ public class WebUavController {
     )
     @GetMapping("/getUav")
     public ResponseEntity<Map<String, Object>> getUav(){
-        log.info("手机端查询目前所有的无人机");
+        log.info("web端查询目前所有的无人机");
         Map<String, Object> result = new HashMap<>();
         try {
             UavVo[] onlineUavVos = webUavService.getUav();

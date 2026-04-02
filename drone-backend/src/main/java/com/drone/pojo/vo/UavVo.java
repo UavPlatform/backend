@@ -12,9 +12,17 @@ public class UavVo {
     @Schema(description = "uavName")
     private String uavName;
 
-    public UavVo(Long id, String uavName) {
+    @Schema(description = "设备ID(DJI ID)")
+    private String djiId;
+
+    @Schema(description = "控制器型号")
+    private String controllerModel;
+
+    public UavVo(Long id, String uavName, String djiId, String controllerModel) {
         this.id = id;
         this.uavName = uavName;
+        this.djiId = djiId;
+        this.controllerModel = controllerModel;
     }
 
     public UavVo() {

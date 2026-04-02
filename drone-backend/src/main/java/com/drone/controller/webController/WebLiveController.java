@@ -6,7 +6,7 @@ import com.drone.server.exception.ApiErrorCode;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.exception.UnauthorizedException;
 import com.drone.server.handler.DroneWebSocketHandler;
-import com.drone.server.handler.WsCommandAckResult;
+import com.drone.server.ws.handler.WsCommandAckResult;
 import com.drone.server.util.UserContext;
 import com.drone.service.AppWebSocketService;
 import com.drone.service.LiveSessionService;
@@ -22,7 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;

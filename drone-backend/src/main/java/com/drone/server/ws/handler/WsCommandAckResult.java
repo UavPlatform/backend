@@ -1,4 +1,4 @@
-package com.drone.server.handler;
+package com.drone.server.ws.handler;
 
 import lombok.Data;
 

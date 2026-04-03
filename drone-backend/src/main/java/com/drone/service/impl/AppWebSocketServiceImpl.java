@@ -51,7 +51,7 @@ public class AppWebSocketServiceImpl implements AppWebSocketService {
      * @param deviceId 设备ID
      */
     public void markAsDisconnected(String deviceId) {
-        connectedDevices.put(deviceId, false);
+        connectedDevices.remove(deviceId);
     }
 
     /**

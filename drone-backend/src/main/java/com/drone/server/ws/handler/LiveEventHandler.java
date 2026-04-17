@@ -41,8 +41,9 @@ public class LiveEventHandler implements WsMessageHandler {
             return;
         }
 
-        String deviceId = getDeviceId(session);
+        String deviceId = WsSessionDeviceIdResolver.resolve(session, json);
         if (deviceId == null) {
+            log.warn("处理 {} 时未解析到 deviceId", eventName);
             return;
         }
 
@@ -64,10 +65,6 @@ public class LiveEventHandler implements WsMessageHandler {
     private void handleLiveStopped(String deviceId) {
         liveSessionService.markStopped(deviceId);
         log.info("设备 {} 直播已停止", deviceId);
-    }
-
-    private String getDeviceId(WebSocketSession session) {
-        return (String) session.getAttributes().get("deviceId");
     }
 
     private JSONObject extractData(JSONObject json) {

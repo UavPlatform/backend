@@ -27,7 +27,7 @@ public class PingHandler implements WsMessageHandler {
 
     @Override
     public void handle(JSONObject json, WebSocketSession session) {
-        String deviceId = getDeviceId(session);
+        String deviceId = WsSessionDeviceIdResolver.resolve(session, json);
         WsEnvelope pong = new WsEnvelope();
         pong.setType("event");
         pong.setName("PONG");
@@ -37,9 +37,5 @@ public class PingHandler implements WsMessageHandler {
         pong.setSuccess(true);
         pong.setMessage("pong");
         messageService.send(session, pong);
-    }
-
-    private String getDeviceId(WebSocketSession session) {
-        return (String) session.getAttributes().get("deviceId");
     }
 }

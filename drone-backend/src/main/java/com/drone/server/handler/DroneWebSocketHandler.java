@@ -84,6 +84,7 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
+        session.getAttributes().put("deviceId", deviceId);
         sessions.put(deviceId, new SessionInfo(session, System.currentTimeMillis()));
         appWebSocketService.markAsConnected(deviceId);
         log.info("设备 {} 已连接", deviceId);
@@ -261,6 +262,11 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
     }
 
     private String getDeviceIdFromSession(WebSocketSession session) {
+        String deviceId = (String) session.getAttributes().get("deviceId");
+        if (deviceId != null && !deviceId.isBlank()) {
+            return deviceId;
+        }
+
         for (Map.Entry<String, SessionInfo> entry : sessions.entrySet()) {
             if (entry.getValue().session.equals(session)) {
                 return entry.getKey();

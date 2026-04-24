@@ -1,6 +1,7 @@
 package com.drone.controller.adminController;
 
 import com.drone.pojo.entity.Uav;
+import com.drone.pojo.result.Result;
 import com.drone.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -9,10 +10,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,29 +46,20 @@ public class UavManagementController {
             }
     )
     @PostMapping("/available")
-    public ResponseEntity<Map<String, Object>> updateUavAvailable(@RequestParam String deviceId, @RequestParam Character isAvailable){
+    public Result<?> updateUavAvailable(@RequestParam String deviceId, @RequestParam Character isAvailable){
         log.info("修改无人机ID：{}的可用状态为：{}", deviceId, isAvailable);
-        Map<String, Object> result = new HashMap<>();
         try {
             boolean updated = adminService.updateUavAvailable(deviceId, isAvailable);
-            result.put("success", updated);
-            result.put("message", updated ? "修改成功" : "修改失败");
-            return ResponseEntity.ok(result);
+            return updated ? Result.success("修改成功") : Result.fail("修改失败");
         } catch (IllegalArgumentException e) {
             log.error("参数错误: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return Result.fail(400, e.getMessage());
         } catch (RuntimeException e) {
             log.error("修改无人机可用状态失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(404).body(result);
+            return Result.fail(404, e.getMessage());
         } catch (Exception e) {
             log.error("修改无人机可用状态失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", "修改失败，请稍后重试");
-            return ResponseEntity.status(500).body(result);
+            return Result.fail(500, "修改失败，请稍后重试");
         }
     }
 
@@ -102,24 +92,18 @@ public class UavManagementController {
             }
     )
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getAllUav(){
+    public Result<?> getAllUav(){
         log.info("管理端查询所有无人机详细信息");
-        Map<String, Object> result = new HashMap<>();
         try {
             var uavs = adminService.getUav();
             if (uavs == null || uavs.length == 0) {
-                result.put("success", false);
-                result.put("message", "系统暂时没有录入无人机");
+                return Result.fail("系统暂时没有录入无人机");
             } else {
-                result.put("success", true);
-                result.put("data", uavs);
+                return Result.success(uavs);
             }
-            return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("查询无人机失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return Result.fail(e.getMessage());
         }
     }
 
@@ -152,24 +136,18 @@ public class UavManagementController {
             }
     )
     @GetMapping("/live")
-    public ResponseEntity<Map<String, Object>> getLiveUav(){
+    public Result<?> getLiveUav(){
         log.info("管理端查询当前正在直播的无人机");
-        Map<String, Object> result = new HashMap<>();
         try {
             List<Map<String, Object>> liveUavList = adminService.getLiveUav();
             if (liveUavList == null || liveUavList.isEmpty()) {
-                result.put("success", false);
-                result.put("message", "当前没有正在直播的无人机");
+                return Result.fail("当前没有正在直播的无人机");
             } else {
-                result.put("success", true);
-                result.put("data", liveUavList);
+                return Result.success(liveUavList);
             }
-            return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("查询直播无人机失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return Result.fail(e.getMessage());
         }
     }
 
@@ -195,29 +173,20 @@ public class UavManagementController {
             }
     )
     @GetMapping("/detail")
-    public ResponseEntity<Map<String, Object>> getUavDetail(@RequestParam String deviceId){
+    public Result<Uav> getUavDetail(@RequestParam String deviceId){
         log.info("管理端查询无人机详情，设备ID：{}", deviceId);
-        Map<String, Object> result = new HashMap<>();
         try {
             Uav uav = adminService.getUavByDeviceId(deviceId);
-            result.put("success", true);
-            result.put("data", uav);
-            return ResponseEntity.ok(result);
+            return Result.success(uav);
         } catch (IllegalArgumentException e) {
             log.error("参数错误: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return Result.fail(400, e.getMessage());
         } catch (RuntimeException e) {
             log.error("查询无人机详情失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(404).body(result);
+            return Result.fail(404, e.getMessage());
         } catch (Exception e) {
             log.error("查询无人机详情失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(500).body(result);
+            return Result.fail(500, e.getMessage());
         }
     }
 
@@ -239,19 +208,14 @@ public class UavManagementController {
             }
     )
     @GetMapping("/statistics")
-    public ResponseEntity<Map<String, Object>> getStatistics(){
+    public Result<Map<String, Object>> getStatistics(){
         log.info("管理端查询统计信息");
-        Map<String, Object> result = new HashMap<>();
         try {
             Map<String, Object> statistics = adminService.getAdminStatistics();
-            result.put("success", true);
-            result.put("data", statistics);
-            return ResponseEntity.ok(result);
+            return Result.success(statistics);
         } catch (Exception e) {
             log.error("获取统计信息失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(500).body(result);
+            return Result.fail(500, e.getMessage());
         }
     }
 }

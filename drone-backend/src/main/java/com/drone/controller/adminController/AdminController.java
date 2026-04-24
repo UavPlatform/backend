@@ -2,6 +2,7 @@ package com.drone.controller.adminController;
 
 import com.drone.pojo.dto.AdminDto;
 import com.drone.pojo.entity.Admin;
+import com.drone.pojo.result.Result;
 import com.drone.server.annotation.SkipJwt;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.exception.UnauthorizedException;
@@ -14,8 +15,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -63,43 +62,29 @@ public class AdminController {
     )
     @SkipJwt
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> adminLogin(@RequestBody AdminDto adminDto) {
+    public Result<Map<String, Object>> adminLogin(@RequestBody AdminDto adminDto) {
         log.info("管理端登录Name：{}", adminDto.getName());
         try {
             Admin admin = adminService.tryToLogin(adminDto);
             String token = jwtUtil.generateToken(admin.getName());
-            
+
             Map<String, Object> adminInfo = new HashMap<>();
             adminInfo.put("id", admin.getId());
             adminInfo.put("name", admin.getName());
             adminInfo.put("phoneNumber", admin.getPhoneNumber());
-            
+
             Map<String, Object> data = new HashMap<>();
             data.put("token", token);
             data.put("admin", adminInfo);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("data", data);
-            response.put("message", "登录成功");
-            
-            return ResponseEntity.ok(response);
+
+            return Result.success("登录成功", data);
         } catch (UnauthorizedException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            return Result.fail(401, e.getMessage());
         } catch (BusinessException e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(e.getHttpStatus()).body(response);
+            return Result.fail(e.getHttpStatus().value(), e.getMessage());
         } catch (Exception e) {
             log.error("登录失败: {}", e.getMessage());
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "登录失败，请稍后重试");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            return Result.fail(500, "登录失败，请稍后重试");
         }
     }
 }

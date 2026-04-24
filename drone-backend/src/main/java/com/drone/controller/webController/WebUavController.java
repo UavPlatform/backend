@@ -173,7 +173,6 @@ public class WebUavController {
         try {
             // 创建分页参数
             Pageable pageable = PageRequest.of(page, size);
-            
             // 查询用户直播记录
             Page<UserRecord> recordPage = webUavService.getUserRecord(userName, pageable);
             result.put("success", true);

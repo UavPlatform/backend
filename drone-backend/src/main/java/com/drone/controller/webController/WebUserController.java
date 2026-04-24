@@ -42,7 +42,7 @@ public class WebUserController {
 
     @Autowired
     private JwtUtil jwtUtil;
-    
+
     @Autowired
     private UserRecordRepository userRecordRepository;
 
@@ -84,12 +84,12 @@ public class WebUserController {
     public ResponseEntity<Map<String, Object>> login(@RequestBody UserLoginDto userLoginDto) {
         //暂时未加密密码，后期添加
         log.info("用户登录请求: userName={}", userLoginDto.getUserName());
-        Map<String, Object> result = new HashMap<>();
         User user = loginService.tryToLogin(userLoginDto);
+        Map<String, Object> result = new HashMap<>();
         if (user != null) {
-            String idStr = user.getId().toString();
-            String token = jwtUtil.generateToken(idStr);
-            String refreshToken = jwtUtil.generateRefreshToken(idStr);
+            String userName = user.getUserName();
+            String token = jwtUtil.generateToken(userName);
+            String refreshToken = jwtUtil.generateRefreshToken(userName);
             result.put("success", true);
             result.put("token", token);
             result.put("refreshToken", refreshToken);
@@ -262,7 +262,7 @@ public class WebUserController {
     public ResponseEntity<Map<String, Object>> getLiveRecords(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         log.info("查询用户直播记录: page={}, size={}", page, size);
         Map<String, Object> result = new HashMap<>();
-        
+
         try {
             // 获取当前登录用户
             String userName = UserContext.getUsername();
@@ -271,10 +271,10 @@ public class WebUserController {
                 result.put("message", "用户未登录");
                 return ResponseEntity.status(401).body(result);
             }
-            
+
             // 创建分页参数
             Pageable pageable = PageRequest.of(page, size);
-            
+
             // 查询用户直播记录
             Page<UserRecord> recordPage = userRecordRepository.findAllByUserName(userName, pageable);
             result.put("success", true);

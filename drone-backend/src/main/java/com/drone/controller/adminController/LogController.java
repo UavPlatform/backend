@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -45,19 +44,19 @@ public class LogController {
             }
     )
     @GetMapping("/application")
-    public ResponseEntity<Map<String, Object>> getApplicationLogs(@RequestParam(defaultValue = "100") int lines){
+    public Map<String, Object> getApplicationLogs(@RequestParam(defaultValue = "100") int lines){
         log.info("获取应用日志，行数：{}", lines);
         Map<String, Object> result = new HashMap<>();
         try {
             List<String> logs = logService.getApplicationLogs(lines);
             result.put("success", true);
             result.put("logs", logs);
-            return ResponseEntity.ok(result);
+            return result;
         } catch (Exception e) {
             log.error("获取应用日志失败: {}", e.getMessage());
             result.put("success", false);
             result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return result;
         }
     }
 
@@ -79,19 +78,19 @@ public class LogController {
             }
     )
     @GetMapping("/error")
-    public ResponseEntity<Map<String, Object>> getErrorLogs(@RequestParam(defaultValue = "100") int lines){
+    public Map<String, Object> getErrorLogs(@RequestParam(defaultValue = "100") int lines){
         log.info("获取错误日志，行数：{}", lines);
         Map<String, Object> result = new HashMap<>();
         try {
             List<String> logs = logService.getErrorLogs(lines);
             result.put("success", true);
             result.put("logs", logs);
-            return ResponseEntity.ok(result);
+            return result;
         } catch (Exception e) {
             log.error("获取错误日志失败: {}", e.getMessage());
             result.put("success", false);
             result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
+            return result;
         }
     }
 }

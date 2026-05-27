@@ -1,18 +1,20 @@
 package com.drone.service.impl;
 
-import com.alibaba.fastjson.JSON;
 import com.drone.mapper.RouteRepository;
 import com.drone.pojo.dto.RouteDto;
-import com.drone.pojo.dto.WaypointDto;
 import com.drone.pojo.entity.Route;
 import com.drone.pojo.entity.RouteWaypoint;
-import com.drone.pojo.dto.WsEnvelope;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.handler.DroneWebSocketHandler;
+import com.drone.server.util.LogMaskUtil;
+import com.drone.server.util.RouteIdGenerator;
+import com.drone.server.ws.handler.WsCommandAckResult;
 import com.drone.service.RouteService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +55,7 @@ public class RouteServiceImpl implements RouteService {
         }
 
         Route route = new Route();
+        route.setRouteNum(RouteIdGenerator.generate(userName));
         route.setRouteName(routeDto.getRouteName());
         route.setDjiId(routeDto.getDjiId());
         route.setUserName(userName);
@@ -78,25 +81,44 @@ public class RouteServiceImpl implements RouteService {
         route.setWaypoints(waypoints);
 
         Route saved = routeRepository.save(route);
-        log.info("用户 {} 保存航线 {} 成功，包含 {} 个航点", userName, routeDto.getRouteName(), waypoints.size());
+        log.info("航线保存成功，编号: {}, 用户: {}, 包含 {} 个航点",
+                saved.getRouteNum(), LogMaskUtil.maskUserName(userName), waypoints.size());
         return saved;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Route> getRoutesByUser(String userName) {
-        return routeRepository.findByUserNameOrderByCreateTimeDesc(userName);
+        List<Route> routes = routeRepository.findByUserNameOrderByCreateTimeDesc(userName);
+        routes.forEach(route -> route.getWaypoints().size());
+        return routes;
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<Route> getRoutesByUser(String userName, int page, int size) {
+        Page<Route> routePage = routeRepository.findByUserNameOrderByCreateTimeDesc(userName, PageRequest.of(page, size));
+        for (Route route : routePage.getContent()) {
+            route.getWaypoints().size();
+        }
+        return routePage;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Route> getRoutesByDjiId(String djiId) {
-        return routeRepository.findByDjiIdOrderByCreateTimeDesc(djiId);
+        List<Route> routes = routeRepository.findByDjiIdOrderByCreateTimeDesc(djiId);
+        routes.forEach(route -> route.getWaypoints().size());
+        return routes;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Route> getRoutesByUserAndDjiId(String userName, String djiId) {
-        return routeRepository.findByUserNameAndDjiIdOrderByCreateTimeDesc(userName, djiId);
+        List<Route> routes = routeRepository.findByUserNameAndDjiIdOrderByCreateTimeDesc(userName, djiId);
+        routes.forEach(route -> route.getWaypoints().size());
+        return routes;
     }
-
 
     @Transactional
     @Override
@@ -107,43 +129,56 @@ public class RouteServiceImpl implements RouteService {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.INVALID_PARAM, "无权删除该航线");
         }
         routeRepository.delete(route);
-        log.info("用户 {} 删除航线 {} 成功", userName, route.getRouteName());
+        log.info("航线删除成功，编号: {}, 用户: {}",
+                route.getRouteNum(), LogMaskUtil.maskUserName(userName));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<Route> getAllRoutes() {
         return routeRepository.findAll();
     }
 
     @Override
-    public boolean assignRouteToUav(long id) {
-        Route route = routeRepository.findById((long) id)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "航线不存在"));
-        
-        // websocket
-        WsEnvelope envelope = new WsEnvelope();
-        envelope.setType("command");
-        envelope.setName("EXECUTE_ROUTE");
-        envelope.setDeviceId(route.getDjiId());
-        envelope.setTimestamp(System.currentTimeMillis());
-        
+    @Transactional(readOnly = true)
+    public Route getRouteByRouteNum(String routeNum, String userName) {
+        Route route = routeRepository.findByRouteNum(routeNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
+        if (!route.getUserName().equals(userName)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权查看此航线");
+        }
+        // 强制初始化懒加载的 waypoints 集合
+        route.getWaypoints().size();
+        return route;
+    }
+
+    @Override
+    public WsCommandAckResult assignRouteToUav(String routeNum, String userName) {
+        Route route = routeRepository.findByRouteNum(routeNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
+
+        if (!route.getUserName().equals(userName)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权执行此航线");
+        }
+
         Map<String, Object> data = new HashMap<>();
         data.put("routeId", route.getId());
         data.put("routeName", route.getRouteName());
         data.put("waypoints", route.getWaypoints());
         data.put("defaultSpeed", route.getDefaultSpeed());
         data.put("defaultHeight", route.getDefaultHeight());
-        envelope.setData(data);
-        
 
-        boolean success = droneWebSocketHandler.sendMessage(route.getDjiId(), JSON.toJSONString(envelope));
-        
-        if (success) {
-            log.info("航线执行命令发送成功，航线ID: {}, 无人机ID: {}", route.getId(), route.getDjiId());
+        WsCommandAckResult result = droneWebSocketHandler.sendCommandWithAck(
+                route.getDjiId(), "EXECUTE_ROUTE", data, 60000);
+
+        if (result.isSuccess()) {
+            log.info("航线执行成功，编号: {}, 无人机: {}", routeNum, route.getDjiId());
+        } else if (result.isTimedOut()) {
+            log.warn("航线执行超时，编号: {}, 无人机: {}", routeNum, route.getDjiId());
         } else {
-            log.warn("航线执行命令发送失败，航线ID: {}, 无人机ID: {}", route.getId(), route.getDjiId());
+            log.warn("航线执行失败，编号: {}, 无人机: {}, 原因: {}", routeNum, route.getDjiId(), result.getMessage());
         }
-        
-        return success;
+
+        return result;
     }
 }

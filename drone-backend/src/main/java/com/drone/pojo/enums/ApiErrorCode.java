@@ -1,4 +1,4 @@
-package com.drone.server.exception;
+package com.drone.pojo.enums;
 
 public enum ApiErrorCode {
     INVALID_PARAM("INVALID_PARAM", "请求参数不合法"),
@@ -13,6 +13,11 @@ public enum ApiErrorCode {
     TRTC_CREDENTIAL_FAILED("TRTC_CREDENTIAL_FAILED", "生成图传凭据失败"),
     INVALID_MESSAGE("INVALID_MESSAGE", "WebSocket 消息格式错误"),
     UNSUPPORTED_MESSAGE("UNSUPPORTED_MESSAGE", "暂不支持的 WebSocket 消息类型"),
+    RATE_LIMITED("RATE_LIMITED", "请求过于频繁，请稍后重试"),
+    ORDER_ALREADY_EXISTS("ORDER_ALREADY_EXISTS", "您已有待支付的订单，请先完成支付"),
+    ORDER_NOT_FOUND("ORDER_NOT_FOUND", "订单不存在"),
+    ORDER_STATUS_INVALID("ORDER_STATUS_INVALID", "当前订单状态不允许此操作"),
+    ROUTE_NOT_FOUND("ROUTE_NOT_FOUND", "未查询到航线信息，请先创建航线"),
     INTERNAL_ERROR("INTERNAL_ERROR", "系统内部错误");
 
     private final String code;

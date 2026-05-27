@@ -1,5 +1,6 @@
 package com.drone.pojo.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -13,6 +14,7 @@ public class RouteWaypoint {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id", nullable = false)
+    @JsonIgnore
     private Route route;
 
     @Column(name = "waypoint_order", nullable = false)

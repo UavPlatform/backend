@@ -5,7 +5,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.drone.pojo.dto.WsEnvelope;
 import com.drone.server.ws.handler.WsCommandAckResult;
 import com.drone.server.ws.handler.WsCommandResponseHandler;
-import com.drone.server.ws.handler.WsMessageHandler;
 import com.drone.server.ws.handler.WsMessageRouter;
 import com.drone.server.ws.service.WsMessageService;
 import com.drone.service.AppWebSocketService;
@@ -29,8 +28,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.drone.server.exception.ApiErrorCode;
-import com.drone.server.ws.service.LiveWebSessionProvider;
+import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.ws.service.LiveWebSessionService;
 
 @Component
@@ -123,6 +121,72 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
             log.warn("处理 App WebSocket 消息失败: {}", e.getMessage());
             messageService.sendError(session, ApiErrorCode.INVALID_MESSAGE, "无法解析 WebSocket 消息");
         }
+    }
+
+    public WsCommandAckResult sendCommandWithAck(String deviceId, String commandName, Map<String, Object> data, long ackTimeoutMillis) {
+        if (!isDeviceConnected(deviceId)) {
+            WsCommandAckResult offline = new WsCommandAckResult();
+            offline.setRequestId(null);
+            offline.setSuccess(false);
+            offline.setCode(ApiErrorCode.UAV_NOT_CONNECTED.getCode());
+            offline.setMessage(ApiErrorCode.UAV_NOT_CONNECTED.getDefaultMessage());
+            return offline;
+        }
+
+        String requestId = UUID.randomUUID().toString();
+
+        WsEnvelope payload = new WsEnvelope();
+        payload.setId(requestId);
+        payload.setType("command");
+        payload.setName(commandName);
+        payload.setDeviceId(deviceId);
+        payload.setTimestamp(System.currentTimeMillis());
+        payload.setData(data);
+
+        CompletableFuture<WsCommandAckResult> future = new CompletableFuture<>();
+        WsCommandResponseHandler.PendingCommand pendingCommand = new WsCommandResponseHandler.PendingCommand(
+                deviceId, commandName, null, System.currentTimeMillis() + ackTimeoutMillis, future
+        );
+        commandResponseHandler.addPendingCommand(requestId, pendingCommand);
+
+        if (!sendMessage(deviceId, JSON.toJSONString(payload))) {
+            commandResponseHandler.removePendingCommand(requestId);
+            WsCommandAckResult failed = new WsCommandAckResult();
+            failed.setRequestId(requestId);
+            failed.setSuccess(false);
+            failed.setCode(ApiErrorCode.UAV_NOT_CONNECTED.getCode());
+            failed.setMessage("指令发送失败，设备可能已断开");
+            return failed;
+        }
+
+        try {
+            return future.get(ackTimeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            WsCommandAckResult timeoutResult = new WsCommandAckResult();
+            timeoutResult.setRequestId(requestId);
+            timeoutResult.setSuccess(false);
+            timeoutResult.setTimedOut(true);
+            timeoutResult.setCode(ApiErrorCode.LIVE_ACK_TIMEOUT.getCode());
+            timeoutResult.setMessage("设备未在超时时间内确认指令");
+            return timeoutResult;
+        } catch (Exception e) {
+            commandResponseHandler.removePendingCommand(requestId);
+            WsCommandAckResult failed = new WsCommandAckResult();
+            failed.setRequestId(requestId);
+            failed.setSuccess(false);
+            failed.setCode(ApiErrorCode.INTERNAL_ERROR.getCode());
+            failed.setMessage("等待设备确认失败");
+            return failed;
+        } finally {
+            if (future.isDone()) {
+                commandResponseHandler.removePendingCommand(requestId);
+            }
+        }
+    }
+
+    public boolean isDeviceConnected(String deviceId) {
+        SessionInfo info = sessions.get(deviceId);
+        return info != null && info.session.isOpen();
     }
 
     public WsCommandAckResult sendStartLiveCommand(String deviceId, String roomId, String userId, String userSig, long ackTimeoutMillis, long startingTtlMillis) {

@@ -47,7 +47,6 @@ public class WebUavController {
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            // 直接用字符串数组，兼容所有版本
                                             examples = {
                                                     "{\"success\": true, \"uav\": [{\"id\": 1, \"uavName\": \"无人机1\"}, {\"id\": 2, \"uavName\": \"无人机2\"}]}",
                                                     "{\"success\": false, \"message\": \"暂时没有无人机在线\"}"

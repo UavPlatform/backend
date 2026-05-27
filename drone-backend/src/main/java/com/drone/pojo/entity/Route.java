@@ -14,6 +14,9 @@ public class Route {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "route_num", unique = true, length = 64)
+    private String routeNum;
+
     @Column(name = "route_name", nullable = false)
     private String routeName;
 

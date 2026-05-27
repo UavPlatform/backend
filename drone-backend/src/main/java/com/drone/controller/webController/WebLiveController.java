@@ -2,7 +2,7 @@ package com.drone.controller.webController;
 
 import com.drone.mapper.UserRecordRepository;
 import com.drone.pojo.entity.UserRecord;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.exception.UnauthorizedException;
 import com.drone.server.handler.DroneWebSocketHandler;

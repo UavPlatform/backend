@@ -1,4 +1,4 @@
-package com.drone.service.impl;
+package com.drone.pojo.enums;
 
 public enum LiveSessionState {
     IDLE,

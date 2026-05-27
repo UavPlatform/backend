@@ -3,7 +3,7 @@ package com.drone.server.ws.handler;
 import com.alibaba.fastjson.JSONObject;
 import com.drone.pojo.dto.UavStatusDto;
 import com.drone.pojo.dto.WsEnvelope;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.ws.service.WsMessageService;
 import com.drone.server.ws.service.LiveWebSessionProvider;
 import com.drone.server.ws.service.LiveWebSessionService;

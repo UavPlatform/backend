@@ -2,12 +2,17 @@ package com.drone.service;
 
 import com.drone.pojo.dto.RouteDto;
 import com.drone.pojo.entity.Route;
+import com.drone.server.ws.handler.WsCommandAckResult;
+import org.springframework.data.domain.Page;
+
 import java.util.List;
 
 public interface RouteService {
     Route saveRoute(RouteDto routeDto, String userName);
 
     List<Route> getRoutesByUser(String userName);
+
+    Page<Route> getRoutesByUser(String userName, int page, int size);
 
     List<Route> getRoutesByDjiId(String djiId);
 
@@ -17,5 +22,7 @@ public interface RouteService {
 
     List<Route> getAllRoutes();
 
-    boolean assignRouteToUav(long id);
+    Route getRouteByRouteNum(String routeNum, String userName);
+
+    WsCommandAckResult assignRouteToUav(String routeNum, String userName);
 }

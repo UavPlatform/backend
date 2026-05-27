@@ -1,5 +1,6 @@
 package com.drone.server.exception;
 
+import com.drone.pojo.enums.ApiErrorCode;
 import org.springframework.http.HttpStatus;
 
 public class BusinessException extends RuntimeException {

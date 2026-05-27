@@ -1,7 +1,7 @@
 package com.drone.server.ws.handler;
 
 import com.alibaba.fastjson.JSONObject;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.ws.service.WsMessageService;
 import com.drone.service.LiveSessionService;
 import lombok.extern.slf4j.Slf4j;

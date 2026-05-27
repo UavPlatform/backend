@@ -2,7 +2,7 @@ package com.drone.server.ws.service;
 
 import com.alibaba.fastjson.JSON;
 import com.drone.pojo.dto.WsEnvelope;
-import com.drone.server.exception.ApiErrorCode;
+import com.drone.pojo.enums.ApiErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;

@@ -9,36 +9,41 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Result<T> {
 
-
     private boolean success;
 
     private Integer code;
+
+    private String errorCode;
 
     private String message;
 
     private T data;
 
     public static <T> Result<T> success() {
-        return new Result<>(true, 200, "操作成功", null);
+        return new Result<>(true, 200, null, "操作成功", null);
     }
 
     public static <T> Result<T> success(T data) {
-        return new Result<>(true, 200, "操作成功", data);
+        return new Result<>(true, 200, null, "操作成功", data);
     }
 
     public static <T> Result<T> success(String message, T data) {
-        return new Result<>(true, 200, message, data);
+        return new Result<>(true, 200, null, message, data);
     }
 
     public static <T> Result<T> success(String message) {
-        return new Result<>(true, 200, message, null);
+        return new Result<>(true, 200, null, message, null);
     }
 
     public static <T> Result<T> fail(Integer code, String message) {
-        return new Result<>(false, code, message, null);
+        return new Result<>(false, code, null, message, null);
+    }
+
+    public static <T> Result<T> fail(Integer code, String errorCode, String message) {
+        return new Result<>(false, code, errorCode, message, null);
     }
 
     public static <T> Result<T> fail(String message) {
-        return new Result<>(false, 400, message, null);
+        return new Result<>(false, 400, null, message, null);
     }
 }

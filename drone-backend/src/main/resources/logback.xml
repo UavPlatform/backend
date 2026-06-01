@@ -1,109 +1,173 @@
 <configuration>
     <property name="LOG_DIR" value="logs"/>
+    <property name="PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | traceId=%-16mdc{traceId:-N/A} | user=%-12mdc{userId:-anonymous} | %-30logger{0} | %msg%n"/>
 
     <!-- ==================== 控制台 ==================== -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
-    <!-- ==================== 应用日志（异步） ==================== -->
-    <appender name="ASYNC_APPLICATION" class="ch.qos.logback.classic.AsyncAppender">
-        <neverBlock>false</neverBlock>
-        <queueSize>512</queueSize>
+    <!-- ==================== 根日志（全量） ==================== -->
+    <appender name="ASYNC_APP" class="ch.qos.logback.classic.AsyncAppender">
+        <neverBlock>false</neverBlock><queueSize>512</queueSize>
         <appender-ref ref="APPLICATION"/>
     </appender>
-
     <appender name="APPLICATION" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/application.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_DIR}/application-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
-    <!-- ==================== 错误日志（异步） ==================== -->
+    <!-- ==================== 错误日志（全量 ERROR） ==================== -->
     <appender name="ASYNC_ERROR" class="ch.qos.logback.classic.AsyncAppender">
-        <neverBlock>false</neverBlock>
-        <queueSize>512</queueSize>
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
         <appender-ref ref="ERROR"/>
     </appender>
-
     <appender name="ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/error.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_DIR}/error-%d{yyyy-MM-dd}.log</fileNamePattern>
-            <maxHistory>30</maxHistory>
+            <maxHistory>60</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
             <level>ERROR</level>
         </filter>
     </appender>
 
-    <!-- ==================== 订单日志（异步、独立文件） ==================== -->
-    <appender name="ASYNC_ORDER" class="ch.qos.logback.classic.AsyncAppender">
-        <neverBlock>false</neverBlock>
-        <queueSize>256</queueSize>
-        <appender-ref ref="ORDER"/>
+    <!-- ==================== 模块日志宏 — 复用 ==================== -->
+    <!-- 用法：每个模块定义一个 rolling appender + async 包装，然后 logger 引用 -->
+    <!-- auth -->
+    <appender name="ASYNC_AUTH" class="ch.qos.logback.classic.AsyncAppender">
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
+        <appender-ref ref="AUTH"/>
+    </appender>
+    <appender name="AUTH" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/auth/auth.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/auth/auth-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
+    <!-- order -->
+    <appender name="ASYNC_ORDER" class="ch.qos.logback.classic.AsyncAppender">
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
+        <appender-ref ref="ORDER"/>
+    </appender>
     <appender name="ORDER" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/order/order.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_DIR}/order/order-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level - %msg%n</pattern>
-        </encoder>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
-    <!-- ==================== 航线日志（异步、独立文件） ==================== -->
+    <!-- route -->
     <appender name="ASYNC_ROUTE" class="ch.qos.logback.classic.AsyncAppender">
-        <neverBlock>false</neverBlock>
-        <queueSize>256</queueSize>
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
         <appender-ref ref="ROUTE"/>
     </appender>
-
     <appender name="ROUTE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_DIR}/route/route.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${LOG_DIR}/route/route-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level - %msg%n</pattern>
-        </encoder>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
-    <!-- ==================== Logger 配置 ==================== -->
-    <!-- 订单相关日志 -->
-    <logger name="com.drone.controller.webController.WebOrderController" level="info" additivity="false">
+    <!-- uav -->
+    <appender name="ASYNC_UAV" class="ch.qos.logback.classic.AsyncAppender">
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
+        <appender-ref ref="UAV"/>
+    </appender>
+    <appender name="UAV" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/uav/uav.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/uav/uav-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
+    </appender>
+
+    <!-- live -->
+    <appender name="ASYNC_LIVE" class="ch.qos.logback.classic.AsyncAppender">
+        <neverBlock>false</neverBlock><queueSize>256</queueSize>
+        <appender-ref ref="LIVE"/>
+    </appender>
+    <appender name="LIVE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/live/live.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/live/live-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder><pattern>${PATTERN}</pattern></encoder>
+    </appender>
+
+    <!-- ==================== Logger 分配（按业务包收敛） ==================== -->
+
+    <!-- auth: 登录/注册 -->
+    <logger name="com.drone.controller.auth" level="info" additivity="true">
+        <appender-ref ref="ASYNC_AUTH"/>
+    </logger>
+    <logger name="com.drone.service.impl.LoginServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_AUTH"/>
+    </logger>
+    <logger name="com.drone.service.impl.RegisterServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_AUTH"/>
+    </logger>
+
+    <!-- order: 订单管理 -->
+    <logger name="com.drone.controller.order" level="info" additivity="true">
         <appender-ref ref="ASYNC_ORDER"/>
     </logger>
-    <logger name="com.drone.service.impl.OrderServiceImpl" level="info" additivity="false">
+    <logger name="com.drone.service.impl.OrderServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_ORDER"/>
     </logger>
 
-    <!-- 航线相关日志 -->
-    <logger name="com.drone.controller.webController.WebRouteController" level="info" additivity="false">
+    <!-- route: 航线规划 -->
+    <logger name="com.drone.controller.route" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
     </logger>
-    <logger name="com.drone.service.impl.RouteServiceImpl" level="info" additivity="false">
+    <logger name="com.drone.service.impl.RouteServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
+    </logger>
+
+    <!-- uav: 无人机管理 -->
+    <logger name="com.drone.controller.uav" level="info" additivity="true">
+        <appender-ref ref="ASYNC_UAV"/>
+    </logger>
+    <logger name="com.drone.service.impl.WebUavServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_UAV"/>
+    </logger>
+    <logger name="com.drone.service.impl.AppUavServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_UAV"/>
+    </logger>
+    <logger name="com.drone.service.impl.AdminServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_UAV"/>
+    </logger>
+
+    <!-- live: 直播/TRTC -->
+    <logger name="com.drone.controller.live" level="info" additivity="true">
+        <appender-ref ref="ASYNC_LIVE"/>
+    </logger>
+    <logger name="com.drone.service.impl.LiveSessionServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_LIVE"/>
+    </logger>
+    <logger name="com.drone.service.impl.TRTCServiceImpl" level="info" additivity="true">
+        <appender-ref ref="ASYNC_LIVE"/>
     </logger>
 
     <!-- 根日志 -->
     <root level="info">
         <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="ASYNC_APPLICATION"/>
+        <appender-ref ref="ASYNC_APP"/>
         <appender-ref ref="ASYNC_ERROR"/>
     </root>
 

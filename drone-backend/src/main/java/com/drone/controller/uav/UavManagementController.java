@@ -1,4 +1,4 @@
-package com.drone.controller.adminController;
+package com.drone.controller.uav;
 
 import com.drone.pojo.entity.Uav;
 import com.drone.pojo.result.Result;

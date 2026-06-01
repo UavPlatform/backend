@@ -53,8 +53,10 @@ public class JwtUtil {
     }
 
     public String generateRefreshToken(String username) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", username);
         return Jwts.builder()
-                .setSubject(username)
+                .setClaims(claims)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -106,17 +108,17 @@ public class JwtUtil {
             }
             return true;
         } catch (ExpiredJwtException e) {
-            log.error("Token expired: {}", e.getMessage());
+            log.warn("Token expired");
         } catch (UnsupportedJwtException e) {
-            log.error("Unsupported JWT: {}", e.getMessage());
+            log.warn("Unsupported JWT");
         } catch (MalformedJwtException e) {
-            log.error("Malformed JWT: {}", e.getMessage());
+            log.warn("Malformed JWT");
         } catch (SignatureException e) {
-            log.error("Invalid signature: {}", e.getMessage());
+            log.warn("Invalid signature");
         } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
+            log.warn("JWT claims string is empty");
         } catch (JwtException e) {
-            log.error("JWT validation error: {}", e.getMessage());
+            log.warn("JWT validation error: {}", e.getMessage());
         }
         return false;
     }
@@ -126,7 +128,7 @@ public class JwtUtil {
             Date expiration = extractExpiration(token);
             return expiration.before(new Date());
         } catch (JwtException e) {
-            log.error("Failed to extract expiration: {}", e.getMessage());
+            log.warn("Failed to extract expiration");
             return true;
         }
     }
@@ -135,9 +137,14 @@ public class JwtUtil {
 
     public String refreshAccessToken(String refreshToken) {
         if (!validateToken(refreshToken)) {
+            log.warn("刷新令牌无效");
             throw new JwtException("Invalid refresh token");
         }
         String username = extractUsername(refreshToken);
+        if (username == null || username.isBlank()) {
+            log.warn("刷新令牌中缺少用户名");
+            throw new JwtException("Invalid refresh token");
+        }
         return generateToken(username);
     }
 

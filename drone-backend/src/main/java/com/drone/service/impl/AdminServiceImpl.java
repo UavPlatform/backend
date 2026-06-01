@@ -6,7 +6,9 @@ import com.drone.mapper.UserRepository;
 import com.drone.pojo.dto.AdminDto;
 import com.drone.pojo.entity.Admin;
 import com.drone.pojo.entity.Uav;
-import com.drone.server.exception.UnauthorizedException;
+import com.drone.pojo.enums.ApiErrorCode;
+import com.drone.server.exception.BusinessException;
+import com.drone.server.util.PasswordUtil;
 import com.drone.service.AdminService;
 import com.drone.service.LiveSessionService;
 import lombok.extern.slf4j.Slf4j;
@@ -40,21 +42,20 @@ public class AdminServiceImpl implements AdminService {
         String password = adminDto.getPassword();
 
         if (name == null || name.isBlank() || password == null || password.isBlank()) {
-            throw new UnauthorizedException("用户名和密码不能为空");
+            throw new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    ApiErrorCode.INVALID_PARAM, "用户名和密码不能为空");
         }
 
-        try {
-            Admin admin = adminRepository.findByNameAndPassword(name, password);
-            if (admin == null) {
-                throw new UnauthorizedException("用户名或密码错误");
-            }
-            return admin;
-        } catch (UnauthorizedException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("管理员登录失败: {}", e.getMessage());
-            throw new RuntimeException("登录失败，请稍后重试");
+        Admin admin = adminRepository.findByName(name)
+                .orElseThrow(() -> new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                        ApiErrorCode.INVALID_PARAM, "用户名或密码错误"));
+
+        if (!PasswordUtil.matches(password, admin.getPassword())) {
+            throw new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    ApiErrorCode.INVALID_PARAM, "用户名或密码错误");
         }
+
+        return admin;
     }
 
     @Override

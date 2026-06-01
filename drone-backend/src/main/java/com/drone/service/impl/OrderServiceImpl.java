@@ -114,7 +114,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void cancelOrder(String orderNum, String name) {
-        MissionOrder order = orderRepository.findByOrderNum(orderNum)
+        MissionOrder order = orderRepository.findByOrderNumForUpdate(orderNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
 
         if (!order.getUserName().equals(name)) {

@@ -27,6 +27,10 @@ public interface OrderRepository extends JpaRepository<MissionOrder, Long> {
     @EntityGraph(attributePaths = "route")
     Optional<MissionOrder> findByOrderNum(String orderNum);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT o FROM MissionOrder o WHERE o.orderNum = :orderNum")
+    Optional<MissionOrder> findByOrderNumForUpdate(@Param("orderNum") String orderNum);
+
     @EntityGraph(attributePaths = "route")
     List<MissionOrder> findByUserNameOrderByCreateTimeDesc(String userName);
 

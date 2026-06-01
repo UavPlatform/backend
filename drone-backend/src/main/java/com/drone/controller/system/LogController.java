@@ -1,4 +1,4 @@
-package com.drone.controller.adminController;
+package com.drone.controller.system;
 
 import com.drone.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;

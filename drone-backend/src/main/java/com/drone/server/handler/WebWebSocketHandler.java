@@ -1,5 +1,6 @@
 package com.drone.server.handler;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -9,7 +10,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.drone.server.ws.service.LiveWebSessionService;
 
-
+@Slf4j
 @Component
 public class WebWebSocketHandler extends TextWebSocketHandler {
 
@@ -27,7 +28,7 @@ public class WebWebSocketHandler extends TextWebSocketHandler {
         } else {
             liveWebSessionService.registerDashboardSession(session);
         }
-        System.out.println("Web端连接已建立");
+        log.info("Web端连接已建立");
     }
 
     @Override
@@ -38,7 +39,7 @@ public class WebWebSocketHandler extends TextWebSocketHandler {
         } else {
             liveWebSessionService.removeDashboardSession(session);
         }
-        System.out.println("Web端连接已关闭");
+        log.info("Web端连接已关闭");
     }
 
     private String getDeviceId(WebSocketSession session) {

@@ -1,4 +1,4 @@
-package com.drone.controller.webController;
+package com.drone.controller.route;
 
 import com.drone.pojo.dto.RouteDto;
 import com.drone.pojo.entity.Route;

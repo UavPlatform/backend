@@ -1,4 +1,4 @@
-package com.drone.controller.appController;
+package com.drone.controller.live;
 
 import com.drone.service.AppWebSocketService;
 import com.drone.server.annotation.SkipJwt;

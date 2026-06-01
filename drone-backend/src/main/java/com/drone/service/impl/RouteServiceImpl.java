@@ -89,35 +89,25 @@ public class RouteServiceImpl implements RouteService {
     @Override
     @Transactional(readOnly = true)
     public List<Route> getRoutesByUser(String userName) {
-        List<Route> routes = routeRepository.findByUserNameOrderByCreateTimeDesc(userName);
-        routes.forEach(route -> route.getWaypoints().size());
-        return routes;
+        return routeRepository.findByUserNameOrderByCreateTimeDesc(userName);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<Route> getRoutesByUser(String userName, int page, int size) {
-        Page<Route> routePage = routeRepository.findByUserNameOrderByCreateTimeDesc(userName, PageRequest.of(page, size));
-        for (Route route : routePage.getContent()) {
-            route.getWaypoints().size();
-        }
-        return routePage;
+        return routeRepository.findByUserNameOrderByCreateTimeDesc(userName, PageRequest.of(page, size));
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<Route> getRoutesByDjiId(String djiId) {
-        List<Route> routes = routeRepository.findByDjiIdOrderByCreateTimeDesc(djiId);
-        routes.forEach(route -> route.getWaypoints().size());
-        return routes;
+        return routeRepository.findByDjiIdOrderByCreateTimeDesc(djiId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<Route> getRoutesByUserAndDjiId(String userName, String djiId) {
-        List<Route> routes = routeRepository.findByUserNameAndDjiIdOrderByCreateTimeDesc(userName, djiId);
-        routes.forEach(route -> route.getWaypoints().size());
-        return routes;
+        return routeRepository.findByUserNameAndDjiIdOrderByCreateTimeDesc(userName, djiId);
     }
 
     @Transactional
@@ -147,12 +137,11 @@ public class RouteServiceImpl implements RouteService {
         if (!route.getUserName().equals(userName)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权查看此航线");
         }
-        // 强制初始化懒加载的 waypoints 集合
-        route.getWaypoints().size();
         return route;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public WsCommandAckResult assignRouteToUav(String routeNum, String userName) {
         Route route = routeRepository.findByRouteNum(routeNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));

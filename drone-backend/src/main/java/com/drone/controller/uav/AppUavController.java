@@ -1,4 +1,4 @@
-package com.drone.controller.appController;
+package com.drone.controller.uav;
 
 import com.drone.pojo.dto.UavDto;
 import com.drone.pojo.vo.UavVo;

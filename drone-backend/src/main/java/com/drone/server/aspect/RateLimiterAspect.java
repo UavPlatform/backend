@@ -11,6 +11,8 @@ import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Deque;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,7 +30,8 @@ public class RateLimiterAspect {
     public Object around(ProceedingJoinPoint joinPoint, RateLimiter rateLimiter) throws Throwable {
         String username = UserContext.getUsername();
         String method = joinPoint.getSignature().toShortString();
-        String key = method + ":" + (username != null ? username : "anonymous");
+        String userKey = username != null ? username : getClientIp();
+        String key = method + ":" + userKey;
 
         int limit = rateLimiter.limit();
         int windowSeconds = rateLimiter.windowSeconds();
@@ -41,6 +44,19 @@ public class RateLimiterAspect {
         }
 
         return joinPoint.proceed();
+    }
+
+    private String getClientIp() {
+        try {
+            ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+            String ip = attrs.getRequest().getHeader("X-Forwarded-For");
+            if (ip == null || ip.isBlank()) {
+                ip = attrs.getRequest().getRemoteAddr();
+            }
+            return ip;
+        } catch (Exception e) {
+            return "unknown";
+        }
     }
 
     private boolean isRateLimited(String key, int limit, int windowSeconds) {

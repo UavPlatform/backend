@@ -1,0 +1,157 @@
+package com.drone.controller.auth;
+
+import com.drone.mapper.UserRecordRepository;
+import com.drone.pojo.dto.UserLoginDto;
+import com.drone.pojo.dto.UserRegisterDto;
+import com.drone.pojo.entity.User;
+import com.drone.pojo.entity.UserRecord;
+import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.RegisterVo;
+import com.drone.server.annotation.OperationLog;
+import com.drone.server.annotation.RateLimiter;
+import com.drone.server.annotation.SkipJwt;
+import com.drone.server.util.JwtUtil;
+import com.drone.server.util.UserContext;
+import com.drone.service.LoginService;
+import com.drone.service.RegisterService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Tag(name = "Authentication and Authorization API")
+@RestController
+@RequestMapping("/user")
+@Slf4j
+public class WebUserController {
+
+    @Autowired
+    private LoginService loginService;
+
+    @Autowired
+    private RegisterService registerService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserRecordRepository userRecordRepository;
+
+    @SkipJwt
+    @OperationLog("登录")
+    @RateLimiter(limit = 5, windowSeconds = 60)
+    @Operation(
+            summary = "用户登录",
+            description = "验证用户名和密码，成功返回 JWT 令牌",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "登录成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"token\": \"eyJ...\", \"refreshToken\": \"eyJ...\"}}"))),
+                    @ApiResponse(responseCode = "401", description = "用户名或密码错误",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"INVALID_PARAM\", \"message\": \"用户名或密码错误\"}")))
+            }
+    )
+    @PostMapping("/login")
+    public Result<Map<String, Object>> login(@RequestBody UserLoginDto userLoginDto) {
+        User user = loginService.tryToLogin(userLoginDto);
+        UserContext.setUsername(user.getUserName());  // AOP 成功日志用
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("token", jwtUtil.generateToken(user.getUserName()));
+        data.put("refreshToken", jwtUtil.generateRefreshToken(user.getUserName()));
+        return Result.success(data);
+    }
+
+    @SkipJwt
+    @OperationLog("刷新令牌")
+    @Operation(
+            summary = "刷新令牌",
+            description = "使用 Refresh-Token 获取新的 Access-Token",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "刷新成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"token\": \"eyJ...\"}}"))),
+                    @ApiResponse(responseCode = "401", description = "刷新失败",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"UNAUTHORIZED\", \"message\": \"无效的刷新令牌\"}")))
+            }
+    )
+    @PostMapping("/refresh")
+    public Result<Map<String, Object>> refreshToken(@RequestHeader("Refresh-Token") String refreshToken) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("token", jwtUtil.refreshAccessToken(refreshToken));
+        return Result.success(data);
+    }
+
+    @SkipJwt
+    @OperationLog("注册")
+    @RateLimiter(limit = 3, windowSeconds = 60)
+    @Operation(
+            summary = "用户注册",
+            description = "用户注册，返回用户信息",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "注册成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"userId\": 123, \"userName\": \"test\"}}"))),
+                    @ApiResponse(responseCode = "400", description = "注册失败",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": false, \"code\": 400, \"errorCode\": \"INVALID_PARAM\", \"message\": \"用户名已存在\"}")))
+            }
+    )
+    @PostMapping("/register")
+    public Result<Map<String, Object>> registerUser(@RequestBody UserRegisterDto userRegisterDto) {
+        RegisterVo registerVo = registerService.tryToRegister(userRegisterDto);
+        UserContext.setUsername(registerVo.getUserName());
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", registerVo.getId());
+        data.put("userName", registerVo.getUserName());
+        return Result.success(data);
+    }
+
+    @OperationLog("查询直播记录")
+    @Operation(
+            summary = "查询用户直播记录",
+            description = "获取当前登录用户的直播观看记录，支持分页",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "查询成功",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"records\": [], \"total\": 0, \"totalPages\": 0}}"))),
+                    @ApiResponse(responseCode = "401", description = "未登录",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(type = "object",
+                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"UNAUTHORIZED\", \"message\": \"Missing token\"}")))
+            }
+    )
+    @GetMapping("/records")
+    public Result<Map<String, Object>> getLiveRecords(@RequestParam(defaultValue = "0") int page,
+                                                       @RequestParam(defaultValue = "10") int size) {
+        String userName = UserContext.getUsername();
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserRecord> recordPage = userRecordRepository.findAllByUserName(userName, pageable);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("records", recordPage.getContent());
+        data.put("total", recordPage.getTotalElements());
+        data.put("totalPages", recordPage.getTotalPages());
+        return Result.success("获取成功", data);
+    }
+}

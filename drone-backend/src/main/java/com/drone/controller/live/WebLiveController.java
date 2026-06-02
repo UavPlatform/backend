@@ -4,6 +4,8 @@ import com.drone.mapper.UserRecordRepository;
 import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.live.LiveStartVO;
+import com.drone.pojo.vo.live.PullCredentialsVO;
 import com.drone.service.impl.LiveSessionSnapshot;
 import com.drone.server.annotation.OperationLog;
 import com.drone.server.annotation.RateLimiter;
@@ -29,9 +31,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "Web Live API")
 @RestController
@@ -83,8 +83,7 @@ public class WebLiveController {
             }
     )
     @PostMapping("/req")
-    public Result<Map<String, Object>> startLive(@RequestParam String deviceId) {
-        String name = currentUserName();
+    public Result<LiveStartVO> startLive(@RequestParam String deviceId) {
         webUavService.getRegisteredUav(deviceId);
 
         if (!appWebSocketService.isConnected(deviceId)) {
@@ -94,12 +93,9 @@ public class WebLiveController {
         LiveSessionSnapshot runningSnapshot = liveSessionService.getSnapshot(deviceId);
         if (runningSnapshot != null && liveSessionService.isRunning(deviceId)) {
             log.info("设备 {} 图传已在运行中", deviceId);
-            Map<String, Object> data = new HashMap<>();
-            data.put("code", ApiErrorCode.LIVE_ALREADY_RUNNING.getCode());
-            data.put("ackConfirmed", true);
-            data.put("liveState", runningSnapshot.getState().name());
-            data.put("roomId", runningSnapshot.getRoomId());
-            return Result.success("图传已在运行中", data);
+            return Result.success("图传已在运行中",
+                    new LiveStartVO(null, runningSnapshot.getRoomId(), true,
+                            runningSnapshot.getState().name(), ApiErrorCode.LIVE_ALREADY_RUNNING.getCode()));
         }
 
         if (liveSessionService.isStarting(deviceId)) {
@@ -114,24 +110,19 @@ public class WebLiveController {
         );
 
         LiveSessionSnapshot snapshot = liveSessionService.getSnapshot(deviceId);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("requestId", ackResult.getRequestId());
-        data.put("roomId", roomId);
-        data.put("ackConfirmed", !ackResult.isTimedOut());
-        data.put("liveState", snapshot != null ? snapshot.getState().name() : "IDLE");
+        String liveState = snapshot != null ? snapshot.getState().name() : "IDLE";
 
         if (ackResult.isTimedOut()) {
-            data.put("code", "LIVE_START_PENDING");
-            return Result.success("开播命令已发送，等待设备确认", data);
+            return Result.success("开播命令已发送，等待设备确认",
+                    new LiveStartVO(ackResult.getRequestId(), roomId, false, liveState, "LIVE_START_PENDING"));
         }
 
         if (!ackResult.isSuccess()) {
             throwStartLiveFailure(ackResult);
         }
 
-        data.put("code", "LIVE_STARTED");
-        return Result.success("设备已确认启动图传", data);
+        return Result.success("设备已确认启动图传",
+                new LiveStartVO(ackResult.getRequestId(), roomId, true, liveState, "LIVE_STARTED"));
     }
 
     @OperationLog("获取拉流凭证")
@@ -154,9 +145,9 @@ public class WebLiveController {
             }
     )
     @PostMapping("/get")
-    public Result<Map<String, Object>> getPullCredentials(@RequestParam String deviceId,
-                                                           @RequestParam String webUserId,
-                                                           HttpServletRequest request) {
+    public Result<PullCredentialsVO> getPullCredentials(@RequestParam String deviceId,
+                                                          @RequestParam String webUserId,
+                                                          HttpServletRequest request) {
         webUavService.getRegisteredUav(deviceId);
 
         if (!appWebSocketService.isConnected(deviceId)) {
@@ -171,16 +162,13 @@ public class WebLiveController {
             ensureOpenRecord(userName, deviceId);
         }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("roomId", roomId);
-        data.put("userId", webUserId);
-        data.put("userSig", userSig);
-        data.put("sdkAppId", trtcService.getSdkAppId());
-        data.put("wsUrl", buildWebSocketUrl(request, deviceId));
-        data.put("liveState", liveSessionService.getSnapshot(deviceId).getState().name());
-        data.put("ackConfirmed", liveSessionService.isRunning(deviceId));
-
-        return Result.success(data);
+        PullCredentialsVO vo = new PullCredentialsVO(
+                roomId, webUserId, userSig, trtcService.getSdkAppId(),
+                buildWebSocketUrl(request, deviceId),
+                liveSessionService.getSnapshot(deviceId).getState().name(),
+                liveSessionService.isRunning(deviceId)
+        );
+        return Result.success(vo);
     }
 
     @OperationLog("结束观看")

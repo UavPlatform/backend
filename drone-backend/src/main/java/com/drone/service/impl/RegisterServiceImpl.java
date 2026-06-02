@@ -4,7 +4,7 @@ import com.drone.mapper.UserRepository;
 import com.drone.pojo.dto.UserRegisterDto;
 import com.drone.pojo.entity.User;
 import com.drone.pojo.enums.ApiErrorCode;
-import com.drone.pojo.vo.RegisterVo;
+import com.drone.pojo.vo.auth.RegisterVo;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.util.PasswordUtil;
 import com.drone.service.RegisterService;
@@ -44,9 +44,6 @@ public class RegisterServiceImpl implements RegisterService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "用户名已存在");
         }
 
-        RegisterVo result = new RegisterVo();
-        result.setId(user.getId());
-        result.setUserName(user.getUserName());
-        return result;
+        return new RegisterVo(user.getId(), user.getUserName());
     }
 }

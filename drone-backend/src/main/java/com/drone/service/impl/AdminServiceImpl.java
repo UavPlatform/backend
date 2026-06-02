@@ -7,18 +7,20 @@ import com.drone.pojo.dto.AdminDto;
 import com.drone.pojo.entity.Admin;
 import com.drone.pojo.entity.Uav;
 import com.drone.pojo.enums.ApiErrorCode;
+import com.drone.pojo.vo.admin.AdminStatisticsVO;
+import com.drone.pojo.vo.admin.LiveUavVO;
 import com.drone.server.exception.BusinessException;
 import com.drone.server.util.PasswordUtil;
 import com.drone.service.AdminService;
 import com.drone.service.LiveSessionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
@@ -37,21 +39,22 @@ public class AdminServiceImpl implements AdminService {
     private UserRepository userRepository;
 
     @Override
+    @Transactional(readOnly = true)
     public Admin tryToLogin(AdminDto adminDto) {
         String name = adminDto.getName();
         String password = adminDto.getPassword();
 
         if (name == null || name.isBlank() || password == null || password.isBlank()) {
-            throw new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+            throw new BusinessException(HttpStatus.UNAUTHORIZED,
                     ApiErrorCode.INVALID_PARAM, "用户名和密码不能为空");
         }
 
         Admin admin = adminRepository.findByName(name)
-                .orElseThrow(() -> new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED,
                         ApiErrorCode.INVALID_PARAM, "用户名或密码错误"));
 
         if (!PasswordUtil.matches(password, admin.getPassword())) {
-            throw new BusinessException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+            throw new BusinessException(HttpStatus.UNAUTHORIZED,
                     ApiErrorCode.INVALID_PARAM, "用户名或密码错误");
         }
 
@@ -59,120 +62,86 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional
     public boolean updateUavAvailable(String djiId, Character isAvailable) {
         if (djiId == null || djiId.isBlank()) {
-            throw new IllegalArgumentException("设备ID不能为空");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "设备ID不能为空");
         }
         if (isAvailable == null || (!isAvailable.equals('0') && !isAvailable.equals('1'))) {
-            throw new IllegalArgumentException(" 0(不可用) 或 1(可用)");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "isAvailable 必须为 0 或 1");
         }
-        try {
-            int result = uavRepository.updateUavAvailableByDjiId(djiId, isAvailable);
-            return result > 0;
-        } catch (Exception e) {
-            log.error("更新无人机可用状态失败: {}", e.getMessage());
-            throw new RuntimeException("更新失败，请稍后重试");
-        }
+        int result = uavRepository.updateUavAvailableByDjiId(djiId, isAvailable);
+        return result > 0;
     }
 
     @Override
-    public Uav[] getUav() {
-        try {
-            List<Uav> uavs = uavRepository.findAllUav();
-            return uavs.toArray(new Uav[0]);
-        } catch (Exception e) {
-            log.error("查询所有无人机失败: {}", e.getMessage());
-            throw new RuntimeException("查询失败，请稍后重试");
-        }
+    @Transactional(readOnly = true)
+    public List<Uav> getUav() {
+        return uavRepository.findAllUav();
     }
 
     @Override
-    public List<Map<String, Object>> getLiveUav() {
-        try {
-            List<LiveSessionSnapshot> runningSessions = liveSessionService.getAllRunningSessions();
-            List<Map<String, Object>> liveUavList = new ArrayList<>();
+    @Transactional(readOnly = true)
+    public List<LiveUavVO> getLiveUav() {
+        List<LiveSessionSnapshot> runningSessions = liveSessionService.getAllRunningSessions();
+        List<LiveUavVO> result = new ArrayList<>();
 
-            for (LiveSessionSnapshot session : runningSessions) {
-                Uav uav = uavRepository.findByDjiId(session.getDeviceId());
-                if (uav != null) {
-                    Map<String, Object> liveUavInfo = new HashMap<>();
-                    liveUavInfo.put("deviceId", session.getDeviceId());
-                    liveUavInfo.put("uavName", uav.getUavName());
-                    liveUavInfo.put("roomId", session.getRoomId());
-                    liveUavInfo.put("requestId", session.getRequestId());
-                    liveUavInfo.put("updatedAt", session.getUpdatedAt());
-                    liveUavInfo.put("onlineStatus", uav.getOnlineStatus());
-                    liveUavInfo.put("isAvailable", uav.getIsAvailable());
-                    liveUavList.add(liveUavInfo);
-                }
+        for (LiveSessionSnapshot session : runningSessions) {
+            var uavOpt = uavRepository.findByDjiId(session.getDeviceId());
+            if (uavOpt.isEmpty()) {
+                continue;
             }
-            return liveUavList;
-        } catch (Exception e) {
-            log.error("查询直播无人机失败: {}", e.getMessage());
-            throw new RuntimeException("查询失败，请稍后重试");
+            Uav uav = uavOpt.get();
+            LiveUavVO vo = new LiveUavVO();
+            vo.setDeviceId(session.getDeviceId());
+            vo.setUavName(uav.getUavName());
+            vo.setRoomId(session.getRoomId());
+            vo.setRequestId(session.getRequestId());
+            vo.setUpdatedAt(session.getUpdatedAt());
+            vo.setOnlineStatus(uav.getOnlineStatus() != null ? String.valueOf(uav.getOnlineStatus()) : "0");
+            vo.setIsAvailable(uav.getIsAvailable() != null ? String.valueOf(uav.getIsAvailable()) : "1");
+            result.add(vo);
         }
+        return result;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Uav getUavByDeviceId(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) {
-            throw new IllegalArgumentException("设备ID不能为空");
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "设备ID不能为空");
         }
-        try {
-            Uav uav = uavRepository.findByDjiId(deviceId);
-            if (uav == null) {
-                throw new RuntimeException("无人机不存在");
-            }
-            return uav;
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("查询无人机详情失败: {}", e.getMessage());
-            throw new RuntimeException("查询无人机详情失败，请稍后重试");
-        }
+        return uavRepository.findByDjiId(deviceId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
     }
 
     @Override
-    public Map<String, Object> getAdminStatistics() {
-        try {
-            Map<String, Object> statistics = new HashMap<>();
+    @Transactional(readOnly = true)
+    public AdminStatisticsVO getAdminStatistics() {
+        List<Uav> allUavs = uavRepository.findAllUav();
+        List<LiveSessionSnapshot> runningSessions = liveSessionService.getAllRunningSessions();
+        long totalUsers = userRepository.count();
 
-            List<Uav> allUavs = uavRepository.findAllUav();
-            List<LiveSessionSnapshot> runningSessions = liveSessionService.getAllRunningSessions();
-            long totalUsers = userRepository.count();
+        int onlineUavs = 0;
+        int availableUavs = 0;
 
-            int totalUavs = allUavs.size();
-            int onlineUavs = 0;
-            int availableUavs = 0;
-            int liveUavs = runningSessions.size();
-
-            log.info("查询到 {} 架无人机", totalUavs);
-            for (Uav uav : allUavs) {
-                log.info("无人机 {} - onlineStatus: {}, isAvailable: {}", 
-                    uav.getUavName(), uav.getOnlineStatus(), uav.getIsAvailable());
-                if (uav.getOnlineStatus() != null && uav.getOnlineStatus() == '1') {
-                    onlineUavs++;
-                }
-                if (uav.getIsAvailable() != null && uav.getIsAvailable() == '1') {
-                    availableUavs++;
-                }
+        for (Uav uav : allUavs) {
+            if (uav.getOnlineStatus() != null && uav.getOnlineStatus() == '1') {
+                onlineUavs++;
             }
-
-            statistics.put("totalUavs", totalUavs);
-            statistics.put("onlineUavs", onlineUavs);
-            statistics.put("availableUavs", availableUavs);
-            statistics.put("liveUavs", liveUavs);
-            statistics.put("offlineUavs", totalUavs - onlineUavs);
-            statistics.put("unavailableUavs", totalUavs - availableUavs);
-            statistics.put("totalUsers", totalUsers);
-
-            log.info("统计结果: 总数={}, 在线={}, 可用={}, 直播中={}", 
-                totalUavs, onlineUavs, availableUavs, liveUavs);
-
-            return statistics;
-        } catch (Exception e) {
-            log.error("获取统计信息失败: {}", e.getMessage());
-            throw new RuntimeException("获取统计信息失败，请稍后重试");
+            if (uav.getIsAvailable() != null && uav.getIsAvailable() == '1') {
+                availableUavs++;
+            }
         }
+
+        AdminStatisticsVO vo = new AdminStatisticsVO();
+        vo.setTotalUavs(allUavs.size());
+        vo.setOnlineUavs(onlineUavs);
+        vo.setAvailableUavs(availableUavs);
+        vo.setLiveUavs(runningSessions.size());
+        vo.setOfflineUavs(allUavs.size() - onlineUavs);
+        vo.setUnavailableUavs(allUavs.size() - availableUavs);
+        vo.setTotalUsers(totalUsers);
+        return vo;
     }
 }

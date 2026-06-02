@@ -1,13 +1,15 @@
 package com.drone.service;
 
 import com.drone.pojo.dto.UavDto;
-import com.drone.pojo.vo.UavVo;
+import com.drone.pojo.vo.uav.UavVo;
+
+import java.util.List;
 
 
 public interface AppUavService {
     UavVo tryToAddUav(UavDto uavDto);
 
-    UavVo[] getAllUav();
+    List<UavVo> getAllUav();
 
-    String updateUav(UavDto uavDto);
+    void updateUav(UavDto uavDto);
 }

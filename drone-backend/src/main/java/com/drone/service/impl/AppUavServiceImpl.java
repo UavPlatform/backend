@@ -3,13 +3,16 @@ package com.drone.service.impl;
 import com.drone.mapper.UavRepository;
 import com.drone.pojo.dto.UavDto;
 import com.drone.pojo.entity.Uav;
-import com.drone.pojo.vo.UavVo;
+import com.drone.pojo.enums.ApiErrorCode;
+import com.drone.pojo.vo.uav.UavVo;
+import com.drone.server.exception.BusinessException;
 import com.drone.service.AppUavService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Service
@@ -19,53 +22,64 @@ public class AppUavServiceImpl implements AppUavService {
     private UavRepository uavRepository;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional
     public UavVo tryToAddUav(UavDto uavDto) {
         String name = uavDto.getUavName();
         Character status = uavDto.getOnlineStatus();
         String djiId = uavDto.getDjiId();
+        String controllerModel = uavDto.getControllerModel();
 
-        // 验证参数
-        if (name == null || status == null || djiId == null) {
-            throw new RuntimeException("无人机名称、在线状态或DjiId为空");
+        if (name == null || name.isBlank() || status == null || djiId == null || djiId.isBlank()
+                || controllerModel == null || controllerModel.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "无人机名称、在线状态、DjiId或控制器型号为空");
         }
-        if (uavRepository.findByDjiId(djiId) != null) {
-            throw new RuntimeException("无人机DjiId已注册");
+        if (uavRepository.findByDjiId(djiId).isPresent()) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.INVALID_PARAM,
+                    "无人机DjiId已注册");
         }
-        UavVo uavVo = uavRepository.findUavByUavName(name);
-        if (uavVo != null && uavVo.getId() != null) {
-            throw new RuntimeException("无人机名字已存在");
+        if (uavRepository.findUavByUavName(name).isPresent()) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.INVALID_PARAM,
+                    "无人机名字已存在");
         }
 
         Uav uav = new Uav();
         uav.setUavName(name);
-        uav.setUavCreateTime(LocalDateTime.now());
         uav.setOnlineStatus(status);
         uav.setDjiId(djiId);
-        uav.setControllerModel(uavDto.getControllerModel());
+        uav.setControllerModel(controllerModel);
+        uav.setIsAvailable('1');
         uavRepository.save(uav);
-        return new UavVo(uav.getId(), uav.getUavName(), uav.getDjiId(), uav.getControllerModel());
+        return new UavVo(uav.getId(), uav.getUavName(), uav.getDjiId(), uav.getControllerModel(), uav.getIsAvailable());
     }
 
     @Override
-    public UavVo[] getAllUav() {
+    @Transactional(readOnly = true)
+    public List<UavVo> getAllUav() {
         return uavRepository.getAll();
     }
 
     @Override
-    public String updateUav(UavDto uavDto) {
-        Uav uav = uavRepository.findByDjiId(uavDto.getDjiId());
-        if(uav==null){
-            throw  new RuntimeException("无人机不存在");
-        }else{
+    @Transactional
+    public void updateUav(UavDto uavDto) {
+        Uav uav = uavRepository.findByDjiId(uavDto.getDjiId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
+
+        if (uavDto.getUavName() != null && !uavDto.getUavName().isBlank()
+                && !uavDto.getUavName().equals(uav.getUavName())) {
+            if (uavRepository.findUavByUavName(uavDto.getUavName()).isPresent()) {
+                throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.INVALID_PARAM,
+                        "无人机名字已存在");
+            }
             uav.setUavName(uavDto.getUavName());
-            uav.setOnlineStatus(uavDto.getOnlineStatus());
-            uav.setDjiId(uavDto.getDjiId());
-            uav.setIsAvailable('1');
-            uav.setControllerModel(uavDto.getControllerModel());
-            uavRepository.save(uav);
         }
-        return "更新成功";
+        if (uavDto.getOnlineStatus() != null) {
+            uav.setOnlineStatus(uavDto.getOnlineStatus());
+        }
+        if (uavDto.getControllerModel() != null && !uavDto.getControllerModel().isBlank()) {
+            uav.setControllerModel(uavDto.getControllerModel());
+        }
+        uav.setIsAvailable('1');
+        uavRepository.save(uav);
     }
 }
-

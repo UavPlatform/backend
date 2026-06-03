@@ -37,6 +37,7 @@ public class RegisterServiceImpl implements RegisterService {
         user.setUserName(name);
         user.setPassword(PasswordUtil.hash(password));
         user.setStatus(1);
+        user.setRole(0);
 
         try {
             userRepository.save(user);

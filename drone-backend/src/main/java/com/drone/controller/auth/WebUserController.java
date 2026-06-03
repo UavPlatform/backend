@@ -70,11 +70,11 @@ public class WebUserController {
     @PostMapping("/login")
     public Result<UserLoginVO> login(@RequestBody UserLoginDto userLoginDto) {
         User user = loginService.tryToLogin(userLoginDto);
-        UserContext.setUsername(user.getUserName());
+        UserContext.setUser(user.getId(), user.getUserName(), user.getRole());
 
         UserLoginVO vo = new UserLoginVO(
-                jwtUtil.generateToken(user.getUserName()),
-                jwtUtil.generateRefreshToken(user.getUserName())
+                jwtUtil.generateToken(user.getId(), user.getUserName(), user.getRole()),
+                jwtUtil.generateRefreshToken(user.getId(), user.getUserName(), user.getRole())
         );
         return Result.success(vo);
     }
@@ -123,7 +123,7 @@ public class WebUserController {
     @PostMapping("/register")
     public Result<RegisterVo> registerUser(@RequestBody UserRegisterDto userRegisterDto) {
         RegisterVo registerVo = registerService.tryToRegister(userRegisterDto);
-        UserContext.setUsername(registerVo.userName());
+        UserContext.setUser(registerVo.id(), registerVo.userName(), 0);
         return Result.success(registerVo);
     }
 

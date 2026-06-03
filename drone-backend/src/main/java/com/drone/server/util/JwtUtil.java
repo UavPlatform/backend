@@ -14,55 +14,50 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
-/**
- * JWT 工具类（配置绑定 + 详细异常日志）
- */
 @Slf4j
 @Component
 @ConfigurationProperties(prefix = "jwt")
 public class JwtUtil {
 
     @Setter
-    private String secret;               // 密钥字符串
+    private String secret;
     @Setter
-    private long expiration;              // access token 过期时间（毫秒）
+    private long expiration;
     @Setter
-    private long refreshExpiration;       // refresh token 过期时间（毫秒）
+    private long refreshExpiration;
 
-    private SecretKey cachedSecretKey;    // 缓存 SecretKey
+    private SecretKey cachedSecretKey;
 
     private SecretKey getSigningKey() {
         if (cachedSecretKey == null) {
-            byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-            cachedSecretKey = Keys.hmacShaKeyFor(keyBytes);
+            cachedSecretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         }
         return cachedSecretKey;
     }
 
     // ========== 生成 Token ==========
 
-    public String generateToken(String username) {
+    public String generateToken(Long userId, String username, Integer role) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
         claims.put("username", username);
-        return generateToken(claims);
+        claims.put("role", role);
+        return buildToken(claims, expiration);
     }
 
-    public String generateToken(Map<String, Object> claims) {
+    public String generateRefreshToken(Long userId, String username, Integer role) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("username", username);
+        claims.put("role", role);
+        return buildToken(claims, refreshExpiration);
+    }
+
+    private String buildToken(Map<String, Object> claims, long ttlMillis) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    public String generateRefreshToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("username", username);
-        return Jwts.builder()
-                .setClaims(claims)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + refreshExpiration))
+                .setExpiration(new Date(System.currentTimeMillis() + ttlMillis))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -78,39 +73,27 @@ public class JwtUtil {
     }
 
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) throws JwtException {
-        final Claims claims = extractAllClaims(token);
-        return claimsResolver.apply(claims);
+        return claimsResolver.apply(extractAllClaims(token));
     }
 
     public String extractUsername(String token) throws JwtException {
         return extractClaim(token, claims -> claims.get("username", String.class));
     }
 
-    public Date extractExpiration(String token) throws JwtException {
-        return extractClaim(token, Claims::getExpiration);
+    public Long extractUserId(String token) throws JwtException {
+        return extractClaim(token, claims -> claims.get("userId", Long.class));
     }
 
-    // 验证 Token
+    public Integer extractRole(String token) throws JwtException {
+        return extractClaim(token, claims -> claims.get("role", Integer.class));
+    }
+
+    // ========== 验证 Token ==========
 
     public boolean validateToken(String token) {
-        return validateToken(token, null);
-    }
-
-    public boolean validateToken(String token, String expectedUsername) {
         try {
             Claims claims = extractAllClaims(token);
-            if (claims.getExpiration().before(new Date())) {
-                log.warn("Token expired: {}", token);
-                return false;
-            }
-            if (expectedUsername != null) {
-                String username = claims.get("username", String.class);
-                if (!expectedUsername.equals(username)) {
-                    log.warn("Username mismatch: expected {}, but got {}", expectedUsername, username);
-                    return false;
-                }
-            }
-            return true;
+            return !claims.getExpiration().before(new Date());
         } catch (ExpiredJwtException e) {
             log.warn("Token expired");
         } catch (UnsupportedJwtException e) {
@@ -129,28 +112,31 @@ public class JwtUtil {
 
     public boolean isTokenExpired(String token) {
         try {
-            Date expiration = extractExpiration(token);
-            return expiration.before(new Date());
+            return extractExpiration(token).before(new Date());
         } catch (JwtException e) {
             log.warn("Failed to extract expiration");
             return true;
         }
     }
 
-    //刷新 Access Token
+    public Date extractExpiration(String token) throws JwtException {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    // ========== 刷新 Access Token ==========
 
     public String refreshAccessToken(String refreshToken) {
         if (!validateToken(refreshToken)) {
             log.warn("刷新令牌无效");
             throw new JwtException("Invalid refresh token");
         }
+        Long userId = extractUserId(refreshToken);
         String username = extractUsername(refreshToken);
-        if (username == null || username.isBlank()) {
-            log.warn("刷新令牌中缺少用户名");
+        Integer role = extractRole(refreshToken);
+        if (userId == null || username == null || username.isBlank() || role == null) {
+            log.warn("刷新令牌中缺少用户信息");
             throw new JwtException("Invalid refresh token");
         }
-        return generateToken(username);
+        return generateToken(userId, username, role);
     }
-
-
 }

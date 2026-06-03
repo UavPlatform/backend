@@ -3,10 +3,15 @@ package com.drone.controller.route;
 import com.drone.pojo.dto.RouteDto;
 import com.drone.pojo.entity.Route;
 import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.route.AmapConfigVO;
+import com.drone.pojo.vo.route.RouteExecuteVO;
+import com.drone.pojo.vo.route.RouteListVO;
+import com.drone.pojo.vo.route.RoutePageVO;
+import com.drone.pojo.vo.route.RouteSaveVO;
+import com.drone.pojo.vo.route.RouteVo;
+import com.drone.server.annotation.OperationLog;
 import com.drone.server.annotation.RateLimiter;
 import com.drone.server.config.AmapConfig;
-import com.drone.server.exception.BusinessException;
-import com.drone.server.util.LogMaskUtil;
 import com.drone.server.util.UserContext;
 import com.drone.server.ws.handler.WsCommandAckResult;
 import com.drone.service.RouteService;
@@ -21,9 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "Route API", description = "航线规划接口")
 @RestController
@@ -56,14 +59,12 @@ public class WebRouteController {
             }
     )
     @GetMapping("/init")
-    public Result<Map<String, Object>> init() {
-        log.info("获取高德地图配置");
-        Map<String, Object> result = new HashMap<>();
-        result.put("key", amapConfig.getKey());
-        result.put("securityKey", amapConfig.getSecurityKey());
-        return Result.success(result);
+    public Result<AmapConfigVO> init() {
+        return Result.success(new AmapConfigVO(amapConfig.getKey(), amapConfig.getSecurityKey()));
     }
 
+    @OperationLog("保存航线")
+    @RateLimiter(limit = 10, windowSeconds = 60)
     @Operation(
             summary = "保存航线",
             description = "创建新航线，包含航点信息",
@@ -76,8 +77,7 @@ public class WebRouteController {
                                     schema = @Schema(
                                             type = "object",
                                             example = "{\"success\": true, \"code\": 200, \"message\": \"航线保存成功\", "
-                                                    + "\"data\": {\"id\": 15, \"routeNum\": \"RT20260525143022zhan0001\", "
-                                                    + "\"message\": \"航线保存成功\"}}"
+                                                    + "\"data\": {\"id\": 15, \"routeNum\": \"RT20260525143022zhan0001\"}}"
                                     )
                             )
                     ),
@@ -122,26 +122,14 @@ public class WebRouteController {
                     )
             }
     )
-    @RateLimiter(limit = 10, windowSeconds = 60)
     @PostMapping("/save")
-    public Result<Map<String, Object>> saveRoute(@RequestBody RouteDto routeDto) {
-        String userName = currentUserName();
-        log.info("用户: {} 尝试保存航线: {}", maskedName(), routeDto.getRouteName());
-        try {
-            Route saved = routeService.saveRoute(routeDto, userName);
-            log.info("航线保存成功，编号: {}", saved.getRouteNum());
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("message", "航线保存成功");
-            result.put("id", saved.getId());
-            result.put("routeNum", saved.getRouteNum());
-            return Result.success("航线保存成功", result);
-        } catch (BusinessException e) {
-            log.warn("航线保存失败，用户: {}, 原因: {}", maskedName(), e.getMessage());
-            throw e;
-        }
+    public Result<RouteSaveVO> saveRoute(@RequestBody RouteDto routeDto) {
+        String userName = UserContext.getUsername();
+        Route saved = routeService.saveRoute(routeDto, userName);
+        return Result.success("航线保存成功", new RouteSaveVO(saved.getId(), saved.getRouteNum()));
     }
 
+    @OperationLog("查询航线列表")
     @Operation(
             summary = "获取当前用户的航线列表",
             description = "获取当前登录用户创建的所有航线，支持分页",
@@ -175,27 +163,24 @@ public class WebRouteController {
             }
     )
     @GetMapping("/list")
-    public Result<Map<String, Object>> listRoutes(@RequestParam(defaultValue = "0") int page,
-                                                   @RequestParam(defaultValue = "20") int size) {
-        String userName = currentUserName();
-        log.info("用户: {} 查询航线列表，第{}页/每页{}条", maskedName(), page, size);
-        try {
-            Page<Route> routePage = routeService.getRoutesByUser(userName, page, size);
-            List<Route> routes = routePage.getContent();
-            log.info("航线列表查询成功，用户: {}, 共 {} 条", maskedName(), routes.size());
+    public Result<RoutePageVO> listRoutes(@RequestParam(defaultValue = "0") int page,
+                                           @RequestParam(defaultValue = "20") int size) {
+        String userName = UserContext.getUsername();
+        Page<Route> routePage = routeService.getRoutesByUser(userName, page, size);
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("routes", routes);
-            result.put("currentPage", routePage.getNumber());
-            result.put("totalPages", routePage.getTotalPages());
-            result.put("totalElements", routePage.getTotalElements());
-            return Result.success("获取成功", result);
-        } catch (BusinessException e) {
-            log.warn("航线列表查询失败，用户: {}, 原因: {}", maskedName(), e.getMessage());
-            throw e;
-        }
+        List<RouteVo> routes = routePage.getContent().stream()
+                .map(RouteVo::from)
+                .toList();
+
+        RoutePageVO vo = new RoutePageVO();
+        vo.setRoutes(routes);
+        vo.setCurrentPage(routePage.getNumber());
+        vo.setTotalPages(routePage.getTotalPages());
+        vo.setTotalElements(routePage.getTotalElements());
+        return Result.success("获取成功", vo);
     }
 
+    @OperationLog("查询无人机航线列表")
     @Operation(
             summary = "根据无人机ID获取航线列表",
             description = "获取指定无人机关联的航线列表",
@@ -218,21 +203,14 @@ public class WebRouteController {
             }
     )
     @GetMapping("/listByDjiId")
-    public Result<Map<String, Object>> listRoutesByDjiId(@RequestParam String djiId) {
-        log.info("查询无人机 {} 的航线列表", djiId);
-        try {
-            List<Route> routes = routeService.getRoutesByDjiId(djiId);
-            log.info("无人机 {} 航线列表查询成功，共 {} 条", djiId, routes.size());
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("routes", routes);
-            return Result.success("获取成功", result);
-        } catch (BusinessException e) {
-            log.warn("无人机 {} 航线列表查询失败，原因: {}", djiId, e.getMessage());
-            throw e;
-        }
+    public Result<RouteListVO> listRoutesByDjiId(@RequestParam String djiId) {
+        List<Route> routes = routeService.getRoutesByDjiId(djiId);
+        RouteListVO vo = new RouteListVO();
+        vo.setRoutes(routes.stream().map(RouteVo::from).toList());
+        return Result.success("获取成功", vo);
     }
 
+    @OperationLog("查询航线详情")
     @Operation(
             summary = "获取航线详情",
             description = "根据航线业务编号获取航线详细信息，包含航点列表",
@@ -248,7 +226,7 @@ public class WebRouteController {
                                     schema = @Schema(
                                             type = "object",
                                             example = "{\"success\": true, \"code\": 200, \"message\": \"获取成功\", "
-                                                    + "\"data\": {\"route\": {}}}"
+                                                    + "\"data\": {\"id\": 1, \"routeNum\": \"RTxxx\", \"routeName\": \"xxx\"}}"
                                     )
                             )
                     ),
@@ -281,22 +259,14 @@ public class WebRouteController {
             }
     )
     @GetMapping("/detail")
-    public Result<Map<String, Object>> getRouteDetail(@RequestParam String routeNum) {
-        String userName = currentUserName();
-        log.info("用户: {} 查询航线详情，编号: {}", maskedName(), routeNum);
-        try {
-            Route route = routeService.getRouteByRouteNum(routeNum, userName);
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("route", route);
-            return Result.success("获取成功", result);
-        } catch (BusinessException e) {
-            log.warn("航线详情查询失败，用户: {}, 编号: {}, 原因: {}",
-                    maskedName(), routeNum, e.getMessage());
-            throw e;
-        }
+    public Result<RouteVo> getRouteDetail(@RequestParam String routeNum) {
+        String userName = UserContext.getUsername();
+        Route route = routeService.getRouteByRouteNum(routeNum, userName);
+        return Result.success("获取成功", RouteVo.from(route));
     }
 
+    @OperationLog("删除航线")
+    @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
             summary = "删除航线",
             description = "删除指定ID的航线，只能删除当前用户创建的航线",
@@ -357,21 +327,15 @@ public class WebRouteController {
                     )
             }
     )
-    @RateLimiter(limit = 5, windowSeconds = 60)
     @DeleteMapping("/delete")
-    public Result<Map<String, Object>> deleteRoute(@RequestParam Long id) {
-        String userName = currentUserName();
-        log.info("用户: {} 尝试删除航线，ID: {}", maskedName(), id);
-        try {
-            routeService.deleteRoute(id, userName);
-            log.info("航线删除成功，ID: {}", id);
-            return Result.success("航线删除成功");
-        } catch (BusinessException e) {
-            log.warn("航线删除失败，用户: {}, ID: {}, 原因: {}", maskedName(), id, e.getMessage());
-            throw e;
-        }
+    public Result<Void> deleteRoute(@RequestParam Long id) {
+        String userName = UserContext.getUsername();
+        routeService.deleteRoute(id, userName);
+        return Result.success("航线删除成功");
     }
 
+    @OperationLog("执行航线")
+    @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
             summary = "执行航线",
             description = "执行指定编号的航线，通过 websocket 发送命令给无人机",
@@ -459,41 +423,19 @@ public class WebRouteController {
                     )
             }
     )
-    @RateLimiter(limit = 5, windowSeconds = 60)
     @PostMapping("/start")
-    public Result<Map<String, Object>> assignRouteToUav(@RequestParam String routeNum) {
-        String userName = currentUserName();
-        log.info("用户: {} 尝试执行航线，编号: {}", maskedName(), routeNum);
-        try {
-            WsCommandAckResult ack = routeService.assignRouteToUav(routeNum, userName);
+    public Result<RouteExecuteVO> assignRouteToUav(@RequestParam String routeNum) {
+        String userName = UserContext.getUsername();
+        WsCommandAckResult ack = routeService.assignRouteToUav(routeNum, userName);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("requestId", ack.getRequestId());
-            response.put("timedOut", ack.isTimedOut());
+        RouteExecuteVO vo = new RouteExecuteVO(ack.getRequestId(), ack.isTimedOut());
 
-            if (ack.isSuccess()) {
-                log.info("航线执行成功，编号: {}", routeNum);
-                return Result.success("无人机已确认执行指令", response);
-            }
-
-            if (ack.isTimedOut()) {
-                log.warn("航线执行超时，编号: {}", routeNum);
-                return Result.fail(408, ack.getCode(), "指令已发送但无人机未确认，请检查设备状态");
-            }
-
-            log.warn("航线执行失败，编号: {}, 原因: {}", routeNum, ack.getMessage());
-            return Result.fail(400, ack.getCode(), ack.getMessage());
-        } catch (BusinessException e) {
-            log.warn("航线执行失败，用户: {}, 编号: {}, 原因: {}", maskedName(), routeNum, e.getMessage());
-            throw e;
+        if (ack.isSuccess()) {
+            return Result.success("无人机已确认执行指令", vo);
         }
-    }
-
-    private String currentUserName() {
-        return UserContext.getUsername();
-    }
-
-    private String maskedName() {
-        return LogMaskUtil.maskUserName(currentUserName());
+        if (ack.isTimedOut()) {
+            return Result.fail(408, ack.getCode(), "指令已发送但无人机未确认，请检查设备状态");
+        }
+        return Result.fail(400, ack.getCode(), ack.getMessage());
     }
 }

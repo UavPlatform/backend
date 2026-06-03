@@ -2,6 +2,7 @@ package com.drone.server.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -21,8 +22,11 @@ import java.util.function.Function;
 @ConfigurationProperties(prefix = "jwt")
 public class JwtUtil {
 
+    @Setter
     private String secret;               // 密钥字符串
+    @Setter
     private long expiration;              // access token 过期时间（毫秒）
+    @Setter
     private long refreshExpiration;       // refresh token 过期时间（毫秒）
 
     private SecretKey cachedSecretKey;    // 缓存 SecretKey
@@ -149,15 +153,4 @@ public class JwtUtil {
     }
 
 
-    public void setSecret(String secret) {
-        this.secret = secret;
-    }
-
-    public void setExpiration(long expiration) {
-        this.expiration = expiration;
-    }
-
-    public void setRefreshExpiration(long refreshExpiration) {
-        this.refreshExpiration = refreshExpiration;
-    }
 }

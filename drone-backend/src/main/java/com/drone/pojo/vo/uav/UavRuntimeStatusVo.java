@@ -1,4 +1,4 @@
-package com.drone.pojo.vo;
+package com.drone.pojo.vo.uav;
 
 import lombok.Data;
 

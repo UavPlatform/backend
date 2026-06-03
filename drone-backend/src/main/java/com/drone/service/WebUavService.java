@@ -2,16 +2,16 @@ package com.drone.service;
 
 import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.entity.Uav;
-import com.drone.pojo.vo.UavVo;
-import com.drone.pojo.vo.WebUavStatusVo;
+import com.drone.pojo.vo.uav.UavVo;
+import com.drone.pojo.vo.uav.WebUavStatusVo;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface WebUavService {
-    UavVo[] getUav();
+    List<UavVo> getUav();
 
-    UavVo[] getOnlineUav();
+    List<UavVo> getOnlineUav();
 
     WebUavStatusVo getUavStatus(String deviceId);
 

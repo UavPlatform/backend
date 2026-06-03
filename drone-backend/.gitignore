@@ -35,3 +35,6 @@ build/
 ### Local Deployment ###
 .env
 logs/
+
+### Profile Config ###
+application-dev.yml

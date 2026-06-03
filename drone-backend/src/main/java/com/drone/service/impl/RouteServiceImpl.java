@@ -19,7 +19,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,8 +61,6 @@ public class RouteServiceImpl implements RouteService {
         route.setDefaultSpeed(routeDto.getDefaultSpeed());
         route.setDefaultHeight(routeDto.getDefaultHeight());
         route.setDescription(routeDto.getDescription());
-        route.setCreateTime(LocalDateTime.now());
-        route.setUpdateTime(LocalDateTime.now());
 
         List<RouteWaypoint> waypoints = routeDto.getWaypoints().stream()
                 .map(wp -> {

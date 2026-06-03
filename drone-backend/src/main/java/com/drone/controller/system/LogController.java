@@ -1,7 +1,12 @@
 package com.drone.controller.system;
 
+import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.log.LogFileVO;
+import com.drone.pojo.vo.log.LogVO;
+import com.drone.server.annotation.OperationLog;
 import com.drone.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,9 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "Log API")
 @RestController
@@ -26,9 +29,13 @@ public class LogController {
     @Autowired
     private LogService logService;
 
+    @OperationLog("查看日志文件列表")
     @Operation(
-            summary = "获取应用日志",
-            description = "获取应用程序的日志信息",
+            summary = "获取日志文件列表",
+            description = "列出日志目录下的文件和子目录",
+            parameters = {
+                    @Parameter(name = "path", description = "相对路径，留空表示根目录")
+            },
             responses = {
                     @ApiResponse(
                             responseCode = "200",
@@ -37,60 +44,57 @@ public class LogController {
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            example = "{\"success\": true, \"logs\": [\"2026-03-31 10:00:00.000 [main] INFO com.drone.DroneBackendApplication - Starting DroneBackendApplication on DESKTOP-123456 with PID 12345\", ...]}"
+                                            example = "{\"success\": true, \"code\": 200, \"data\": [{\"name\": \"2026-06-01\", \"path\": \"logs/2026-06-01\", \"directory\": true, \"size\": 0, \"lastModified\": \"2026-06-01 16:00:00\"}]}"
                                     )
                             )
                     )
             }
     )
-    @GetMapping("/application")
-    public Map<String, Object> getApplicationLogs(@RequestParam(defaultValue = "100") int lines){
-        log.info("获取应用日志，行数：{}", lines);
-        Map<String, Object> result = new HashMap<>();
-        try {
-            List<String> logs = logService.getApplicationLogs(lines);
-            result.put("success", true);
-            result.put("logs", logs);
-            return result;
-        } catch (Exception e) {
-            log.error("获取应用日志失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return result;
-        }
+    @GetMapping("/files")
+    public Result<List<LogFileVO>> listFiles(@RequestParam(defaultValue = "") String path) {
+        return Result.success(logService.listLogFiles(path));
     }
 
+    @OperationLog("读取日志文件")
     @Operation(
-            summary = "获取错误日志",
-            description = "获取应用程序的错误日志信息",
+            summary = "读取日志文件内容",
+            description = "读取指定日志文件的最后 N 行",
+            parameters = {
+                    @Parameter(name = "file", description = "日志文件相对路径", required = true),
+                    @Parameter(name = "lines", description = "读取行数，默认 200")
+            },
             responses = {
                     @ApiResponse(
                             responseCode = "200",
-                            description = "获取成功",
+                            description = "读取成功",
                             content = @Content(
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            example = "{\"success\": true, \"logs\": [\"2026-03-31 10:00:00.000 [main] ERROR com.drone.service.impl.AdminServiceImpl - 登录验证失败: 用户名或密码错误\", ...]}"
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"logs\": [\"2026-06-01 10:00:00 INFO ...\", \"...\"]}}"
                                     )
                             )
                     )
             }
     )
+    @GetMapping("/read")
+    public Result<LogVO> readLog(@RequestParam String file,
+                                  @RequestParam(defaultValue = "200") int lines) {
+        List<String> logs = logService.readLogFile(file, lines);
+        return Result.success(new LogVO(logs));
+    }
+
+    @OperationLog("获取应用日志")
+    @GetMapping("/application")
+    public Result<LogVO> getApplicationLogs(@RequestParam(defaultValue = "100") int lines) {
+        List<String> logs = logService.getApplicationLogs(lines);
+        return Result.success(new LogVO(logs));
+    }
+
+    @OperationLog("获取错误日志")
     @GetMapping("/error")
-    public Map<String, Object> getErrorLogs(@RequestParam(defaultValue = "100") int lines){
-        log.info("获取错误日志，行数：{}", lines);
-        Map<String, Object> result = new HashMap<>();
-        try {
-            List<String> logs = logService.getErrorLogs(lines);
-            result.put("success", true);
-            result.put("logs", logs);
-            return result;
-        } catch (Exception e) {
-            log.error("获取错误日志失败: {}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return result;
-        }
+    public Result<LogVO> getErrorLogs(@RequestParam(defaultValue = "100") int lines) {
+        List<String> logs = logService.getErrorLogs(lines);
+        return Result.success(new LogVO(logs));
     }
 }

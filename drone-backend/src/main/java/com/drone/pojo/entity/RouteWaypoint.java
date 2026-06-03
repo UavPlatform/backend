@@ -31,4 +31,4 @@ public class RouteWaypoint {
 
     @Column(name = "stay_time")
     private Integer stayTime; // 停留时间（秒，可选）
-}
+}

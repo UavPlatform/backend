@@ -1,8 +1,11 @@
 package com.drone.controller.uav;
 
 import com.drone.pojo.entity.UserRecord;
-import com.drone.pojo.vo.UavVo;
-import com.drone.pojo.vo.WebUavStatusVo;
+import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.uav.UavVo;
+import com.drone.pojo.vo.uav.WebUavStatusVo;
+import com.drone.pojo.vo.user.UserRecordsVO;
+import com.drone.server.annotation.OperationLog;
 import com.drone.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -14,14 +17,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @Tag(name = "WebUav API")
 @RestController
@@ -32,73 +33,35 @@ public class WebUavController {
     @Autowired
     private WebUavService webUavService;
 
-    /**
-     * 获取所有的无人机
-     * @return
-     */
+    @OperationLog("查询无人机列表")
     @Operation(
             summary = "查询无人机",
             description = "获取所有的无人机列表",
             responses = {
                     @ApiResponse(
                             responseCode = "200",
-                            description = "查询成功（可能有数据或无数据）",
+                            description = "查询成功",
                             content = @Content(
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            examples = {
-                                                    "{\"success\": true, \"uav\": [{\"id\": 1, \"uavName\": \"无人机1\"}, {\"id\": 2, \"uavName\": \"无人机2\"}]}",
-                                                    "{\"success\": false, \"message\": \"暂时没有无人机在线\"}"
-                                            }
-                                    )
-                            )
-                    ),
-                    @ApiResponse(
-                            responseCode = "400",
-                            description = "查询失败",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": false, \"message\": \"查询失败\"}"
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
+                                                    + "\"data\": [{\"id\": 1, \"uavName\": \"无人机1\"}, "
+                                                    + "{\"id\": 2, \"uavName\": \"无人机2\"}]}"
                                     )
                             )
                     )
             }
     )
     @GetMapping("/getUav")
-    public ResponseEntity<Map<String, Object>> getUav(@RequestParam(required = false, defaultValue = "false") Boolean onlineOnly){
-        log.info("web端查询无人机, 仅在线: {}", onlineOnly);
-        Map<String, Object> result = new HashMap<>();
-        try {
-            UavVo[] uavVos;
-            if (onlineOnly != null && onlineOnly) {
-                uavVos = webUavService.getOnlineUav();
-                if (uavVos == null || uavVos.length == 0) {
-                    result.put("success", false);
-                    result.put("message", "暂时没有无人机在线");
-                    return ResponseEntity.ok(result);
-                }
-            } else {
-                uavVos = webUavService.getUav();
-                if (uavVos == null || uavVos.length == 0) {
-                    result.put("success", false);
-                    result.put("message", "系统暂时没有录入无人机");
-                    return ResponseEntity.ok(result);
-                }
-            }
-            result.put("success", true);
-            result.put("uav", uavVos);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            log.error("查询无人机失败:{}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
-        }
+    public Result<List<UavVo>> getUav(@RequestParam(required = false, defaultValue = "false") Boolean onlineOnly) {
+        List<UavVo> list = (onlineOnly != null && onlineOnly)
+                ? webUavService.getOnlineUav()
+                : webUavService.getUav();
+        return Result.success(list);
     }
 
+    @OperationLog("查询无人机状态")
     @Operation(
             summary = "查询单台无人机实时状态",
             description = "根据设备ID查询平台侧最近一次收到的无人机状态",
@@ -110,7 +73,9 @@ public class WebUavController {
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            example = "{\"success\": true, \"code\": \"OK\", \"status\": {\"djiId\": \"123456\", \"wsConnected\": true, \"liveState\": \"RUNNING\", \"latestStatus\": {\"battery\": 85}}}"
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
+                                                    + "\"data\": {\"djiId\": \"123456\", \"wsConnected\": true, "
+                                                    + "\"liveState\": \"RUNNING\", \"latestStatus\": {\"battery\": 85}}}"
                                     )
                             )
                     ),
@@ -121,24 +86,14 @@ public class WebUavController {
             }
     )
     @GetMapping("/status")
-    public ResponseEntity<Map<String, Object>> getUavStatus(@RequestParam String deviceId) {
-        log.info("平台端查询无人机状态，deviceId={}", deviceId);
+    public Result<WebUavStatusVo> getUavStatus(@RequestParam String deviceId) {
         WebUavStatusVo status = webUavService.getUavStatus(deviceId);
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", true);
-        result.put("code", "OK");
-        result.put("status", status);
-        return ResponseEntity.ok(result);
+        return Result.success(status);
     }
 
-
-    /**
-     * 查询用户个人观看记录，暂定为管理员权限（虽然现在还没有管理员
-     * @param userName 用户名
-     * @return 用户的直播记录列表
-     */
+    @OperationLog("查询用户观看记录")
     @Operation(
-            summary = "查询用户个人观看记录（管理员权限",
+            summary = "查询用户个人观看记录（管理员权限）",
             description = "根据用户名查询用户的直播观看记录",
             responses = {
                     @ApiResponse(
@@ -148,44 +103,36 @@ public class WebUavController {
                                     mediaType = "application/json",
                                     schema = @Schema(
                                             type = "object",
-                                            example = "{\"success\": true, \"records\": [{\"id\": 1, \"userName\": \"test\", \"djiId\": \"123456\", \"start_time\": \"2026-03-27T10:00:00\", \"end_time\": \"2026-03-27T11:00:00\"}]}"
-                                    )
-                            )
-                    ),
-                    @ApiResponse(
-                            responseCode = "400",
-                            description = "查询失败",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": false, \"message\": \"用户未注册\"}"
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"获取成功\", "
+                                                    + "\"data\": {\"records\": [{\"id\": 1, \"djiId\": \"123456\", "
+                                                    + "\"startTime\": \"2026-03-27T10:00:00\", "
+                                                    + "\"endTime\": \"2026-03-27T11:00:00\"}], "
+                                                    + "\"total\": 5, \"totalPages\": 1}}"
                                     )
                             )
                     )
             }
     )
     @GetMapping("/getRecord")
-    public  ResponseEntity<Map<String, Object>> getUserRecord(@RequestParam String userName, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size){
-        log.info("查询用户个人观看记录：{}, page={}, size={}", userName, page, size);
-        Map<String, Object> result = new HashMap<>();
-        try {
-            // 创建分页参数
-            Pageable pageable = PageRequest.of(page, size);
-            // 查询用户直播记录
-            Page<UserRecord> recordPage = webUavService.getUserRecord(userName, pageable);
-            result.put("success", true);
-            result.put("records", recordPage.getContent());
-            result.put("total", recordPage.getTotalElements());
-            result.put("page", recordPage.getNumber());
-            result.put("size", recordPage.getSize());
-            result.put("totalPages", recordPage.getTotalPages());
-            return ResponseEntity.status(200).body(result);
-        } catch (Exception e) {
-            log.error("查询用户记录失败:{}", e.getMessage());
-            result.put("success", false);
-            result.put("message", e.getMessage());
-            return ResponseEntity.status(400).body(result);
-        }
+    public Result<UserRecordsVO> getUserRecord(@RequestParam String userName,
+                                                @RequestParam(defaultValue = "0") int page,
+                                                @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserRecord> recordPage = webUavService.getUserRecord(userName, pageable);
+
+        List<UserRecordsVO.RecordItem> records = recordPage.getContent().stream().map(r -> {
+            UserRecordsVO.RecordItem item = new UserRecordsVO.RecordItem();
+            item.setId(r.getId());
+            item.setDjiId(r.getDjiId());
+            item.setStartTime(r.getStart_time());
+            item.setEndTime(r.getEnd_time());
+            return item;
+        }).toList();
+
+        UserRecordsVO vo = new UserRecordsVO();
+        vo.setRecords(records);
+        vo.setTotal(recordPage.getTotalElements());
+        vo.setTotalPages(recordPage.getTotalPages());
+        return Result.success("获取成功", vo);
     }
 }

@@ -3,9 +3,11 @@ package com.drone.controller.order;
 import com.drone.pojo.entity.MissionOrder;
 import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.order.OrderListVO;
+import com.drone.pojo.vo.order.OrderVO;
+import com.drone.server.annotation.OperationLog;
 import com.drone.server.annotation.RateLimiter;
 import com.drone.server.exception.BusinessException;
-import com.drone.server.util.LogMaskUtil;
 import com.drone.server.util.UserContext;
 import com.drone.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,14 +18,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.data.domain.Page;
-
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Tag(name = "Order API", description = "订单接口")
 @RestController
@@ -34,6 +33,8 @@ public class WebOrderController {
     @Autowired
     private OrderService orderService;
 
+    @OperationLog("创建订单")
+    @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
             summary = "创建订单",
             description = "根据指定的航线创建支付订单，需传入 routeNum",
@@ -109,25 +110,18 @@ public class WebOrderController {
                     )
             }
     )
-    @RateLimiter(limit = 5, windowSeconds = 60)
     @PostMapping("/create")
-    public Result<Map<String, Object>> createOrder(@RequestParam String routeNum) {
+    public Result<OrderVO> createOrder(@RequestParam String routeNum) {
         if (routeNum == null || routeNum.isBlank()) {
-            throw new BusinessException(org.springframework.http.HttpStatus.BAD_REQUEST,
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
                     ApiErrorCode.INVALID_PARAM, "routeNum 不能为空");
         }
-        String name = currentUserName();
-        log.info("用户: {} 尝试创建订单，航线: {}", maskedName(), routeNum);
-        try {
-            MissionOrder order = orderService.createOrder(name, routeNum);
-            log.info("订单创建成功，订单号: {}", order.getOrderNum());
-            return Result.success("订单创建成功", toMap(order));
-        } catch (BusinessException e) {
-            log.warn("订单创建失败，用户: {}, 原因: {}", maskedName(), e.getMessage());
-            throw e;
-        }
+        String name = UserContext.getUsername();
+        MissionOrder order = orderService.createOrder(name, routeNum);
+        return Result.success("订单创建成功", OrderVO.from(order));
     }
 
+    @OperationLog("查询订单列表")
     @Operation(
             summary = "订单列表",
             description = "获取当前用户的所有订单，按创建时间倒序",
@@ -144,7 +138,7 @@ public class WebOrderController {
                                                     + "\"orderNum\": \"MO20260524143022123zhan0001\", "
                                                     + "\"totalAmount\": 12.50, \"distance\": 250.0, "
                                                     + "\"djiId\": \"DJI-001\", \"routeName\": \"测试航线\", \"orderStatus\": 0}], "
-                                                    + "\"message\": \"获取成功\"}}"
+                                                    + "\"currentPage\": 0, \"totalPages\": 1, \"totalElements\": 1}}"
                                     )
                             )
                     ),
@@ -164,31 +158,24 @@ public class WebOrderController {
             }
     )
     @GetMapping("/list")
-    public Result<Map<String, Object>> listOrders(@RequestParam(defaultValue = "0") int page,
-                                                   @RequestParam(defaultValue = "20") int size) {
-        String name = currentUserName();
-        log.info("用户: {} 查询订单列表，第{}页/每页{}条", maskedName(), page, size);
-        try {
-            Page<MissionOrder> orderPage = orderService.listOrders(name, page, size);
-            List<Map<String, Object>> orderList = new ArrayList<>();
-            for (MissionOrder order : orderPage.getContent()) {
-                orderList.add(toMap(order));
-            }
-            log.info("订单列表查询成功，用户: {}, 共 {} 条", maskedName(), orderList.size());
+    public Result<OrderListVO> listOrders(@RequestParam(defaultValue = "0") int page,
+                                           @RequestParam(defaultValue = "20") int size) {
+        String name = UserContext.getUsername();
+        Page<MissionOrder> orderPage = orderService.listOrders(name, page, size);
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("orders", orderList);
-            result.put("currentPage", orderPage.getNumber());
-            result.put("totalPages", orderPage.getTotalPages());
-            result.put("totalElements", orderPage.getTotalElements());
-            result.put("message", "获取成功");
-            return Result.success("获取成功", result);
-        } catch (BusinessException e) {
-            log.warn("订单列表查询失败，用户: {}, 原因: {}", maskedName(), e.getMessage());
-            throw e;
-        }
+        List<OrderVO> orderList = orderPage.getContent().stream()
+                .map(OrderVO::from)
+                .toList();
+
+        OrderListVO vo = new OrderListVO();
+        vo.setOrders(orderList);
+        vo.setCurrentPage(orderPage.getNumber());
+        vo.setTotalPages(orderPage.getTotalPages());
+        vo.setTotalElements(orderPage.getTotalElements());
+        return Result.success("获取成功", vo);
     }
 
+    @OperationLog("查询订单详情")
     @Operation(
             summary = "订单详情",
             description = "根据订单号获取订单详细信息",
@@ -239,23 +226,18 @@ public class WebOrderController {
             }
     )
     @GetMapping("/detail")
-    public Result<Map<String, Object>> getOrderDetail(@RequestParam String orderNum) {
+    public Result<OrderVO> getOrderDetail(@RequestParam String orderNum) {
         if (orderNum == null || orderNum.isBlank()) {
-            throw new BusinessException(org.springframework.http.HttpStatus.BAD_REQUEST,
-                    com.drone.pojo.enums.ApiErrorCode.INVALID_PARAM, "orderNum 不能为空");
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    ApiErrorCode.INVALID_PARAM, "orderNum 不能为空");
         }
-        String name = currentUserName();
-        log.info("用户: {} 查询订单详情，订单号: {}", maskedName(), orderNum);
-        try {
-            MissionOrder order = orderService.getOrderDetail(orderNum, name);
-            return Result.success("获取成功", toMap(order));
-        } catch (BusinessException e) {
-            log.warn("订单详情查询失败，用户: {}, 订单号: {}, 原因: {}",
-                    maskedName(), orderNum, e.getMessage());
-            throw e;
-        }
+        String name = UserContext.getUsername();
+        MissionOrder order = orderService.getOrderDetail(orderNum, name);
+        return Result.success("获取成功", OrderVO.from(order));
     }
 
+    @OperationLog("取消订单")
+    @RateLimiter(limit = 3, windowSeconds = 60)
     @Operation(
             summary = "取消订单",
             description = "取消待支付状态的订单",
@@ -317,40 +299,13 @@ public class WebOrderController {
             }
     )
     @PostMapping("/cancel")
-    public Result<Map<String, Object>> cancelOrder(@RequestParam String orderNum) {
+    public Result<Void> cancelOrder(@RequestParam String orderNum) {
         if (orderNum == null || orderNum.isBlank()) {
-            throw new BusinessException(org.springframework.http.HttpStatus.BAD_REQUEST,
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
                     ApiErrorCode.INVALID_PARAM, "orderNum 不能为空");
         }
-        String name = currentUserName();
-        log.info("用户: {} 尝试取消订单，订单号: {}", maskedName(), orderNum);
-        try {
-            orderService.cancelOrder(orderNum, name);
-            log.info("订单取消成功，订单号: {}", orderNum);
-            return Result.success("订单取消成功");
-        } catch (BusinessException e) {
-            log.warn("订单取消失败，用户: {}, 订单号: {}, 原因: {}",
-                    maskedName(), orderNum, e.getMessage());
-            throw e;
-        }
-    }
-
-    private String currentUserName() {
-        return UserContext.getUsername();
-    }
-
-    private String maskedName() {
-        return LogMaskUtil.maskUserName(currentUserName());
-    }
-
-    private Map<String, Object> toMap(MissionOrder order) {
-        Map<String, Object> map = new HashMap<>();
-        map.put("orderNum", order.getOrderNum());
-        map.put("totalAmount", order.getTotalAmount());
-        map.put("distance", order.getTotalDistance());
-        map.put("djiId", order.getDjiId());
-        map.put("orderStatus", order.getOrderStatus().getCode());
-        map.put("routeName", order.getRoute() != null ? order.getRoute().getRouteName() : null);
-        return map;
+        String name = UserContext.getUsername();
+        orderService.cancelOrder(orderNum, name);
+        return Result.success("订单取消成功");
     }
 }

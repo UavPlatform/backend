@@ -18,10 +18,13 @@ public class Uav {
     private String uavName;
 
     @Column(name = "online_status")
-    private Character onlineStatus; // 0离线, 1在线
+    private Character onlineStatus;
 
     @Column(name = "uav_create_time")
     private LocalDateTime uavCreateTime;
+
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
 
     @Column(name = "dji_id")
     private String djiId;
@@ -32,4 +35,14 @@ public class Uav {
     @Column(name ="is_available")
     private Character isAvailable;
 
-}
+    @PrePersist
+    protected void onCreate() {
+        this.uavCreateTime = LocalDateTime.now();
+        this.updateTime = this.uavCreateTime;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updateTime = LocalDateTime.now();
+    }
+}

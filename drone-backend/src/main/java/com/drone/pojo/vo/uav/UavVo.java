@@ -1,4 +1,4 @@
-package com.drone.pojo.vo;
+package com.drone.pojo.vo.uav;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

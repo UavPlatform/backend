@@ -6,9 +6,9 @@ import com.drone.mapper.UserRepository;
 import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.entity.Uav;
 import com.drone.pojo.dto.UavStatusDto;
-import com.drone.pojo.vo.UavRuntimeStatusVo;
-import com.drone.pojo.vo.UavVo;
-import com.drone.pojo.vo.WebUavStatusVo;
+import com.drone.pojo.vo.uav.UavRuntimeStatusVo;
+import com.drone.pojo.vo.uav.UavVo;
+import com.drone.pojo.vo.uav.WebUavStatusVo;
 import com.drone.pojo.enums.ApiErrorCode;
 import com.drone.server.exception.BusinessException;
 import com.drone.service.AppWebSocketService;
@@ -20,6 +20,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 
 @Service
@@ -45,16 +47,19 @@ public class WebUavServiceImpl implements WebUavService {
     private LiveSessionService liveSessionService;
 
     @Override
-    public UavVo[] getUav() {
+    @Transactional(readOnly = true)
+    public List<UavVo> getUav() {
         return uavRepository.getAll();
     }
 
     @Override
-    public UavVo[] getOnlineUav() {
+    @Transactional(readOnly = true)
+    public List<UavVo> getOnlineUav() {
         return uavRepository.findUavByOnlineStatus('1');
     }
 
     @Override
+    @Transactional(readOnly = true)
     public WebUavStatusVo getUavStatus(String deviceId) {
         Uav uav = getRegisteredUav(deviceId);
         UavStatusDto status = uavStatusService.getUavStatus(deviceId);
@@ -73,47 +78,31 @@ public class WebUavServiceImpl implements WebUavService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Uav getRegisteredUav(String deviceId) {
         if (deviceId == null || deviceId.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "deviceId 不能为空");
         }
-        Uav uav = uavRepository.findByDjiId(deviceId);
-        if (uav == null) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND);
-        }
-        return uav;
+        return uavRepository.findByDjiId(deviceId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<UserRecord> getUserRecord(String userName) {
-
-        List<UserRecord> records;
-        if(userRepository.findByUserName(userName)!=null){
-            try {
-                records = userRecordRepository.findAllByUserName(userName);
-                if (records.isEmpty()){
-                    return null;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            return records;
-        }else{
-            throw new RuntimeException("用户未注册");
+        if (!userRepository.existsByUserName(userName)) {
+            return List.of();
         }
+        return userRecordRepository.findAllByUserName(userName);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<UserRecord> getUserRecord(String userName, Pageable pageable) {
-        if(userRepository.findByUserName(userName)!=null){
-            try {
-                return userRecordRepository.findAllByUserName(userName, pageable);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }else{
-            throw new RuntimeException("用户未注册");
+        if (!userRepository.existsByUserName(userName)) {
+            return Page.empty(pageable);
         }
+        return userRecordRepository.findAllByUserName(userName, pageable);
     }
 
     private String getLiveState(String deviceId) {

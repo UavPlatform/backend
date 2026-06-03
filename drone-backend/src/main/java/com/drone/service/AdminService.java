@@ -3,20 +3,21 @@ package com.drone.service;
 import com.drone.pojo.dto.AdminDto;
 import com.drone.pojo.entity.Admin;
 import com.drone.pojo.entity.Uav;
-import com.drone.service.impl.LiveSessionSnapshot;
+import com.drone.pojo.vo.admin.AdminStatisticsVO;
+import com.drone.pojo.vo.admin.LiveUavVO;
+
 import java.util.List;
-import java.util.Map;
 
 public interface AdminService {
     Admin tryToLogin(AdminDto adminDto);
 
     boolean updateUavAvailable(String deviceId, Character isAvailable);
 
-    Uav[] getUav();
+    List<Uav> getUav();
 
-    List<Map<String, Object>> getLiveUav();
+    List<LiveUavVO> getLiveUav();
 
     Uav getUavByDeviceId(String deviceId);
 
-    Map<String, Object> getAdminStatistics();
+    AdminStatisticsVO getAdminStatistics();
 }

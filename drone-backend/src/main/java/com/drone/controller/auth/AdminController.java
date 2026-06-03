@@ -3,6 +3,7 @@ package com.drone.controller.auth;
 import com.drone.pojo.dto.AdminDto;
 import com.drone.pojo.entity.Admin;
 import com.drone.pojo.result.Result;
+import com.drone.pojo.vo.auth.AdminLoginVO;
 import com.drone.server.annotation.OperationLog;
 import com.drone.server.annotation.SkipJwt;
 import com.drone.server.util.JwtUtil;
@@ -15,9 +16,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Tag(name = "Admin Auth API")
 @RestController
@@ -48,19 +46,19 @@ public class AdminController {
             }
     )
     @PostMapping("/login")
-    public Result<Map<String, Object>> adminLogin(@RequestBody AdminDto adminDto) {
+    public Result<AdminLoginVO> adminLogin(@RequestBody AdminDto adminDto) {
         Admin admin = adminService.tryToLogin(adminDto);
-        UserContext.setUsername(admin.getName());
+        UserContext.setUser(admin.getId(), admin.getName(), 2);
 
-        Map<String, Object> adminInfo = new HashMap<>();
-        adminInfo.put("id", admin.getId());
-        adminInfo.put("name", admin.getName());
-        adminInfo.put("phoneNumber", admin.getPhoneNumber());
+        AdminLoginVO.AdminInfo adminInfo = new AdminLoginVO.AdminInfo();
+        adminInfo.setId(admin.getId());
+        adminInfo.setName(admin.getName());
+        adminInfo.setPhoneNumber(admin.getPhoneNumber());
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("token", jwtUtil.generateToken(admin.getName()));
-        data.put("admin", adminInfo);
+        AdminLoginVO vo = new AdminLoginVO();
+        vo.setToken(jwtUtil.generateToken(admin.getId(), admin.getName(), 2));
+        vo.setAdmin(adminInfo);
 
-        return Result.success("登录成功", data);
+        return Result.success("登录成功", vo);
     }
 }

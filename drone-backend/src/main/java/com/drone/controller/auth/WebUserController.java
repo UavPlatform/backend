@@ -6,7 +6,10 @@ import com.drone.pojo.dto.UserRegisterDto;
 import com.drone.pojo.entity.User;
 import com.drone.pojo.entity.UserRecord;
 import com.drone.pojo.result.Result;
-import com.drone.pojo.vo.RegisterVo;
+import com.drone.pojo.vo.auth.RegisterVo;
+import com.drone.pojo.vo.auth.TokenRefreshVO;
+import com.drone.pojo.vo.auth.UserLoginVO;
+import com.drone.pojo.vo.user.UserRecordsVO;
 import com.drone.server.annotation.OperationLog;
 import com.drone.server.annotation.RateLimiter;
 import com.drone.server.annotation.SkipJwt;
@@ -26,8 +29,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @Tag(name = "Authentication and Authorization API")
 @RestController
@@ -57,7 +59,8 @@ public class WebUserController {
                     @ApiResponse(responseCode = "200", description = "登录成功",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"token\": \"eyJ...\", \"refreshToken\": \"eyJ...\"}}"))),
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
+                                                    + "\"data\": {\"token\": \"eyJ...\", \"refreshToken\": \"eyJ...\"}}"))),
                     @ApiResponse(responseCode = "401", description = "用户名或密码错误",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
@@ -65,14 +68,15 @@ public class WebUserController {
             }
     )
     @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody UserLoginDto userLoginDto) {
+    public Result<UserLoginVO> login(@RequestBody UserLoginDto userLoginDto) {
         User user = loginService.tryToLogin(userLoginDto);
-        UserContext.setUsername(user.getUserName());  // AOP 成功日志用
+        UserContext.setUser(user.getId(), user.getUserName(), user.getRole());
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("token", jwtUtil.generateToken(user.getUserName()));
-        data.put("refreshToken", jwtUtil.generateRefreshToken(user.getUserName()));
-        return Result.success(data);
+        UserLoginVO vo = new UserLoginVO(
+                jwtUtil.generateToken(user.getId(), user.getUserName(), user.getRole()),
+                jwtUtil.generateRefreshToken(user.getId(), user.getUserName(), user.getRole())
+        );
+        return Result.success(vo);
     }
 
     @SkipJwt
@@ -84,7 +88,8 @@ public class WebUserController {
                     @ApiResponse(responseCode = "200", description = "刷新成功",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"token\": \"eyJ...\"}}"))),
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
+                                                    + "\"data\": {\"token\": \"eyJ...\"}}"))),
                     @ApiResponse(responseCode = "401", description = "刷新失败",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
@@ -92,10 +97,9 @@ public class WebUserController {
             }
     )
     @PostMapping("/refresh")
-    public Result<Map<String, Object>> refreshToken(@RequestHeader("Refresh-Token") String refreshToken) {
-        Map<String, Object> data = new HashMap<>();
-        data.put("token", jwtUtil.refreshAccessToken(refreshToken));
-        return Result.success(data);
+    public Result<TokenRefreshVO> refreshToken(@RequestHeader("Refresh-Token") String refreshToken) {
+        TokenRefreshVO vo = new TokenRefreshVO(jwtUtil.refreshAccessToken(refreshToken));
+        return Result.success(vo);
     }
 
     @SkipJwt
@@ -108,7 +112,8 @@ public class WebUserController {
                     @ApiResponse(responseCode = "200", description = "注册成功",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"userId\": 123, \"userName\": \"test\"}}"))),
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
+                                                    + "\"data\": {\"id\": 123, \"userName\": \"test\"}}"))),
                     @ApiResponse(responseCode = "400", description = "注册失败",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
@@ -116,14 +121,10 @@ public class WebUserController {
             }
     )
     @PostMapping("/register")
-    public Result<Map<String, Object>> registerUser(@RequestBody UserRegisterDto userRegisterDto) {
+    public Result<RegisterVo> registerUser(@RequestBody UserRegisterDto userRegisterDto) {
         RegisterVo registerVo = registerService.tryToRegister(userRegisterDto);
-        UserContext.setUsername(registerVo.getUserName());
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("userId", registerVo.getId());
-        data.put("userName", registerVo.getUserName());
-        return Result.success(data);
+        UserContext.setUser(registerVo.id(), registerVo.userName(), 0);
+        return Result.success(registerVo);
     }
 
     @OperationLog("查询直播记录")
@@ -134,7 +135,10 @@ public class WebUserController {
                     @ApiResponse(responseCode = "200", description = "查询成功",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"records\": [], \"total\": 0, \"totalPages\": 0}}"))),
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"获取成功\", "
+                                                    + "\"data\": {\"records\": [{\"id\": 1, \"djiId\": \"xxx\", "
+                                                    + "\"startTime\": \"2026-05-31T10:00:00\", \"endTime\": \"2026-05-31T11:00:00\"}], "
+                                                    + "\"total\": 1, \"totalPages\": 1}}"))),
                     @ApiResponse(responseCode = "401", description = "未登录",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
@@ -142,16 +146,25 @@ public class WebUserController {
             }
     )
     @GetMapping("/records")
-    public Result<Map<String, Object>> getLiveRecords(@RequestParam(defaultValue = "0") int page,
-                                                       @RequestParam(defaultValue = "10") int size) {
+    public Result<UserRecordsVO> getLiveRecords(@RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "10") int size) {
         String userName = UserContext.getUsername();
         Pageable pageable = PageRequest.of(page, size);
         Page<UserRecord> recordPage = userRecordRepository.findAllByUserName(userName, pageable);
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("records", recordPage.getContent());
-        data.put("total", recordPage.getTotalElements());
-        data.put("totalPages", recordPage.getTotalPages());
-        return Result.success("获取成功", data);
+        List<UserRecordsVO.RecordItem> records = recordPage.getContent().stream().map(r -> {
+            UserRecordsVO.RecordItem item = new UserRecordsVO.RecordItem();
+            item.setId(r.getId());
+            item.setDjiId(r.getDjiId());
+            item.setStartTime(r.getStart_time());
+            item.setEndTime(r.getEnd_time());
+            return item;
+        }).toList();
+
+        UserRecordsVO vo = new UserRecordsVO();
+        vo.setRecords(records);
+        vo.setTotal(recordPage.getTotalElements());
+        vo.setTotalPages(recordPage.getTotalPages());
+        return Result.success("获取成功", vo);
     }
 }

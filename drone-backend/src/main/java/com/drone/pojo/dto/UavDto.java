@@ -3,8 +3,6 @@ package com.drone.pojo.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import javax.swing.*;
-
 @Data
 @Schema(description = "Parameters for Add Request")
 public class UavDto {

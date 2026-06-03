@@ -10,6 +10,17 @@ import java.util.List;
 @Entity
 @Table(name = "route")
 public class Route {
+
+    @PrePersist
+    protected void onCreate() {
+        this.createTime = LocalDateTime.now();
+        this.updateTime = this.createTime;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updateTime = LocalDateTime.now();
+    }
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -44,4 +55,4 @@ public class Route {
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     private List<RouteWaypoint> waypoints;
-}
+}

@@ -1,0 +1,43 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: drone-backend
+  profiles:
+    active: dev
+
+  datasource:
+    driver-class-name: ${drone.datasource.driver-class-name}
+    url: jdbc:mysql://${drone.datasource.host}:${drone.datasource.port}/${drone.datasource.database}?useSSL=false&serverTimezone=UTC
+    username: ${drone.datasource.username}
+    password: ${drone.datasource.password}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+  sql:
+    init:
+      mode: always
+
+log:
+  dir: logs
+
+jwt:
+  secret: ${drone.jwt.secret}
+  expiration: ${drone.jwt.expiration}
+  refresh-expiration: ${drone.jwt.refresh-expiration}
+
+trtc:
+  sdk-app-id: ${drone.trtc.sdk-app-id}
+  secret-key: ${drone.trtc.secret-key}
+  room-expire: ${drone.trtc.room-expire}
+
+order:
+  price-per-meter: 0.05
+
+amap:
+  key: ${drone.amap.key}
+  security-key: ${drone.amap.security-key}

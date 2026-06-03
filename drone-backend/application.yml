@@ -1,0 +1,19 @@
+server:
+  port: 8081
+jwt:
+  secret: "jfaklsddjfklsdgklsdghsdfklghsdfklhskfldhs"
+  # Access Token 过期时间：1 小时
+  expiration: 3600000
+  # Refresh Token 过期时间：7 天
+  refresh-expiration: 604800000
+spring:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+    database-platform: org.hibernate.dialect.MySQLDialect
+  mybatis-plus:
+    configuration:
+      map-underscore-to-camel-case: true   # 开启驼峰转下划线

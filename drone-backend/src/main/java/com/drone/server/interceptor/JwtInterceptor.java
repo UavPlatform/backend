@@ -1,5 +1,6 @@
 package com.drone.server.interceptor;
 
+import com.drone.server.annotation.RequireRole;
 import com.drone.server.annotation.SkipJwt;
 import com.drone.server.exception.UnauthorizedException;
 import com.drone.server.util.JwtUtil;
@@ -54,12 +55,31 @@ public class JwtInterceptor implements HandlerInterceptor {
         }
 
         try {
+            Long userId = jwtUtil.extractUserId(token);
             String username = jwtUtil.extractUsername(token);
-            UserContext.setUsername(username);
-            MDC.put("userId", username);
-            log.debug("Set user: {} into context", username);
+            Integer role = jwtUtil.extractRole(token);
+            UserContext.setUser(userId, username, role);
+            MDC.put("userId", String.valueOf(userId));
+            log.debug("Set user: {}(id={}, role={}) into context", username, userId, role);
         } catch (JwtException e) {
-            throw new UnauthorizedException("Failed to extract username from token");
+            throw new UnauthorizedException("Failed to extract from token");
+        }
+
+        //角色鉴权
+        if (handler instanceof HandlerMethod) {
+            HandlerMethod handlerMethod = (HandlerMethod) handler;
+            RequireRole requireRole = handlerMethod.getMethodAnnotation(RequireRole.class);
+            if (requireRole == null) {
+                requireRole = handlerMethod.getBeanType().getAnnotation(RequireRole.class);
+            }
+            if (requireRole != null && requireRole.value().length > 0) {
+                Integer userRole = UserContext.getRole();
+                boolean allowed = java.util.Arrays.stream(requireRole.value())
+                        .anyMatch(r -> r == (userRole != null ? userRole : -1));
+                if (!allowed) {
+                    throw new UnauthorizedException("权限不足");
+                }
+            }
         }
 
         return true;

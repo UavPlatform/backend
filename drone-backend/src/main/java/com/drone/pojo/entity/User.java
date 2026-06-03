@@ -18,4 +18,7 @@ public class User {
     private String password;
 
     private Integer status;
+
+    @Column(nullable = false)
+    private Integer role = 0;
 }

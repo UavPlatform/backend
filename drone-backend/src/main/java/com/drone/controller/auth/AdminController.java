@@ -48,7 +48,7 @@ public class AdminController {
     @PostMapping("/login")
     public Result<AdminLoginVO> adminLogin(@RequestBody AdminDto adminDto) {
         Admin admin = adminService.tryToLogin(adminDto);
-        UserContext.setUsername(admin.getName());
+        UserContext.setUser(admin.getId(), admin.getName(), 2);
 
         AdminLoginVO.AdminInfo adminInfo = new AdminLoginVO.AdminInfo();
         adminInfo.setId(admin.getId());
@@ -56,7 +56,7 @@ public class AdminController {
         adminInfo.setPhoneNumber(admin.getPhoneNumber());
 
         AdminLoginVO vo = new AdminLoginVO();
-        vo.setToken(jwtUtil.generateToken(admin.getName()));
+        vo.setToken(jwtUtil.generateToken(admin.getId(), admin.getName(), 2));
         vo.setAdmin(adminInfo);
 
         return Result.success("登录成功", vo);

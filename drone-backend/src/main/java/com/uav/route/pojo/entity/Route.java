@@ -1,0 +1,58 @@
+package com.uav.route.pojo.entity;
+
+import jakarta.persistence.*;
+import lombok.Data;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Entity
+@Table(name = "route")
+public class Route {
+
+    @PrePersist
+    protected void onCreate() {
+        this.createTime = LocalDateTime.now();
+        this.updateTime = this.createTime;
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updateTime = LocalDateTime.now();
+    }
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "route_num", unique = true, length = 64)
+    private String routeNum;
+
+    @Column(name = "route_name", nullable = false)
+    private String routeName;
+
+    @Column(name = "user_name")
+    private String userName;
+
+    @Column(name = "dji_id")
+    private String djiId;
+
+    @Column(name = "default_speed", nullable = false)
+    private Double defaultSpeed;
+
+    @Column(name = "default_height", nullable = false)
+    private Double defaultHeight;
+
+    @Column(name = "description")
+    private String description;
+
+    @Column(name = "create_time", nullable = false)
+    private LocalDateTime createTime;
+
+    @Column(name = "update_time")
+    private LocalDateTime updateTime;
+
+    @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<RouteWaypoint> waypoints;
+}

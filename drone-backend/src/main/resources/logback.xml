@@ -116,10 +116,10 @@
     <logger name="com.drone.controller.auth" level="info" additivity="true">
         <appender-ref ref="ASYNC_AUTH"/>
     </logger>
-    <logger name="com.drone.service.impl.LoginServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.auth.service.impl.LoginServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_AUTH"/>
     </logger>
-    <logger name="com.drone.service.impl.RegisterServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.auth.service.impl.RegisterServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_AUTH"/>
     </logger>
 
@@ -127,7 +127,7 @@
     <logger name="com.drone.controller.order" level="info" additivity="true">
         <appender-ref ref="ASYNC_ORDER"/>
     </logger>
-    <logger name="com.drone.service.impl.OrderServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.order.service.impl.OrderServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_ORDER"/>
     </logger>
 
@@ -135,7 +135,7 @@
     <logger name="com.drone.controller.route" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
     </logger>
-    <logger name="com.drone.service.impl.RouteServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.route.service.impl.RouteServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
     </logger>
 
@@ -143,13 +143,13 @@
     <logger name="com.drone.controller.uav" level="info" additivity="true">
         <appender-ref ref="ASYNC_UAV"/>
     </logger>
-    <logger name="com.drone.service.impl.WebUavServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.live.service.impl.WebUavServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_UAV"/>
     </logger>
-    <logger name="com.drone.service.impl.AppUavServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.auth.service.impl.AppUavServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_UAV"/>
     </logger>
-    <logger name="com.drone.service.impl.AdminServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.auth.service.impl.AdminServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_UAV"/>
     </logger>
 
@@ -157,10 +157,10 @@
     <logger name="com.drone.controller.live" level="info" additivity="true">
         <appender-ref ref="ASYNC_LIVE"/>
     </logger>
-    <logger name="com.drone.service.impl.LiveSessionServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.live.service.impl.LiveSessionServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_LIVE"/>
     </logger>
-    <logger name="com.drone.service.impl.TRTCServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.live.service.impl.TRTCServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_LIVE"/>
     </logger>
 

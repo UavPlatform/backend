@@ -14,3 +14,6 @@ spring:
     properties:
       hibernate:
     database-platform: org.hibernate.dialect.MySQLDialect
+  mybatis-plus:
+    configuration:
+      map-underscore-to-camel-case: true   # 开启驼峰转下划线

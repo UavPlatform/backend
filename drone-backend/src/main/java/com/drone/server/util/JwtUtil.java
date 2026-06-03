@@ -79,7 +79,7 @@ public class JwtUtil {
     }
 
     public String extractUsername(String token) throws JwtException {
-        return extractClaim(token, claims -> claims.get("username", String.class));
+        return extractClaim(token, claims -> claims.get("userid", String.class));
     }
 
     public Date extractExpiration(String token) throws JwtException {

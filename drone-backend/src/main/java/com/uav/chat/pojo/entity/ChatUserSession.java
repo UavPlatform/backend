@@ -9,8 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,7 +23,7 @@ public class ChatUserSession {
     @TableField("user_id")
     private Long userId;
     @TableField("join_time")
-    private LocalDateTime joinTime;
+    private Long joinTime;
     @TableField("last_read_time")
-    private LocalDateTime lastReadTime; // 可选，最后读取消息时间
+    private Long lastReadTime; // 可选，最后读取消息时间
 }

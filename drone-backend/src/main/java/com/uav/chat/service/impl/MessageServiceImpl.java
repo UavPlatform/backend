@@ -1,79 +1,101 @@
 package com.uav.chat.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.lang.UUID;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.uav.chat.mapper.ChatMessageMapper;
 import com.uav.chat.pojo.dto.MessageDTO;
+import com.uav.chat.pojo.entity.ChatEnvelope;
 import com.uav.chat.pojo.entity.ChatMessage;
-import com.uav.chat.pojo.vo.MessageVO;
+import com.uav.chat.pojo.enums.MsgType;
 import com.uav.chat.service.MessageService;
-import com.uav.server.enums.ApiErrorCode;
-import com.uav.server.exception.BusinessException;
+import com.uav.chat.websocket.WebSocketServer;
 import com.uav.server.util.UserContext;
-import org.springframework.beans.BeanUtils;
-import org.springframework.http.HttpStatus;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 public class MessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessage> implements MessageService {
+    private WebSocketServer webSocketServer;
 
     @Override
-    public void sendMessage(MessageDTO dto) {
+    public void sendMessage(@Valid MessageDTO dto) {
+        dto.setCreateTime(System.currentTimeMillis());
+        dto.setMsgId(CreateMsgId());
+        // 尝试webSocket发送
+        webSocketServer.sendToUserIds(dto);
+
         ChatMessage chatMessage = BeanUtil.copyProperties(dto, ChatMessage.class);
-        chatMessage.setStatus(0);
-        chatMessage.setCreateTime(LocalDateTime.now());
         super.save(chatMessage);
     }
 
-    @Override
-    public void recallMessage(Long messageId) {
-        ChatMessage existing = super.getById(messageId);
-        if (existing == null) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.MESSAGE_NOT_FOUND);
-        }
-        ChatMessage message = ChatMessage.builder()
-                .id(messageId)
-                .status(2)
-                .recallTime(LocalDateTime.now())
-                .build();
-        super.updateById(message);
+    private static String CreateMsgId() {
+        // UUID
+        return UUID.fastUUID().toString();
     }
 
     @Override
-    public void deleteMessage(Long messageId) {
+    public void recallMessage(@Valid String messageId) {
+        LambdaUpdateWrapper<ChatMessage> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(ChatMessage::getMsgId, messageId)
+                .set(ChatMessage::getStatus, 2)
+                .set(ChatMessage::getRecallTime, System.currentTimeMillis());
+        baseMapper.update(null, updateWrapper);
+    }
+
+    @Override
+    public void deleteMessage(@Valid String messageId) {
         Long userId = UserContext.getUserId();
         ChatMessage message = super.getById(messageId);
-        if (message == null) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.MESSAGE_NOT_FOUND);
+        List<Long> deletedByUserIds = message.getDeletedByUserIds();
+        if (!deletedByUserIds.contains(userId)) {
+            deletedByUserIds.add(userId);
         }
-        message.getDeletedByUserIds().add(userId);
         super.updateById(message);
     }
 
     @Override
-    public List<MessageVO> getMessages(Long sessionId) {
+    public Object getMessages(Long sessionId) {
         Long userId = UserContext.getUserId();
         QueryWrapper<ChatMessage> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("session_id", sessionId);
         queryWrapper.orderByAsc("create_time");
         List<ChatMessage> list = super.list(queryWrapper);
-
+        // 做内容处理,封装成 ChatEnvelope 再返回
+        // 去掉删除的
         list = list.stream()
                 .filter(msg -> !msg.getDeletedByUserIds().contains(userId))
-                .collect(Collectors.toList());
-
+                .toList();
+        // 替换撤回的内容
         return list.stream().map(msg -> {
-            MessageVO vo = new MessageVO();
-            BeanUtils.copyProperties(msg, vo);
+            ChatEnvelope envelope = ChatEnvelope.builder()
+                    .fromUserId(msg.getFromUserId())
+                    .toUserId(userId)
+                    .msgId(msg.getMsgId())
+                    .isOffline(true)
+                    .msgType(MsgType.CHAT)
+                    .needAck(Boolean.FALSE)
+                    .timestamp(msg.getCreateTime())  // 毫秒时间戳
+                    .build();
             if (msg.getStatus() == 2) {
-                vo.setContent("id: " + msg.getFromUserId() + "的用户撤回了一条消息");
-            }
-            return vo;
-        }).collect(Collectors.toList());
+                Long fromUserId = msg.getFromUserId();
+                String content =  "";
+                if (fromUserId.equals(userId)) {
+                    content = "你撤回了一条消息";
+                    msg.setContent(content);
+                }
+                else {
+                    content = "id: " + fromUserId + "的用户撤回了一条消息";
+                }
+                msg.setContent(content);
+                }
+            envelope.setPayload(Map.of("text", msg.getContent()));
+            return envelope;
+        }).toList();
     }
 }

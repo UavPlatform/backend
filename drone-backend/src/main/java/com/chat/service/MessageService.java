@@ -7,7 +7,7 @@ import jakarta.validation.Valid;
 
 public interface MessageService extends IService<ChatMessage>{
     void sendMessage(@Valid MessageDTO dto);
-    void recallMessage(@Valid Long messageId);
-    void deleteMessage(@Valid Long messageId);
+    void recallMessage(@Valid String messageId);
+    void deleteMessage(@Valid String messageId);
     Object getMessages(@Valid Long sessionId);
 }

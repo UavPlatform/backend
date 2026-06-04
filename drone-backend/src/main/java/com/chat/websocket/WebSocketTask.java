@@ -10,8 +10,4 @@ import java.time.format.DateTimeFormatter;
 
 @Component
 public class WebSocketTask {
-    @Autowired
-    private WebSocketServer webSocketServer;
-
-
 }

@@ -5,6 +5,7 @@ import com.chat.pojo.dto.SessionDTO;
 import com.chat.pojo.entity.ChatSession;
 import com.chat.pojo.vo.SessionVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
@@ -14,4 +15,6 @@ public interface SessionService extends IService<ChatSession> {
     void deleteSession(@Valid Long sessionId);
 
     List<SessionVO> listSession();
+
+    List<Long> getUserIdsBySessionId(@NotNull Long sessionId);
 }

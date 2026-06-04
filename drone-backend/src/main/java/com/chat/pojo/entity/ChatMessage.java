@@ -11,7 +11,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +22,10 @@ import java.util.List;
 public class ChatMessage {
 
     @TableId(type = IdType.AUTO)
-    private Long id;
+    private Long id;                 // 数据库自增主键，仅内部使用
+
+    @TableField("msg_id")
+    private String msgId;            // 业务唯一ID（雪花算法生成字符串）
 
     @TableField("from_user_id")
     private Long fromUserId;
@@ -43,7 +45,7 @@ public class ChatMessage {
 
     // 撤回专用字段
     @TableField("recall_time")
-    private LocalDateTime recallTime;
+    private Long recallTime;
 
     // 用户侧软删除：各自独立，不影响其他人
     @TableField(value = "deleted_by_user_ids", typeHandler = FastjsonTypeHandler.class)
@@ -51,7 +53,7 @@ public class ChatMessage {
 
     @Builder.Default
     @TableField("create_time")
-    private LocalDateTime createTime = LocalDateTime.now();
+    private Long createTime = System.currentTimeMillis();
 
     @Builder.Default
     @TableField("msg_type")

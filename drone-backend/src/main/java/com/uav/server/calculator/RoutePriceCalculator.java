@@ -1,6 +1,6 @@
 package com.uav.server.calculator;
 
-import com.uav.route.pojo.entity.RouteWaypoint;
+import com.uav.task.pojo.entity.TaskWaypoint;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,13 +10,7 @@ public class RoutePriceCalculator {
 
     private static final double EARTH_RADIUS = 6371000.0;
 
-    /**
-     * 计算一条航线所有航点连起来的总地面里程
-     *
-     * @param waypoints 航线中的所有航点集合（前提是已经按执行顺序排好）
-     * @return 航线总距离（单位：米）
-     */
-    public static BigDecimal calculateTotalDistance(List<RouteWaypoint> waypoints) {
+    public static BigDecimal calculateTotalDistance(List<TaskWaypoint> waypoints) {
         if (waypoints == null || waypoints.size() < 2) {
             return BigDecimal.ZERO;
         }
@@ -24,8 +18,8 @@ public class RoutePriceCalculator {
         double totalDistance = 0.0;
 
         for (int i = 0; i < waypoints.size() - 1; i++) {
-            RouteWaypoint currentPoint = waypoints.get(i);
-            RouteWaypoint nextPoint = waypoints.get(i + 1);
+            TaskWaypoint currentPoint = waypoints.get(i);
+            TaskWaypoint nextPoint = waypoints.get(i + 1);
 
             double lat1 = currentPoint.getLatitude();
             double lon1 = currentPoint.getLongitude();
@@ -42,9 +36,6 @@ public class RoutePriceCalculator {
         return pricePerMeter.multiply(distanceMeters).setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * 基于哈弗辛公式 (Haversine Formula) 计算两个 GPS 坐标点之间的最短球面距离
-     */
     private static double getDistance2D(double lat1, double lon1, double lat2, double lon2) {
         double radLat1 = Math.toRadians(lat1);
         double radLat2 = Math.toRadians(lat2);

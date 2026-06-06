@@ -1,4 +1,4 @@
-package com.uav.route.pojo.entity;
+package com.uav.task.pojo.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -7,28 +7,26 @@ import lombok.Data;
 @Data
 @Entity
 @Table(name = "route_waypoint")
-public class RouteWaypoint {
+public class TaskWaypoint {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id", nullable = false)
+    @JoinColumn(name = "task_id", nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     @JsonIgnore
-    private Route route;
+    private Task task;
 
     @Column(name = "waypoint_order", nullable = false)
-    private Integer orderIndex; // 路径点顺序
+    private Integer orderIndex;
 
     @Column(name = "longitude", nullable = false)
-    private Double longitude; // 经度
+    private Double longitude;
 
     @Column(name = "latitude", nullable = false)
-    private Double latitude; // 纬度
+    private Double latitude;
 
     @Column(name = "altitude")
-    private Double altitude; // 高度（可选，可使用航线默认高度）
-
-    @Column(name = "stay_time")
-    private Integer stayTime; // 停留时间（秒，可选）
+    private Double altitude;
 }

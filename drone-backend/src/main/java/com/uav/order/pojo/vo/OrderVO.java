@@ -8,8 +8,7 @@ public record OrderVO(
         String orderNum,
         BigDecimal totalAmount,
         BigDecimal distance,
-        String djiId,
-        String routeName,
+        String taskName,
         int orderStatus
 ) {
     public static OrderVO from(MissionOrder order) {
@@ -17,8 +16,7 @@ public record OrderVO(
                 order.getOrderNum(),
                 order.getTotalAmount(),
                 order.getTotalDistance(),
-                order.getDjiId(),
-                order.getRoute() != null ? order.getRoute().getRouteName() : null,
+                order.getTask() != null ? order.getTask().getTaskName() : null,
                 order.getOrderStatus().getCode()
         );
     }

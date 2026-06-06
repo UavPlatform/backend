@@ -1,16 +1,15 @@
 package com.uav.order.service.impl;
 
 import com.uav.order.mapper.OrderRepository;
-import com.uav.route.mapper.RouteRepository;
+import com.uav.task.mapper.TaskRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.OrderStatus;
-import com.uav.route.pojo.entity.Route;
-import com.uav.route.pojo.entity.RouteWaypoint;
+import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.calculator.RoutePriceCalculator;
 import com.uav.server.config.OrderConfig;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
-import com.uav.server.util.LogMaskUtil;
 import com.uav.server.util.OrderIdGenerator;
 import com.uav.order.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +30,7 @@ import java.util.Optional;
 public class OrderServiceImpl implements OrderService {
 
     @Autowired
-    private RouteRepository routeRepository;
+    private TaskRepository taskRepository;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -40,36 +39,33 @@ public class OrderServiceImpl implements OrderService {
     private OrderConfig orderConfig;
 
     @Override
-    @Transactional
-    public MissionOrder createOrder(String name, String routeNum) {
-        // 先校验航线
-        Optional<Route> routeOpt = routeRepository.findByRouteNum(routeNum);
-        if (routeOpt.isEmpty()) {
+    @Transactional(rollbackFor = Exception.class)
+    public MissionOrder createOrder(Long userId, String taskNum) {
+        Optional<Task> taskOpt = taskRepository.findByTaskNum(taskNum);
+        if (taskOpt.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ROUTE_NOT_FOUND);
         }
 
-        Route route = routeOpt.get();
-        if (!route.getUserName().equals(name)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权使用此航线");
+        Task task = taskOpt.get();
+        if (!task.getUserId().equals(userId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权使用此任务");
         }
 
-        // 航线校验通过后再拿锁检查已有未支付订单
-        Optional<MissionOrder> unpaid = orderRepository.findByUserNameAndOrderStatusForUpdate(name, OrderStatus.PENDING);
+        Optional<MissionOrder> unpaid = orderRepository.findByUserIdAndOrderStatusForUpdate(userId, OrderStatus.PENDING);
         if (unpaid.isPresent()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
-        List<RouteWaypoint> waypoints = route.getWaypoints();
+        List<TaskWaypoint> waypoints = task.getWaypoints();
 
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
         BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, orderConfig.getPricePerMeter());
 
-        String orderNum = OrderIdGenerator.generate(name);
+        String orderNum = OrderIdGenerator.generate(userId);
 
         MissionOrder order = new MissionOrder();
         order.setOrderNum(orderNum);
-        order.setUserName(name);
-        order.setRoute(route);
-        order.setDjiId(route.getDjiId());
+        order.setUserId(userId);
+        order.setTask(task);
         order.setTotalAmount(totalAmount);
         order.setTotalDistance(distance);
         order.setOrderStatus(OrderStatus.PENDING);
@@ -77,16 +73,15 @@ public class OrderServiceImpl implements OrderService {
         try {
             orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
-            log.warn("并发冲突，用户 {} 已有待支付订单，唯一约束拦截", LogMaskUtil.maskUserName(name));
+            log.warn("并发冲突，用户ID {} 已有待支付订单，唯一约束拦截", userId);
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
 
-        log.info("订单创建成功，订单号: {}, 用户: {}, 金额: {}元, 距离: {}m",
-                orderNum, LogMaskUtil.maskUserName(name), totalAmount, distance);
+        log.info("订单创建成功，订单号: {}, 用户ID: {}, 金额: {}元, 距离: {}m",
+                orderNum, userId, totalAmount, distance);
 
-        // 事务内触碰懒加载字段，确保返回给 Controller 后 open-in-view=false 时可用
-        if (order.getRoute() != null) {
-            order.getRoute().getRouteName();
+        if (order.getTask() != null) {
+            order.getTask().getTaskName();
         }
 
         return order;
@@ -94,17 +89,17 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MissionOrder> listOrders(String name, int page, int size) {
-        return orderRepository.findByUserNameOrderByCreateTimeDesc(name, PageRequest.of(page, size));
+    public Page<MissionOrder> listOrders(Long userId, int page, int size) {
+        return orderRepository.findByUserIdOrderByCreateTimeDesc(userId, PageRequest.of(page, size));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MissionOrder getOrderDetail(String orderNum, String name) {
+    public MissionOrder getOrderDetail(String orderNum, Long userId) {
         MissionOrder order = orderRepository.findByOrderNum(orderNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
 
-        if (!order.getUserName().equals(name)) {
+        if (!order.getUserId().equals(userId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND);
         }
 
@@ -112,12 +107,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
-    public void cancelOrder(String orderNum, String name) {
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelOrder(String orderNum, Long userId) {
         MissionOrder order = orderRepository.findByOrderNumForUpdate(orderNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
 
-        if (!order.getUserName().equals(name)) {
+        if (!order.getUserId().equals(userId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND);
         }
 
@@ -128,6 +123,6 @@ public class OrderServiceImpl implements OrderService {
 
         order.setOrderStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
-        log.info("订单取消成功，订单号: {}, 用户: {}", orderNum, LogMaskUtil.maskUserName(name));
+        log.info("订单取消成功，订单号: {}, 用户ID: {}", orderNum, userId);
     }
 }

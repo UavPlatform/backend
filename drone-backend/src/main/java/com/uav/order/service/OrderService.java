@@ -5,11 +5,11 @@ import org.springframework.data.domain.Page;
 
 public interface OrderService {
 
-    MissionOrder createOrder(String name, String routeNum);
+    MissionOrder createOrder(Long userId, String taskNum);
 
-    Page<MissionOrder> listOrders(String name, int page, int size);
+    Page<MissionOrder> listOrders(Long userId, int page, int size);
 
-    MissionOrder getOrderDetail(String orderNum, String name);
+    MissionOrder getOrderDetail(String orderNum, Long userId);
 
-    void cancelOrder(String orderNum, String name);
+    void cancelOrder(String orderNum, Long userId);
 }

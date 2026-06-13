@@ -3,12 +3,15 @@ package com.uav.server.handler;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.result.Result;
 import com.uav.server.exception.BusinessException;
+import com.uav.server.exception.PayNotifyException;
 import com.uav.server.exception.UnauthorizedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
@@ -26,6 +29,13 @@ public class GlobalExceptionHandler {
         log.warn("BusinessException: {}", e.getMessage());
         return ResponseEntity.status(e.getHttpStatus())
                 .body(Result.fail(e.getHttpStatus().value(), e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(PayNotifyException.class)
+    public ResponseEntity<Map<String, String>> handlePayNotifyException(PayNotifyException e) {
+        log.error("支付回调处理失败: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("code", "FAIL", "message", e.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

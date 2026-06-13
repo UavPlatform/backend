@@ -1,6 +1,6 @@
 package com.uav.order.pojo.entity;
 
-import com.uav.route.pojo.entity.Route;
+import com.uav.task.pojo.entity.Task;
 import com.uav.server.enums.OrderStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Setter
 @Entity
 @Table(name = "mission_order", indexes = {
-        @Index(name = "idx_user_status", columnList = "user_name, order_status")
+        @Index(name = "idx_user_status", columnList = "user_id, order_status")
 })
 public class MissionOrder {
     @Id
@@ -22,15 +22,13 @@ public class MissionOrder {
     @Column(name = "order_num", unique = true, nullable = false, length = 64)
     private String orderNum;
 
-    @Column(name = "user_name", nullable = false)
-    private String userName;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id", nullable = false)
-    private Route route;
-
-    @Column(name = "dji_id", nullable = false)
-    private String djiId;
+    @JoinColumn(name = "task_id", nullable = false,
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+    private Task task;
 
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
@@ -42,9 +40,6 @@ public class MissionOrder {
     @Column(name = "order_status", nullable = false)
     private OrderStatus orderStatus;
 
-    /**
-     * 唯一索引防并发重复下单：PENDING 时 = userName，非 PENDING 时 = NULL（允许多个 NULL）
-     */
     @Column(name = "pending_key", unique = true, length = 64)
     private String pendingKey;
 
@@ -81,6 +76,7 @@ public class MissionOrder {
     }
 
     private void syncPendingKey() {
-        this.pendingKey = (this.orderStatus == OrderStatus.PENDING) ? this.userName : null;
+        this.pendingKey = (this.orderStatus == OrderStatus.PENDING && this.userId != null)
+                ? String.valueOf(this.userId) : null;
     }
 }

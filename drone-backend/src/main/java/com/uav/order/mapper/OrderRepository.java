@@ -13,27 +13,25 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface OrderRepository extends JpaRepository<MissionOrder, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT o FROM MissionOrder o WHERE o.userName = :userName AND o.orderStatus = :orderStatus")
-    Optional<MissionOrder> findByUserNameAndOrderStatusForUpdate(@Param("userName") String userName,
-                                                                  @Param("orderStatus") OrderStatus orderStatus);
+    @Query("SELECT o FROM MissionOrder o WHERE o.userId = :userId AND o.orderStatus = :orderStatus")
+    Optional<MissionOrder> findByUserIdAndOrderStatusForUpdate(@Param("userId") Long userId,
+                                                                @Param("orderStatus") OrderStatus orderStatus);
 
-    @EntityGraph(attributePaths = "route")
+    @EntityGraph(attributePaths = "task")
     Optional<MissionOrder> findByOrderNum(String orderNum);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM MissionOrder o WHERE o.orderNum = :orderNum")
     Optional<MissionOrder> findByOrderNumForUpdate(@Param("orderNum") String orderNum);
 
-    @EntityGraph(attributePaths = "route")
-    List<MissionOrder> findByUserNameOrderByCreateTimeDesc(String userName);
+    @EntityGraph(attributePaths = "task")
+    Page<MissionOrder> findByUserIdOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
-    @EntityGraph(attributePaths = "route")
-    Page<MissionOrder> findByUserNameOrderByCreateTimeDesc(String userName, Pageable pageable);
+    Optional<MissionOrder> findByTaskId(Long taskId);
 }

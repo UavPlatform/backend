@@ -8,6 +8,7 @@ import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.RouteIdGenerator;
@@ -232,6 +233,37 @@ public class TaskServiceImpl implements TaskService {
         assignment.setCompleteTime(LocalDateTime.now());
         taskAssignmentRepository.save(assignment);
 
-        log.info("任务 {} 已完成，骑手ID: {}", taskNum, riderId);
+        orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
+            order.setOrderStatus(OrderStatus.WAITING_CONFIRM);
+            orderRepository.save(order);
+        });
+
+        log.info("任务 {} 已完成，等待用户ID {} 确认", taskNum, task.getUserId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void userConfirmTask(String taskNum, Long userId) {
+        Task task = taskRepository.findByTaskNum(taskNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
+        if (!task.getUserId().equals(userId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权确认此任务");
+        }
+        if (task.getTaskStatus() != TaskStatus.COMPLETED) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务尚未完成，无法确认");
+        }
+
+        orderRepository.findByTaskId(task.getId()).ifPresentOrElse(
+                order -> {
+                    if (order.getOrderStatus() != OrderStatus.WAITING_CONFIRM) {
+                        throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_STATUS_INVALID,
+                                "订单状态不允许确认");
+                    }
+                    order.setOrderStatus(OrderStatus.COMPLETED);
+                    orderRepository.save(order);
+                    log.info("用户ID {} 确认收货，订单 {} 已完成", userId, order.getOrderNum());
+                },
+                () -> log.warn("任务 {} 未找到关联订单，跳过确认", taskNum)
+        );
     }
 }

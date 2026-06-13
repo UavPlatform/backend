@@ -115,4 +115,14 @@ public class UserTaskController {
         taskService.deleteTask(id, userId);
         return Result.success("任务删除成功");
     }
+
+    @OperationLog("确认收货")
+    @Operation(summary = "确认收货", description = "骑手完成任务后用户确认收货，订单完结",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @PostMapping("/confirm")
+    public Result<Void> confirmTask(@RequestParam String taskNum) {
+        Long userId = UserContext.getUserId();
+        taskService.userConfirmTask(taskNum, userId);
+        return Result.success("确认收货成功");
+    }
 }

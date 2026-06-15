@@ -68,15 +68,15 @@
         <encoder><pattern>${PATTERN}</pattern></encoder>
     </appender>
 
-    <!-- route -->
+    <!-- task -->
     <appender name="ASYNC_ROUTE" class="ch.qos.logback.classic.AsyncAppender">
         <neverBlock>false</neverBlock><queueSize>256</queueSize>
         <appender-ref ref="ROUTE"/>
     </appender>
     <appender name="ROUTE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/route/route.log</file>
+        <file>${LOG_DIR}/task/task.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_DIR}/route/route-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_DIR}/task/task-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>90</maxHistory>
         </rollingPolicy>
         <encoder><pattern>${PATTERN}</pattern></encoder>
@@ -131,11 +131,11 @@
         <appender-ref ref="ASYNC_ORDER"/>
     </logger>
 
-    <!-- route: 航线规划 -->
-    <logger name="com.drone.controller.route" level="info" additivity="true">
+    <!-- task: 航线规划 -->
+    <logger name="com.drone.controller.task" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
     </logger>
-    <logger name="com.uav.route.service.impl.RouteServiceImpl" level="info" additivity="true">
+    <logger name="com.uav.task.service.impl.RouteServiceImpl" level="info" additivity="true">
         <appender-ref ref="ASYNC_ROUTE"/>
     </logger>
 

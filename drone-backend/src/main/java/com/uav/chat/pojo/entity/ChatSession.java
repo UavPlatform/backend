@@ -43,5 +43,5 @@ public class ChatSession {
     private String description;          // 会话描述
 
     @TableField("create_time")
-    private Long createTime = System.currentTimeMillis(); // 群聊创建时间
+    private LocalDateTime createTime = LocalDateTime.now(); // 群聊创建时间
 }

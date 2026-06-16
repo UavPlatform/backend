@@ -19,4 +19,14 @@ public enum OrderStatus {
         this.desc = desc;
     }
 
+    public static OrderStatus fromCode(Integer code) {
+        if (code == null) return null;
+        for (OrderStatus status : values()) {
+            if (status.code == code) {
+                return status;
+            }
+        }
+        throw new IllegalArgumentException("无效的订单状态码: " + code);
+    }
+
 }

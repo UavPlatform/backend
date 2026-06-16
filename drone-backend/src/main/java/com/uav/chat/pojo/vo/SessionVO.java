@@ -2,7 +2,6 @@ package com.uav.chat.pojo.vo;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -20,9 +19,5 @@ public class SessionVO {
     private String avatar;               // 会话头像（可选）
     private String description;          // 会话描述（可选）
 
-    private LocalDateTime createTime;    // 群聊创建时间
-
-    public void setSessionId(Long id) {
-
-    }
+    private Long createTime;    // 群聊创建时间
 }

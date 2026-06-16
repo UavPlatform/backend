@@ -4,7 +4,9 @@ import com.uav.pay.config.WeChatPayConfig;
 import com.uav.server.exception.PayNotifyException;
 import com.github.binarywang.wxpay.bean.notify.SignatureHeader;
 import com.github.binarywang.wxpay.bean.notify.WxPayNotifyV3Result;
+import com.github.binarywang.wxpay.bean.request.WxPayRefundV3Request;
 import com.github.binarywang.wxpay.bean.request.WxPayUnifiedOrderV3Request;
+import com.github.binarywang.wxpay.bean.result.WxPayRefundV3Result;
 import com.github.binarywang.wxpay.bean.result.WxPayUnifiedOrderV3Result;
 import com.github.binarywang.wxpay.bean.result.enums.TradeTypeEnum;
 import com.github.binarywang.wxpay.config.WxPayConfig;
@@ -72,6 +74,30 @@ public class WeChatPayUtil {
             }
         }
         return wxPayService;
+    }
+
+    public static WxPayRefundV3Result refund(WeChatPayConfig wechatConfig,
+                                             String transactionId, String outRefundNo,
+                                             String reason, BigDecimal totalAmount, BigDecimal refundAmount) {
+        WxPayService service = getWxPayService(wechatConfig);
+
+        WxPayRefundV3Request request = new WxPayRefundV3Request();
+        request.setTransactionId(transactionId);
+        request.setOutRefundNo(outRefundNo);
+        request.setReason(reason);
+
+        WxPayRefundV3Request.Amount amount = new WxPayRefundV3Request.Amount();
+        amount.setTotal(totalAmount.multiply(BigDecimal.valueOf(100)).intValue());
+        amount.setRefund(refundAmount.multiply(BigDecimal.valueOf(100)).intValue());
+        amount.setCurrency("CNY");
+        request.setAmount(amount);
+
+        try {
+            return service.refundV3(request);
+        } catch (Exception e) {
+            log.error("微信退款失败: {}", e.getMessage());
+            throw new RuntimeException("微信退款失败", e);
+        }
     }
 
     public static WxPayNotifyV3Result parseNotifyResult(HttpServletRequest request,

@@ -5,10 +5,12 @@ import lombok.Data;
 
 @Data
 public class MessageDTO {
-    @NotNull
+    private String msgId;
     private Long fromUserId;
     @NotNull
     private Long sessionId;
     @NotNull
     private String content;
+
+    private Long createTime;
 }

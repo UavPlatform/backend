@@ -21,6 +21,11 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Override
+    public String getName(Long userId) {
+        return userRepository.findById(userId).map(User::getUserName).orElse(null);
+    }
+
+    @Override
     public User tryToLogin(UserLoginDto userLoginDto) {
         String userName = userLoginDto.getUserName();
         String password = userLoginDto.getPassword();

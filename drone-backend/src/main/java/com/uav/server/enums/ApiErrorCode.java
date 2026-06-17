@@ -25,7 +25,16 @@ public enum ApiErrorCode {
     MESSAGE_NOT_FOUND("MESSAGE_NOT_FOUND", "消息不存在"),
     SESSION_NOT_FOUND("SESSION_NOT_FOUND", "会话不存在"),
     REFUND_FAILED("REFUND_FAILED", "退款失败"),
-    PAY_RECORD_NOT_FOUND("PAY_RECORD_NOT_FOUND", "支付记录不存在");
+    PAY_RECORD_NOT_FOUND("PAY_RECORD_NOT_FOUND", "支付记录不存在"),
+    FILE_NOT_FOUND("FILE_NOT_FOUND", "文件不存在"),
+    FILE_UPLOAD_EXPIRED("FILE_UPLOAD_EXPIRED", "上传会话已过期"),
+    FILE_CHUNK_INVALID("FILE_CHUNK_INVALID", "分片索引无效"),
+    FILE_TOO_LARGE("FILE_TOO_LARGE", "文件大小超出限制"),
+    FILE_TYPE_NOT_ALLOWED("FILE_TYPE_NOT_ALLOWED", "不支持的文件类型"),
+    FILE_MERGE_FAILED("FILE_MERGE_FAILED", "文件合并失败"),
+    FILE_BIND_FAILED("FILE_BIND_FAILED", "文件与订单绑定失败"),
+    FILE_UPLOAD_NOT_COMPLETE("FILE_UPLOAD_NOT_COMPLETE", "上传未完成，缺少分片"),
+    FILE_ACCESS_DENIED("FILE_ACCESS_DENIED", "无权访问此文件");
 
     private final String code;
     private final String defaultMessage;

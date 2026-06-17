@@ -12,4 +12,11 @@ public interface OrderService {
     MissionOrder getOrderDetail(String orderNum, Long userId);
 
     void cancelOrder(String orderNum, Long userId);
+
+    /**
+     * 更新订单的 executeResult（文件上传后绑定）
+     * @param orderNum 订单号
+     * @param resultUuid 32 字符 UUID（去横杠），作为文件目录标识
+     */
+    void updateExecuteResult(String orderNum, String resultUuid);
 }

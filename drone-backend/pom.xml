@@ -157,6 +157,13 @@
             <version>2.0.53</version>
         </dependency>
 
+        <!-- 腾讯云 COS SDK -->
+        <dependency>
+            <groupId>com.qcloud</groupId>
+            <artifactId>cos_api</artifactId>
+            <version>5.6.241</version>
+        </dependency>
+
         <!-- Flyway: chat 模块数据库迁移（JPA 模块仍由 ddl-auto=update 管理） -->
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -173,6 +180,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
 				<configuration>
 					<annotationProcessorPaths>
 						<path>

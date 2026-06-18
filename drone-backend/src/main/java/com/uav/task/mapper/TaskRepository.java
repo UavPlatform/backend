@@ -20,6 +20,9 @@ import java.util.List;
 public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @EntityGraph(attributePaths = "waypoints")
+    List<Task> findAllById(Iterable<Long> ids);
+
+    @EntityGraph(attributePaths = "waypoints")
     List<Task> findByUserIdOrderByCreateTimeDesc(Long userId);
 
     @EntityGraph(attributePaths = "waypoints")
@@ -31,6 +34,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @EntityGraph(attributePaths = "waypoints")
     List<Task> findByTaskStatusOrderByCreateTimeDesc(TaskStatus taskStatus);
 
+    @EntityGraph(attributePaths = "waypoints")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT t FROM Task t WHERE t.taskNum = :taskNum")
     Optional<Task> findByTaskNumForUpdate(@Param("taskNum") String taskNum);

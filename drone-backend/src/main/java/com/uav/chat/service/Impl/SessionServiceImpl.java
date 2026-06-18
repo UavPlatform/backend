@@ -43,7 +43,7 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
         session.setCreateTime(currentTimeMillis);
         session.setOwnerId(userId);
         super.save(session);
-        List<ChatUserSession> sessions = distinctIds.stream()
+        List<ChatUserSession> chatUserSessions = distinctIds.stream()
                 .map(id -> ChatUserSession.builder()
                         .sessionId(session.getId())
                         .userId(id)
@@ -51,7 +51,7 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                         .lastReadTime(currentTimeMillis)
                         .build())
                 .collect(Collectors.toList());
-        userSessionService.saveBatch(sessions);
+        userSessionService.saveBatch(chatUserSessions);
         return;
 
 //        // 2. 查出这些用户中真实存在的ID
@@ -82,18 +82,26 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
 //                        .build())
 //                .collect(Collectors.toList());
 //
-//        userSessionService.saveBatch(sessions);
+//        userSessionService.saveBatch(chatUserSessions);
     }
 
     @Override
-    public void deleteSession(Long sessionId) {
+    public String deleteSession(Long sessionId) {
+        String respStr = "";
         ChatSession session = super.getById(sessionId);
         if (session == null) {
-            throw new RuntimeException("会话不存在");
+            respStr = "会话不存在";
+            return respStr;
         }
-        if (session.getOwnerId().equals(UserContext.getUserId())) {
-            super.removeById(sessionId);
+        Long ownerId = session.getOwnerId();
+        Long userId = UserContext.getUserId();
+        if (ownerId != null && Objects.equals(ownerId, userId)) {
+            respStr = super.removeById(sessionId) ? "会话已删除" : "会话删除失败";
         }
+        else {
+            respStr = "只有群主可以删除会话";
+        }
+        return respStr;
     }
 
     @Override

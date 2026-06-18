@@ -12,7 +12,7 @@ import java.util.List;
 public interface SessionService extends IService<ChatSession> {
     void createSession(@Valid SessionDTO dto);
 
-    void deleteSession(@Valid Long sessionId);
+    String deleteSession(@Valid Long sessionId);
 
     List<SessionVO> listSession();
 

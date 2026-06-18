@@ -23,7 +23,7 @@ public class MessageController {
 
     @OperationLog("发送消息")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "发送消息")
+    @Operation(summary = "发送消息", description = "发送消息")
     @PostMapping("/send")
     public Object sendMessage(@Valid @RequestBody MessageDTO dto) {
         messageService.sendMessage(dto);
@@ -31,25 +31,34 @@ public class MessageController {
     }
     @OperationLog("撤回消息")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "撤回消息")
-    @PostMapping("/recall/{messageId}")
-    public Object recallMessage(@Valid @PathVariable String messageId) {
-        messageService.recallMessage(messageId);
+    @Operation(summary = "撤回消息", description = "撤回消息")
+    @PostMapping("/recall/{msgId}")
+    public Object recallMessage(@Valid @PathVariable String msgId) {
+        messageService.recallMessage(msgId);
         return Result.success();
     }
     @OperationLog("删除消息")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "删除消息")
-    @PostMapping("/delete/{messageId}")
-    public Object deleteMessage(@Valid @PathVariable String messageId) {
-        messageService.deleteMessage(messageId);
+    @Operation(summary = "删除消息", description = "删除消息")
+    @PostMapping("/delete/{msgId}")
+    public Object deleteMessage(@Valid @PathVariable String msgId) {
+        messageService.deleteMessage(msgId);
         return Result.success();
     }
     @OperationLog("获取消息")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "获取消息")
-    @GetMapping("/messages/{sessionId}")
-    public Object getMessages(@Valid @PathVariable Long sessionId) {
-        return Result.success(messageService.getMessages(sessionId));
+    @Operation(summary = "获取消息", description = "获取消息")
+    @GetMapping("/messages/{msgId}")
+    public Object getMessages(@Valid @PathVariable Long msgId) {
+        return Result.success(messageService.getMessages(msgId));
+    }
+
+    @OperationLog("同步离线消息")
+    @RateLimiter(limit = 2, windowSeconds = 30)
+    @Operation(summary = "同步离线消息", description = "拉取所有会话中上次读取后错过的消息，并更新 lastReadTime")
+    @GetMapping("/sync")
+    public Object syncMessages() {
+        Long userId = com.uav.server.util.UserContext.getUserId();
+        return Result.success(messageService.getUnreadMessages(userId));
     }
 }

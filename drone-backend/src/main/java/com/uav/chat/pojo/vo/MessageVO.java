@@ -2,8 +2,6 @@ package com.uav.chat.pojo.vo;
 
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
 public class MessageVO {
 
@@ -19,9 +17,9 @@ public class MessageVO {
     private Integer status;
 
     // 撤回专用字段
-    private LocalDateTime recallTime;   // 撤回时间
+    private Long recallTime;   // 撤回时间
 
-    private LocalDateTime createTime;
+    private Long createTime;
 
     // 消息类型（文本、图片、语音等）
     private Integer msgType;

@@ -23,7 +23,9 @@ public enum ApiErrorCode {
     ROUTE_NOT_FOUND("ROUTE_NOT_FOUND", "未查询到航线信息，请先创建航线"),
     INTERNAL_ERROR("INTERNAL_ERROR", "系统内部错误"),
     MESSAGE_NOT_FOUND("MESSAGE_NOT_FOUND", "消息不存在"),
-    SESSION_NOT_FOUND("SESSION_NOT_FOUND", "会话不存在");
+    SESSION_NOT_FOUND("SESSION_NOT_FOUND", "会话不存在"),
+    REFUND_FAILED("REFUND_FAILED", "退款失败"),
+    PAY_RECORD_NOT_FOUND("PAY_RECORD_NOT_FOUND", "支付记录不存在");
 
     private final String code;
     private final String defaultMessage;

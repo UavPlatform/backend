@@ -48,7 +48,7 @@ public class ChatMessage {
     private Long recallTime;
 
     // 用户侧软删除：各自独立，不影响其他人
-    @TableField(value = "deleted_by_user_ids", typeHandler = FastjsonTypeHandler.class)
+    @TableField(value = "deleted_by_user_ids", typeHandler = JacksonTypeHandler.class)
     private List<Long> deletedByUserIds = new ArrayList<>();
 
     @Builder.Default

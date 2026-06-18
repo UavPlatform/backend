@@ -6,6 +6,7 @@ import com.uav.user.pojo.entity.User;
 import com.uav.user.pojo.vo.RegisterVo;
 
 public interface UserService {
+    String getName(Long userId);
     void updateRole(Long userId, Integer role);
     RegisterVo tryToRegister(UserRegisterDto userRegisterDto);
     User tryToLogin(UserLoginDto userLoginDto);

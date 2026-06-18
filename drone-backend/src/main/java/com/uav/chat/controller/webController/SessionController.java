@@ -24,7 +24,7 @@ public class SessionController {
 
     @OperationLog("创建会话")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "创建会话")
+    @Operation(summary = "创建会话", description = "创建会话")
     @PostMapping("/create")
     public Object createSession(@Valid @RequestBody SessionDTO dto) {
         sessionService.createSession(dto);
@@ -32,15 +32,14 @@ public class SessionController {
     }
     @OperationLog("删除会话")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "删除会话")
+    @Operation(summary = "删除会话", description = "删除会话")
     @PostMapping("/delete/{sessionId}")
     public Object deleteSession(@Valid @PathVariable Long sessionId) {
-        sessionService.deleteSession(sessionId);
-        return Result.success();
+        return Result.success(sessionService.deleteSession(sessionId));
     }
     @OperationLog("列出会话")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "列出会话")
+    @Operation(summary = "列出会话", description = "列出会话")
     @GetMapping("/list")
     public Object listSession() {
         return Result.success(sessionService.listSession());

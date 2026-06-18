@@ -9,5 +9,6 @@ public class TaskDto {
     private String taskName;
     private TaskType type;
     private String description;
+    private Double reward;
     private List<WaypointDto> waypoints;
 }

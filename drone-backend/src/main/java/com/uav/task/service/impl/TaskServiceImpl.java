@@ -67,6 +67,7 @@ public class TaskServiceImpl implements TaskService {
         task.setTaskStatus(TaskStatus.IDLE);
         task.setUserId(userId);
         task.setDescription(dto.getDescription());
+        task.setReward(dto.getReward());
 
         List<TaskWaypoint> waypoints = dto.getWaypoints().stream()
                 .map(wp -> {
@@ -82,7 +83,7 @@ public class TaskServiceImpl implements TaskService {
 
         task.setWaypoints(waypoints);
         Task saved = taskRepository.save(task);
-        orderService.createOrder(userId, saved.getTaskNum());
+        orderService.createOrder(userId, saved.getTaskNum(), saved.getReward());
         log.info("任务创建成功，编号: {}, 用户ID: {}, 类型: {}", saved.getTaskNum(), userId, dto.getType());
         return saved;
     }

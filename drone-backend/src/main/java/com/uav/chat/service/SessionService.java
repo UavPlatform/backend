@@ -10,7 +10,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public interface SessionService extends IService<ChatSession> {
-    void createSession(@Valid SessionDTO dto);
+    SessionVO createSession(@Valid SessionDTO dto);
 
     String deleteSession(@Valid Long sessionId);
 

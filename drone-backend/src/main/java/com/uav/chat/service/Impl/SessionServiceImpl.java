@@ -4,14 +4,18 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.uav.chat.mapper.ChatMessageMapper;
 import com.uav.chat.mapper.ChatSessionMapper;
 import com.uav.chat.pojo.dto.SessionDTO;
+import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
 import com.uav.chat.pojo.vo.SessionVO;
 import com.uav.chat.service.SessionService;
 import com.uav.chat.service.UserSessionService;
 import com.uav.server.util.UserContext;
+import com.uav.user.mapper.UserRepository;
+import com.uav.user.pojo.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,18 +31,35 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
     @Autowired
     private UserSessionService userSessionService;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private ChatMessageMapper chatMessageMapper;
+
 //    @Transactional(rollbackFor = Exception.class)
     @Override
-    public void createSession(SessionDTO dto) {
+    public SessionVO createSession(SessionDTO dto) {
         Long userId = UserContext.getUserId();
-        List<Long> ids = dto.getUserIds();
-
-        // 1. 包含创建者并去重
+        List<Long> ids = new java.util.ArrayList<>(dto.getUserIds());
         ids.add(userId);
         List<Long> distinctIds = ids.stream().distinct().toList();
 
-        // 先用这个测试
+        if (dto.getType() != null && dto.getType() == 0 && distinctIds.size() == 2) {
+            List<SessionVO> existing = listSession();
+            for (SessionVO s : existing) {
+                if (s.getType() != null && s.getType() == 0) {
+                    List<Long> sIds = getUserIdsBySessionId(s.getId());
+                    if (sIds != null && sIds.size() == 2
+                            && sIds.containsAll(distinctIds)) {
+                        return s;
+                    }
+                }
+            }
+        }
+
         ChatSession session = BeanUtil.copyProperties(dto, ChatSession.class);
+        session.setUserIds(distinctIds);
         long currentTimeMillis = System.currentTimeMillis();
         session.setCreateTime(currentTimeMillis);
         session.setOwnerId(userId);
@@ -52,37 +73,17 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                         .build())
                 .collect(Collectors.toList());
         userSessionService.saveBatch(chatUserSessions);
-        return;
 
-//        // 2. 查出这些用户中真实存在的ID
-//        List<Long> validUserIds = userService.listByIds(distinctIds)
-//                .stream()
-//                .map(User::getId)
-//                .collect(Collectors.toList());
-//
-//        // 3. 创建会话（即使有效用户只剩一个人也允许或者可以再加判断）
-//        ChatSession session = BeanUtil.copyProperties(dto, ChatSession.class);
-//        session.setCreateTime(LocalDateTime.now());
-//        session.setOwnerId(userId);
-//        if (session.getName() == null) {
-//            String sessionName = session.getUserIds().stream()
-//                    .map(id -> userService.getById(id).getName())
-//                    .collect(Collectors.joining("、"));
-//            session.setName(sessionName);
-//        }
-//        super.save(session);
-//
-//        // 4. 只为存在的用户建立会话关联
-//        List<ChatUserSession> sessions = validUserIds.stream()
-//                .map(id -> ChatUserSession.builder()
-//                        .sessionId(session.getId())
-//                        .userId(id)
-//                        .joinTime(LocalDateTime.now())
-//                        .lastReadTime(LocalDateTime.now())
-//                        .build())
-//                .collect(Collectors.toList());
-//
-//        userSessionService.saveBatch(chatUserSessions);
+        SessionVO vo = BeanUtil.copyProperties(session, SessionVO.class);
+        vo.setUserIds(distinctIds);
+
+        if (dto.getType() != null && dto.getType() == 0 && distinctIds.size() == 2) {
+            Long otherId = distinctIds.stream().filter(id -> !id.equals(userId)).findFirst().orElse(null);
+            if (otherId != null) {
+                userRepository.findById(otherId).ifPresent(u -> vo.setOtherUserName(u.getUserName()));
+            }
+        }
+        return vo;
     }
 
     @Override
@@ -126,12 +127,44 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
         Map<Long, ChatSession> sessionMap = sessions.stream()
                 .collect(Collectors.toMap(ChatSession::getId, Function.identity()));
 
-        // 4. 组装 VO
+        // 4. 查询这些会话的所有成员
+        LambdaQueryWrapper<ChatUserSession> memberWrapper = Wrappers.lambdaQuery();
+        memberWrapper.in(ChatUserSession::getSessionId, sessionIds);
+        List<ChatUserSession> allMembers = userSessionService.list(memberWrapper);
+        Map<Long, List<Long>> memberMap = allMembers.stream()
+                .collect(Collectors.groupingBy(
+                        ChatUserSession::getSessionId,
+                        Collectors.mapping(ChatUserSession::getUserId, Collectors.toList())));
+
         return userSessions.stream()
-                .map(us -> {
-                    ChatSession session = sessionMap.get(us.getSessionId());
+                .map(ChatUserSession::getSessionId)
+                .distinct()
+                .map(sessionId -> {
+                    ChatSession session = sessionMap.get(sessionId);
                     if (session == null) return null;
-                    return BeanUtil.copyProperties(session, SessionVO.class);
+                    SessionVO vo = BeanUtil.copyProperties(session, SessionVO.class);
+                    List<Long> memberIds = memberMap.getOrDefault(sessionId, Collections.emptyList());
+                    vo.setUserIds(memberIds);
+                    // 私聊：找对方用户名
+                    if (session.getType() != null && session.getType() == 0 && memberIds.size() == 2) {
+                        Long otherId = memberIds.stream().filter(id -> !id.equals(userId)).findFirst().orElse(null);
+                        if (otherId != null) {
+                            User otherUser = userRepository.findById(otherId).orElse(null);
+                            if (otherUser != null) vo.setOtherUserName(otherUser.getUserName());
+                        }
+                    }
+                    // 最后一条消息
+                    com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatMessage> msgWrapper =
+                            Wrappers.<ChatMessage>lambdaQuery()
+                                    .eq(ChatMessage::getSessionId, sessionId)
+                                    .orderByDesc(ChatMessage::getCreateTime)
+                                    .last("LIMIT 1");
+                    ChatMessage lastMsg = chatMessageMapper.selectOne(msgWrapper);
+                    if (lastMsg != null) {
+                        vo.setLastMessage(lastMsg.getContent());
+                        vo.setLastMessageTime(lastMsg.getCreateTime());
+                    }
+                    return vo;
                 })
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -139,7 +172,11 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
 
     @Override
     public List<Long> getUserIdsBySessionId(Long sessionId) {
-        return super.getById(sessionId).getUserIds();
+        LambdaQueryWrapper<ChatUserSession> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(ChatUserSession::getSessionId, sessionId);
+        return userSessionService.list(wrapper).stream()
+                .map(ChatUserSession::getUserId)
+                .collect(Collectors.toList());
     }
 
 }

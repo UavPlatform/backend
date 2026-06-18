@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 
 public interface OrderService {
 
-    MissionOrder createOrder(Long userId, String taskNum);
+    MissionOrder createOrder(Long userId, String taskNum, Double reward);
 
     Page<MissionOrder> listOrders(Long userId, int page, int size);
 

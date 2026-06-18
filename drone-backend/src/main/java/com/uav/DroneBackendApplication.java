@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
 @MapperScan({"com.uav.chat.mapper"})
-@ConfigurationPropertiesScan({"com.uav.server.util", "com.uav.pay.config", "com.uav.server.file.config"})
+@ConfigurationPropertiesScan({"com.uav.server.util", "com.uav.pay.config", "com.uav.upload.config"})
 @EnableScheduling
 public class DroneBackendApplication {
 

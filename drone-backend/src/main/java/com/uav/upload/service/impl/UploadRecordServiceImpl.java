@@ -1,4 +1,4 @@
-package com.uav.server.file.service.impl;
+package com.uav.upload.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
@@ -6,11 +6,11 @@ import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
-import com.uav.server.file.config.FileStorageConfig;
-import com.uav.server.file.entity.UploadedFile;
-import com.uav.server.file.repository.FileRepository;
-import com.uav.server.file.service.FileRecordService;
-import com.uav.server.file.service.FileStorageService;
+import com.uav.upload.config.UploadStorageConfig;
+import com.uav.upload.entity.UploadedFile;
+import com.uav.upload.repository.UploadRepository;
+import com.uav.upload.service.UploadRecordService;
+import com.uav.upload.service.UploadStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,11 +27,11 @@ import java.util.List;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-public class FileRecordServiceImpl implements FileRecordService {
+public class UploadRecordServiceImpl implements UploadRecordService {
 
-    private final FileRepository fileRepository;
-    private final FileStorageService fileStorageService;
-    private final FileStorageConfig config;
+    private final UploadRepository uploadRepository;
+    private final UploadStorageService uploadStorageService;
+    private final UploadStorageConfig config;
     private final OrderRepository orderRepository;
 
     @Override
@@ -47,56 +47,56 @@ public class FileRecordServiceImpl implements FileRecordService {
                 .userId(userId)
                 .uploadStatus("INITIATED")
                 .build();
-        return fileRepository.save(entity);
+        return uploadRepository.save(entity);
     }
 
     @Override
     @Transactional
     public UploadedFile markCompleted(String uploadId, String storagePath, String fileUrl, long actualFileSize) {
-        UploadedFile entity = fileRepository.findByUploadId(uploadId)
+        UploadedFile entity = uploadRepository.findByUploadId(uploadId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.FILE_NOT_FOUND));
         entity.setUploadStatus("COMPLETED");
         entity.setStoragePath(storagePath);
         entity.setFileUrl(fileUrl);
         entity.setFileSize(actualFileSize);
-        return fileRepository.save(entity);
+        return uploadRepository.save(entity);
     }
 
     @Override
     @Transactional
     public void markFailed(String uploadId) {
-        fileRepository.findByUploadId(uploadId).ifPresent(entity -> {
+        uploadRepository.findByUploadId(uploadId).ifPresent(entity -> {
             entity.setUploadStatus("FAILED");
-            fileRepository.save(entity);
+            uploadRepository.save(entity);
         });
     }
 
     @Override
     public UploadedFile getById(Long id) {
-        return fileRepository.findById(id)
+        return uploadRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.FILE_NOT_FOUND));
     }
 
     @Override
     public Page<UploadedFile> listByUser(Long userId, int page, int size) {
-        return fileRepository.findByUserIdOrderByCreateTimeDesc(userId, PageRequest.of(page, size));
+        return uploadRepository.findByUserIdOrderByCreateTimeDesc(userId, PageRequest.of(page, size));
     }
 
     @Override
     public Page<UploadedFile> listByOrder(String orderNum, int page, int size) {
-        return fileRepository.findByOrderNumOrderByCreateTimeDesc(orderNum, PageRequest.of(page, size));
+        return uploadRepository.findByOrderNumOrderByCreateTimeDesc(orderNum, PageRequest.of(page, size));
     }
 
     @Override
     public Page<UploadedFile> listByOrderAndUser(String orderNum, Long userId, int page, int size) {
-        return fileRepository.findByOrderNumAndUserIdOrderByCreateTimeDesc(orderNum, userId, PageRequest.of(page, size));
+        return uploadRepository.findByOrderNumAndUserIdOrderByCreateTimeDesc(orderNum, userId, PageRequest.of(page, size));
     }
 
     @Override
     @Transactional
     public List<UploadedFile> bindToOrder(List<Long> fileIds, String orderNum, Long userId) {
         // 1. 校验所有文件属于当前用户且已完成上传
-        List<UploadedFile> files = fileRepository.findByUserIdAndIdIn(userId, fileIds);
+        List<UploadedFile> files = uploadRepository.findByUserIdAndIdIn(userId, fileIds);
         if (files.size() != fileIds.size()) {
             throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.FILE_NOT_FOUND,
                     "部分文件不存在或无权访问");
@@ -131,12 +131,12 @@ public class FileRecordServiceImpl implements FileRecordService {
             String newPath = targetDir + "/" + f.getOriginalName();
 
             if (!newPath.equals(oldPath)) {
-                String movedPath = fileStorageService.moveFile(oldPath, newPath);
+                String movedPath = uploadStorageService.moveFile(oldPath, newPath);
                 f.setStoragePath(movedPath);
-                f.setFileUrl(fileStorageService.getFileUrl(movedPath));
+                f.setFileUrl(uploadStorageService.getFileUrl(movedPath));
             }
             f.setOrderNum(orderNum);
-            fileRepository.save(f);
+            uploadRepository.save(f);
             log.info("文件绑定订单，fileId: {}, orderNum: {}, path: {}", f.getId(), orderNum, f.getStoragePath());
         }
 
@@ -151,11 +151,11 @@ public class FileRecordServiceImpl implements FileRecordService {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.FILE_ACCESS_DENIED);
         }
         try {
-            fileStorageService.deleteFile(entity.getStoragePath());
+            uploadStorageService.deleteFile(entity.getStoragePath());
         } catch (Exception e) {
             log.warn("删除 COS 文件失败，继续删除记录: {}", entity.getStoragePath(), e);
         }
-        fileRepository.delete(entity);
+        uploadRepository.delete(entity);
         log.info("文件记录删除，fileId: {}, path: {}", id, entity.getStoragePath());
     }
 
@@ -166,12 +166,13 @@ public class FileRecordServiceImpl implements FileRecordService {
     @Transactional
     public void cleanupStaleUploads() {
         LocalDateTime deadline = LocalDateTime.now().minusHours(config.getUploadTtlHours());
-        List<UploadedFile> stale = new ArrayList<>(fileRepository.findByUploadStatusAndCreateTimeBefore("INITIATED", deadline));
-        stale.addAll(fileRepository.findByUploadStatusAndCreateTimeBefore("UPLOADING", deadline));
+        List<UploadedFile> stale = new ArrayList<>(uploadRepository.findByUploadStatusAndCreateTimeBefore("INITIATED", deadline));
+        stale.addAll(uploadRepository.findByUploadStatusAndCreateTimeBefore("UPLOADING", deadline));
+        stale.addAll(uploadRepository.findByUploadStatusAndCreateTimeBefore("PENDING_SIGN", deadline));
 
         for (UploadedFile f : stale) {
             f.setUploadStatus("FAILED");
-            fileRepository.save(f);
+            uploadRepository.save(f);
         }
         if (!stale.isEmpty()) {
             log.info("清理过期上传会话 {} 条", stale.size());

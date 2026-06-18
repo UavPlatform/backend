@@ -1,4 +1,4 @@
-package com.uav.server.file.entity;
+package com.uav.upload.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

@@ -1,4 +1,4 @@
-package com.uav.server.file.dto;
+package com.uav.upload.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

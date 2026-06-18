@@ -1,11 +1,11 @@
-package com.uav.server.file.service;
+package com.uav.upload.service;
 
 import java.io.InputStream;
 
 /**
  * 文件存储服务接口 —— 当前仅 COS 实现，设计兼容本地存储。
  */
-public interface FileStorageService {
+public interface UploadStorageService {
 
     /**
      * 初始化分片上传会话。

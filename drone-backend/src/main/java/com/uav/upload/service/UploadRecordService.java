@@ -1,11 +1,11 @@
-package com.uav.server.file.service;
+package com.uav.upload.service;
 
-import com.uav.server.file.entity.UploadedFile;
+import com.uav.upload.entity.UploadedFile;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
 
-public interface FileRecordService {
+public interface UploadRecordService {
 
     /** 创建上传初始化记录 */
     UploadedFile createInitRecord(String uploadId, String fileName, long fileSize,

@@ -1,4 +1,4 @@
-package com.uav.server.file.vo;
+package com.uav.upload.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

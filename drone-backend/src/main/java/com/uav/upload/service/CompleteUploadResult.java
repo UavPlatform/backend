@@ -1,4 +1,4 @@
-package com.uav.server.file.service;
+package com.uav.upload.service;
 
 /**
  * 分片上传完成结果。

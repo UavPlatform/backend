@@ -1,4 +1,4 @@
-package com.uav.server.file.service.impl;
+package com.uav.upload.service.impl;
 
 import cn.hutool.core.util.IdUtil;
 import com.qcloud.cos.COSClient;
@@ -7,10 +7,11 @@ import com.qcloud.cos.auth.BasicCOSCredentials;
 import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.model.*;
 import com.qcloud.cos.region.Region;
-import com.uav.server.file.config.FileStorageConfig;
-import com.uav.server.file.service.CompleteUploadResult;
-import com.uav.server.file.service.FileStorageService;
+import com.uav.upload.config.UploadStorageConfig;
+import com.uav.upload.service.CompleteUploadResult;
+import com.uav.upload.service.UploadStorageService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -23,19 +24,19 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * 腾讯云 COS 文件存储实现 —— 分片上传。
  */
-@Service
+@ConditionalOnProperty(name = "file.storage.type", havingValue = "cos", matchIfMissing = true)
 @Slf4j
-public class CosFileStorageServiceImpl implements FileStorageService {
+public class CosUploadStorageServiceImpl implements UploadStorageService {
 
     private final COSClient cosClient;
-    private final FileStorageConfig config;
+    private final UploadStorageConfig config;
 
     /** 上传会话：key=会话ID, value=COS 分片上传上下文 */
     private final Map<String, CosUploadContext> sessions = new ConcurrentHashMap<>();
 
-    public CosFileStorageServiceImpl(FileStorageConfig config) {
+    public CosUploadStorageServiceImpl(UploadStorageConfig config) {
         this.config = config;
-        FileStorageConfig.Cos cos = config.getCos();
+        UploadStorageConfig.Cos cos = config.getCos();
         COSCredentials cred = new BasicCOSCredentials(cos.getSecretId(), cos.getSecretKey());
         ClientConfig clientConfig = new ClientConfig(new Region(cos.getRegion()));
         this.cosClient = new COSClient(cred, clientConfig);

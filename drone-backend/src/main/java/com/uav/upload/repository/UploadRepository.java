@@ -1,6 +1,6 @@
-package com.uav.server.file.repository;
+package com.uav.upload.repository;
 
-import com.uav.server.file.entity.UploadedFile;
+import com.uav.upload.entity.UploadedFile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface FileRepository extends JpaRepository<UploadedFile, Long> {
+public interface UploadRepository extends JpaRepository<UploadedFile, Long> {
 
     Optional<UploadedFile> findByUploadId(String uploadId);
 

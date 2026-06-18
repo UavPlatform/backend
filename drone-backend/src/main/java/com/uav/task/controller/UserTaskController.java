@@ -16,6 +16,7 @@ import com.uav.server.annotation.RateLimiter;
 import com.uav.server.config.AmapConfig;
 import com.uav.server.util.UserContext;
 import com.uav.task.service.TaskService;
+import com.uav.user.mapper.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,6 +47,9 @@ public class UserTaskController {
     @Autowired
     private OrderRepository orderRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @GetMapping("/init")
     public Result<AmapConfigVO> init() {
         return Result.success(new AmapConfigVO(amapConfig.getKey(), amapConfig.getSecurityKey()));
@@ -57,14 +61,7 @@ public class UserTaskController {
     @PostMapping("/create")
     public Result<TaskVo> createTask(@RequestBody TaskDto dto) {
         Task saved = taskService.createTask(dto);
-        TaskVo vo = TaskVo.from(saved);
-        MissionOrder order = orderRepository.findByTaskId(saved.getId()).orElse(null);
-        if (order != null) {
-            vo.setOrderNum(order.getOrderNum());
-            vo.setTotalAmount(order.getTotalAmount());
-            vo.setTotalDistance(order.getTotalDistance());
-        }
-        return Result.success("任务创建成功", vo);
+        return Result.success("任务创建成功", toTaskVo(saved));
     }
 
     @OperationLog("查询任务列表")
@@ -76,7 +73,7 @@ public class UserTaskController {
         Page<Task> taskPage = taskService.getTasksByUser(userId, page, size);
 
         List<TaskVo> tasks = taskPage.getContent().stream()
-                .map(TaskVo::from)
+                .map(this::toTaskVo)
                 .toList();
 
         TaskPageVO vo = new TaskPageVO();
@@ -94,15 +91,24 @@ public class UserTaskController {
     public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {
         Long userId = UserContext.getUserId();
         Task task = taskService.getTaskByTaskNum(taskNum, userId);
+        return Result.success("获取成功", toTaskVo(task));
+    }
+
+    private TaskVo toTaskVo(Task task) {
         TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElse(null);
         TaskVo vo = TaskVo.from(task, assignment);
+        if (assignment != null) {
+            userRepository.findById(assignment.getRiderId())
+                .ifPresent(user -> vo.setRiderName(user.getUserName()));
+        }
         MissionOrder order = orderRepository.findByTaskId(task.getId()).orElse(null);
         if (order != null) {
             vo.setOrderNum(order.getOrderNum());
             vo.setTotalAmount(order.getTotalAmount());
             vo.setTotalDistance(order.getTotalDistance());
+            vo.setOrderStatus(order.getOrderStatus().name());
         }
-        return Result.success("获取成功", vo);
+        return vo;
     }
 
     @OperationLog("删除任务")

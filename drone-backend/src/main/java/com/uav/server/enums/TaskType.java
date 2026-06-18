@@ -5,7 +5,11 @@ import lombok.Getter;
 @Getter
 public enum TaskType {
     AERIAL_PHOTO("航拍"),
-    TRANSPORT("调运");
+    TRANSPORT("调运"),
+
+    SURVEY("测绘"),
+
+    MONITORING("监测");
 
     private final String description;
 

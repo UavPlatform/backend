@@ -20,10 +20,12 @@ public class TaskVo {
     private TaskStatus taskStatus;
     private String description;
     private Long riderId;
+    private String riderName;
     private LocalDateTime acceptTime;
     private String orderNum;
     private BigDecimal totalAmount;
     private BigDecimal totalDistance;
+    private String orderStatus;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<WaypointVo> waypoints;

@@ -18,6 +18,7 @@ spring:
       ddl-auto: update
     show-sql: true
     open-in-view: false
+    defer-datasource-initialization: true
   sql:
     init:
       mode: always
@@ -25,7 +26,8 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    locations: classpath:db/migration
+    baseline-version: 0
+    locations: classpath:db/migration/chat,classpath:db/migration/task,classpath:db/migration/user
 
 log:
   dir: logs

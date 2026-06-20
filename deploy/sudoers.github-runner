@@ -1,0 +1,1 @@
+github-runner ALL=(root) NOPASSWD: /opt/drone/deploy.sh

@@ -1,0 +1,1 @@
+command="sudo /opt/drone/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,no-user-rc ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBd5sTR30zhTuGe8LOSgLvB57DJTsg/cgXWTQneXOaQR github-actions-deploy

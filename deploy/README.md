@@ -19,6 +19,7 @@
 | `restricted-shell.sh` | github-runner 的受限 shell | `/opt/drone/restricted-shell.sh` |
 | `sudoers.github-runner` | sudo 权限配置 | `/etc/sudoers.d/github-runner` |
 | `authorized_keys.example` | SSH 公钥模板 | `/opt/drone/.ssh/authorized_keys` |
+| `Caddyfile` | Caddy 反向代理配置 | `/etc/caddy/Caddyfile` |
 
 ## 初始部署步骤
 
@@ -51,7 +52,11 @@ ssh root@drone.fuwaki.icu "mkdir -p /opt/drone/.ssh && ssh-keygen -t ed25519 -f 
 # 8. 共享 podman 认证
 ssh root@drone.fuwaki.icu "mkdir -p /etc/containers && cp /run/user/0/containers/auth.json /etc/containers/auth.json && chmod 644 /etc/containers/auth.json"
 
-# 9. 启动服务
+# 9. 配置 Caddy 反向代理
+scp Caddyfile root@drone.fuwaki.icu:/etc/caddy/Caddyfile
+ssh root@drone.fuwaki.icu "systemctl restart caddy"
+
+# 10. 启动服务
 ssh root@drone.fuwaki.icu "cd /opt/drone && docker compose up -d"
 ```
 

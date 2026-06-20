@@ -41,7 +41,7 @@ RUN jlink \
          --module-path /opt/java/openjdk/jmods \
          --add-modules java.base,java.compiler,java.desktop,java.logging,\
 java.management,java.naming,java.rmi,java.sql,java.transaction.xa,\
-java.xml,java.net.http,jdk.crypto.ec,jdk.unsupported \
+java.xml,java.net.http,java.security.jgss,jdk.crypto.ec,jdk.unsupported \
          --output /jre \
          --no-header-files \
          --no-man-pages \

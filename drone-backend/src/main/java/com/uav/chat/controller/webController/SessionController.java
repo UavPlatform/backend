@@ -1,6 +1,7 @@
 package com.uav.chat.controller.webController;
 
 import com.uav.chat.pojo.dto.SessionDTO;
+import com.uav.chat.pojo.vo.SessionVO;
 import com.uav.chat.service.SessionService;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RateLimiter;
@@ -26,9 +27,8 @@ public class SessionController {
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(summary = "创建会话", description = "创建会话")
     @PostMapping("/create")
-    public Object createSession(@Valid @RequestBody SessionDTO dto) {
-        sessionService.createSession(dto);
-        return Result.success();
+    public Result<SessionVO> createSession(@Valid @RequestBody SessionDTO dto) {
+        return Result.success(sessionService.createSession(dto));
     }
     @OperationLog("删除会话")
     @RateLimiter(limit = 5, windowSeconds = 60)

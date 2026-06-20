@@ -47,8 +47,13 @@ public class UserServiceImpl implements UserService {
 
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateRole(Long userId, Integer role) {
-
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST,
+                        ApiErrorCode.INVALID_PARAM, "用户不存在"));
+        user.setRole(role);
+        userRepository.save(user);
     }
 
     @Override

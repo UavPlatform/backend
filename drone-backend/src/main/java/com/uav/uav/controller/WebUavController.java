@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import static com.uav.user.controller.UserController.getUserRecordsVOResult;
+
 @Tag(name = "WebUav API")
 @RestController
 @RequestMapping("/webUav")
@@ -120,19 +122,6 @@ public class WebUavController {
         Pageable pageable = PageRequest.of(page, size);
         Page<UserRecord> recordPage = webUavService.getUserRecord(userName, pageable);
 
-        List<UserRecordsVO.RecordItem> records = recordPage.getContent().stream().map(r -> {
-            UserRecordsVO.RecordItem item = new UserRecordsVO.RecordItem();
-            item.setId(r.getId());
-            item.setDjiId(r.getDjiId());
-            item.setStartTime(r.getStart_time());
-            item.setEndTime(r.getEnd_time());
-            return item;
-        }).toList();
-
-        UserRecordsVO vo = new UserRecordsVO();
-        vo.setRecords(records);
-        vo.setTotal(recordPage.getTotalElements());
-        vo.setTotalPages(recordPage.getTotalPages());
-        return Result.success("获取成功", vo);
+        return getUserRecordsVOResult(recordPage);
     }
 }

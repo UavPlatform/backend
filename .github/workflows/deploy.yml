@@ -1,0 +1,21 @@
+name: Deploy to Server
+
+on:
+  workflow_run:
+    workflows: ["Docker Publish"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: drone.fuwaki.icu
+          username: github-runner
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: sudo /opt/drone/deploy.sh

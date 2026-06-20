@@ -9,7 +9,7 @@ spring:
 
   datasource:
     driver-class-name: ${drone.datasource.driver-class-name}
-    url: jdbc:mysql://${drone.datasource.host}:${drone.datasource.port}/${drone.datasource.database}?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://${drone.datasource.host}:${drone.datasource.port}/${drone.datasource.database}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${drone.datasource.username}
     password: ${drone.datasource.password}
 

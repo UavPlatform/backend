@@ -8,9 +8,8 @@ WORKDIR /build
 # 代理（本地构建传入，CI 不传）
 ARG PROXY=""
 
-# ① 复制源码并直接编译打包
+# ① 缓存 Maven 依赖（仅 pom.xml 变化时重新下载）
 COPY pom.xml ./
-COPY src/ src/
 RUN set -eux; \
     if [ -n "$PROXY" ]; then \
       export http_proxy="$PROXY" https_proxy="$PROXY"; \
@@ -29,37 +28,32 @@ RUN set -eux; \
         '  </proxies>' \
         '</settings>' > /root/.m2/settings.xml; \
     fi; \
+    mvn -B -ntp -DskipTests dependency:go-offline
+
+# ② 编译打包
+COPY src/ src/
+RUN set -eux; \
+    if [ -n "$PROXY" ]; then \
+      export http_proxy="$PROXY" https_proxy="$PROXY"; \
+    fi; \
     mvn -B -ntp -DskipTests clean package \
     && find target -maxdepth 1 -type f -name "*.jar" ! -name "original-*.jar" \
        -exec cp {} target/app.jar \;
 
-# ② 提取 Spring Boot 分层
+# ③ 提取 Spring Boot 分层（dependencies → loader → snapshots → application）
 RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/extracted
 
-# ③ jlink 生成精简 JRE
-RUN jlink \
-         --module-path /opt/java/openjdk/jmods \
-         --add-modules java.base,java.compiler,java.desktop,java.logging,\
-java.management,java.naming,java.rmi,java.sql,java.transaction.xa,\
-java.xml,java.net.http,java.security.jgss,jdk.crypto.ec,jdk.unsupported \
-         --output /jre \
-         --no-header-files \
-         --no-man-pages \
-         --strip-debug \
-         --compress=zip-9
-
 # ============================================================
-# Stage 2: Runtime（~40-60MB）
+# Stage 2: Runtime
 # ============================================================
-FROM alpine:3.21
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring \
     && mkdir -p /app/logs && chown spring:spring /app/logs
 
-COPY --from=builder /jre /app/jre
-
+# 按 Spring Boot 分层顺序 COPY（依赖层在下、应用层在上，最大化 Docker 缓存命中）
 COPY --from=builder /build/target/extracted/dependencies/        ./
 COPY --from=builder /build/target/extracted/spring-boot-loader/   ./
 COPY --from=builder /build/target/extracted/snapshot-dependencies/ ./
@@ -72,4 +66,4 @@ EXPOSE 8081
 
 USER spring
 
-ENTRYPOINT ["/app/jre/bin/java", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

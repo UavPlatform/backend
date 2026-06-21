@@ -135,6 +135,13 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional(readOnly = true)
+    public Task getTaskByTaskNum(String taskNum) {
+        return taskRepository.findByTaskNum(taskNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Task> getAvailableTasks() {
         return taskRepository.findByTaskStatusOrderByCreateTimeDesc(TaskStatus.IDLE);
     }

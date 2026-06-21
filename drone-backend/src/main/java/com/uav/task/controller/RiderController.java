@@ -2,7 +2,9 @@ package com.uav.task.controller;
 
 import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
+import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.result.Result;
 import com.uav.task.pojo.vo.TaskPageVO;
@@ -28,7 +30,20 @@ public class RiderController {
     @Autowired
     private TaskService taskService;
 
+    @Autowired
+    private TaskAssignmentRepository taskAssignmentRepository;
+
     // ── 只读接口：不需要绑定无人机 ──
+
+    @OperationLog("飞手查看任务详情")
+    @Operation(summary = "任务详情", description = "飞手查看任意任务的详细信息（无需任务归属）",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @GetMapping("/task/detail")
+    public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {
+        Task task = taskService.getTaskByTaskNum(taskNum);
+        TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElse(null);
+        return Result.success(TaskVo.from(task, assignment));
+    }
 
     @OperationLog("查看任务广场")
     @Operation(summary = "任务广场", description = "骑手查看所有可接的任务")

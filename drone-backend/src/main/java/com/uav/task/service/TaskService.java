@@ -15,6 +15,9 @@ public interface TaskService {
 
     Task getTaskByTaskNum(String taskNum, Long userId);
 
+    /** 飞手查看任务详情，不校验归属 */
+    Task getTaskByTaskNum(String taskNum);
+
     List<Task> getAvailableTasks();
 
     void acceptTask(String taskNum, Long riderId);

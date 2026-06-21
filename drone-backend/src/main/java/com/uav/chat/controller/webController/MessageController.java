@@ -46,7 +46,7 @@ public class MessageController {
         return Result.success();
     }
     @OperationLog("获取消息")
-    @RateLimiter(limit = 5, windowSeconds = 60)
+    @RateLimiter(limit = 30, windowSeconds = 60)
     @Operation(summary = "获取消息", description = "获取消息")
     @GetMapping("/messages/{msgId}")
     public Object getMessages(@Valid @PathVariable Long msgId) {

@@ -38,7 +38,7 @@ public class SessionController {
         return Result.success(sessionService.deleteSession(sessionId));
     }
     @OperationLog("列出会话")
-    @RateLimiter(limit = 5, windowSeconds = 60)
+    @RateLimiter(limit = 30, windowSeconds = 60)
     @Operation(summary = "列出会话", description = "列出会话")
     @GetMapping("/list")
     public Object listSession() {

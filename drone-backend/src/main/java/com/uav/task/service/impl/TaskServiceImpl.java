@@ -14,7 +14,10 @@ import com.uav.server.exception.BusinessException;
 import com.uav.server.util.RouteIdGenerator;
 import com.uav.server.util.UserContext;
 import com.uav.order.service.OrderService;
+import com.uav.task.pojo.vo.RiderStatsVO;
 import com.uav.task.service.TaskService;
+import com.uav.user.mapper.UserRepository;
+import com.uav.user.pojo.entity.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -23,7 +26,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,6 +48,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -273,5 +282,36 @@ public class TaskServiceImpl implements TaskService {
                 },
                 () -> log.warn("任务 {} 未找到关联订单，跳过确认", taskNum)
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RiderStatsVO getRiderStats(Long riderId) {
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        RiderStatsVO vo = new RiderStatsVO();
+        vo.setTodayOrders(taskAssignmentRepository.countByRiderIdAndAcceptTimeAfter(riderId, todayStart));
+        vo.setTotalCompleted(taskAssignmentRepository.countByRiderIdAndCompleteTimeIsNotNull(riderId));
+        vo.setTotalEarnings(taskAssignmentRepository.sumRewardByRiderId(riderId));
+        return vo;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RiderStatsVO> getRecommendedRiders() {
+        // 查询所有骑手（role=1），按完成任务量降序排列
+        List<User> riders = userRepository.findByRole(1);
+        if (riders.isEmpty()) {
+            return List.of();
+        }
+
+        List<RiderStatsVO> result = new ArrayList<>();
+        for (User rider : riders) {
+            RiderStatsVO vo = getRiderStats(rider.getId());
+            vo.setRiderId(rider.getId());
+            vo.setRiderName(rider.getUserName());
+            result.add(vo);
+        }
+        result.sort(Comparator.comparingLong(RiderStatsVO::getTotalCompleted).reversed());
+        return result;
     }
 }

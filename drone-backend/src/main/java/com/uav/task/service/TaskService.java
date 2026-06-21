@@ -4,6 +4,8 @@ import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import org.springframework.data.domain.Page;
 
+import com.uav.task.pojo.vo.RiderStatsVO;
+
 import java.util.List;
 
 public interface TaskService {
@@ -31,4 +33,10 @@ public interface TaskService {
     void riderCompleteTask(String taskNum, Long riderId);
 
     void userConfirmTask(String taskNum, Long userId);
+
+    /** 飞手统计（今日接单、总完成、总收益） */
+    RiderStatsVO getRiderStats(Long riderId);
+
+    /** 推荐飞手列表（按完成量降序） */
+    List<RiderStatsVO> getRecommendedRiders();
 }

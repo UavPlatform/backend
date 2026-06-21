@@ -5,6 +5,7 @@ import com.uav.server.annotation.RequireRole;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
+import com.uav.task.pojo.vo.RiderStatsVO;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.result.Result;
 import com.uav.task.pojo.vo.TaskPageVO;
@@ -72,6 +73,21 @@ public class RiderController {
         List<Task> tasks = taskService.getRiderAllTasks(riderId);
         List<TaskVo> taskVos = tasks.stream().map(TaskVo::from).toList();
         return Result.success(new TaskPageVO(taskVos, 0, 1, taskVos.size()));
+    }
+
+    @OperationLog("飞手统计")
+    @Operation(summary = "飞手统计", description = "当前骑手的今日接单数、总完成数、总收益")
+    @GetMapping("/stats")
+    public Result<RiderStatsVO> getRiderStats() {
+        Long riderId = UserContext.getUserId();
+        return Result.success(taskService.getRiderStats(riderId));
+    }
+
+    @OperationLog("推荐飞手")
+    @Operation(summary = "推荐飞手", description = "按完成任务量降序返回飞手列表")
+    @GetMapping("/recommended")
+    public Result<List<RiderStatsVO>> getRecommendedRiders() {
+        return Result.success(taskService.getRecommendedRiders());
     }
 
     // ── 写操作：需要绑定无人机 ──

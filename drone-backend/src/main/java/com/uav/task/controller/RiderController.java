@@ -1,5 +1,6 @@
 package com.uav.task.controller;
 
+import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.vo.TaskVo;
@@ -27,6 +28,8 @@ public class RiderController {
     @Autowired
     private TaskService taskService;
 
+    // ── 只读接口：不需要绑定无人机 ──
+
     @OperationLog("查看任务广场")
     @Operation(summary = "任务广场", description = "骑手查看所有可接的任务")
     @GetMapping("/square")
@@ -34,16 +37,6 @@ public class RiderController {
         List<Task> tasks = taskService.getAvailableTasks();
         List<TaskVo> taskVos = tasks.stream().map(TaskVo::from).toList();
         return Result.success(new TaskPageVO(taskVos, 0, 1, taskVos.size()));
-    }
-
-    @OperationLog("接受任务")
-    @Operation(summary = "接受任务", description = "骑手接受指定任务",
-            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
-    @PostMapping("/accept")
-    public Result<Void> acceptTask(@RequestParam String taskNum) {
-        Long riderId = UserContext.getUserId();
-        taskService.acceptTask(taskNum, riderId);
-        return Result.success("接单成功");
     }
 
     @OperationLog("查看进行中的任务")
@@ -63,9 +56,23 @@ public class RiderController {
         Long riderId = UserContext.getUserId();
         List<Task> tasks = taskService.getRiderAllTasks(riderId);
         List<TaskVo> taskVos = tasks.stream().map(TaskVo::from).toList();
-        return Result.success(new TaskPageVO(taskVos, 0, 1,taskVos.size()));
+        return Result.success(new TaskPageVO(taskVos, 0, 1, taskVos.size()));
     }
 
+    // ── 写操作：需要绑定无人机 ──
+
+    @RequireDrone
+    @OperationLog("接受任务")
+    @Operation(summary = "接受任务", description = "骑手接受指定任务",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @PostMapping("/accept")
+    public Result<Void> acceptTask(@RequestParam String taskNum) {
+        Long riderId = UserContext.getUserId();
+        taskService.acceptTask(taskNum, riderId);
+        return Result.success("接单成功");
+    }
+
+    @RequireDrone
     @OperationLog("取消接单")
     @Operation(summary = "取消接单", description = "骑手取消已接受的任务，任务回到空闲状态",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
@@ -76,6 +83,7 @@ public class RiderController {
         return Result.success("已取消接单");
     }
 
+    @RequireDrone
     @OperationLog("完成任务")
     @Operation(summary = "完成任务", description = "骑手完成已接受的任务",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})

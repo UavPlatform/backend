@@ -1,8 +1,8 @@
 package com.uav.server.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
-import com.uav.server.annotation.SkipDroneCheck;
 import com.uav.server.annotation.SkipJwt;
 import com.uav.server.result.Result;
 import com.uav.server.util.JwtUtil;
@@ -94,13 +94,14 @@ public class JwtInterceptor implements HandlerInterceptor {
             }
         }
 
+        // 仅在端点标注了 @RequireDrone 时才检查无人机绑定
         Integer role = UserContext.getRole();
         if (role != null && role == 1) {
             if (handler instanceof HandlerMethod) {
                 HandlerMethod handlerMethod = (HandlerMethod) handler;
-                boolean skip = handlerMethod.hasMethodAnnotation(SkipDroneCheck.class)
-                        || handlerMethod.getBeanType().isAnnotationPresent(SkipDroneCheck.class);
-                if (!skip && !riderUavRepository.existsByUserId(UserContext.getUserId())) {
+                boolean requireDrone = handlerMethod.hasMethodAnnotation(RequireDrone.class)
+                        || handlerMethod.getBeanType().isAnnotationPresent(RequireDrone.class);
+                if (requireDrone && !riderUavRepository.existsByUserId(UserContext.getUserId())) {
                     sendUnauthorized(response, "请先绑定至少一台无人机");
                     return false;
                 }

@@ -23,4 +23,5 @@ public class SessionVO {
     private String otherUserName; // 私聊对方的用户名
     private String lastMessage;   // 最后一条消息内容
     private Long lastMessageTime; // 最后一条消息时间
+    private Integer unreadCount;  // 未读消息数
 }

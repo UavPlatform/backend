@@ -136,6 +136,13 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                         ChatUserSession::getSessionId,
                         Collectors.mapping(ChatUserSession::getUserId, Collectors.toList())));
 
+        // 构建 sessionId -> lastReadTime 映射，用于计算未读数
+        Map<Long, Long> lastReadMap = userSessions.stream()
+                .collect(Collectors.toMap(ChatUserSession::getSessionId, us -> {
+                    Long lrt = us.getLastReadTime();
+                    return lrt != null ? lrt : us.getJoinTime();
+                }));
+
         return userSessions.stream()
                 .map(ChatUserSession::getSessionId)
                 .distinct()
@@ -163,6 +170,13 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                     if (lastMsg != null) {
                         vo.setLastMessage(lastMsg.getContent());
                         vo.setLastMessageTime(lastMsg.getCreateTime());
+                    }
+                    // 未读消息数
+                    Long since = lastReadMap.get(sessionId);
+                    if (since != null) {
+                        vo.setUnreadCount(chatMessageMapper.countUnread(sessionId, since, userId));
+                    } else {
+                        vo.setUnreadCount(0);
                     }
                     return vo;
                 })

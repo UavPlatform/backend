@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -190,5 +191,23 @@ public class MessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessa
         }
 
         return allUnread;
+    }
+
+    @Override
+    public Map<Long, Integer> getUnreadCountMap(Long userId) {
+        List<ChatUserSession> userSessions = userSessionService.list(
+                Wrappers.<ChatUserSession>lambdaQuery().eq(ChatUserSession::getUserId, userId));
+        if (userSessions == null || userSessions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<Long, Integer> countMap = new HashMap<>();
+        for (ChatUserSession us : userSessions) {
+            Long lastReadTime = us.getLastReadTime();
+            long since = lastReadTime != null ? lastReadTime : us.getJoinTime();
+            int count = baseMapper.countUnread(us.getSessionId(), since, userId);
+            countMap.put(us.getSessionId(), count);
+        }
+        return countMap;
     }
 }

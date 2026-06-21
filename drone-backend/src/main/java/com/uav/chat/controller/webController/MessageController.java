@@ -61,4 +61,13 @@ public class MessageController {
         Long userId = com.uav.server.util.UserContext.getUserId();
         return Result.success(messageService.getUnreadMessages(userId));
     }
+
+    @OperationLog("未读消息数")
+    @RateLimiter(limit = 30, windowSeconds = 60)
+    @Operation(summary = "未读消息数", description = "获取当前用户每个会话的未读消息数（只读，不更新 lastReadTime）")
+    @GetMapping("/unread/count")
+    public Object getUnreadCount() {
+        Long userId = com.uav.server.util.UserContext.getUserId();
+        return Result.success(messageService.getUnreadCountMap(userId));
+    }
 }

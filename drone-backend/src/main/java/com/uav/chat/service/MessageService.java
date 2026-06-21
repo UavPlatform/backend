@@ -7,6 +7,7 @@ import com.uav.chat.pojo.entity.ChatMessage;
 import jakarta.validation.Valid;
 
 import java.util.List;
+import java.util.Map;
 
 public interface MessageService extends IService<ChatMessage> {
     void sendMessage(@Valid MessageDTO dto);
@@ -19,4 +20,7 @@ public interface MessageService extends IService<ChatMessage> {
      * 调用后会自动更新 lastReadTime
      */
     List<ChatEnvelope> getUnreadMessages(Long userId);
+
+    /** 获取用户所有会话的未读消息数（不更新 lastReadTime，只读） */
+    Map<Long, Integer> getUnreadCountMap(Long userId);
 }

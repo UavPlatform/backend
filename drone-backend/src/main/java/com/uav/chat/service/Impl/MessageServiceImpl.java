@@ -117,6 +117,7 @@ public class MessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessa
                     .fromUserId(msg.getFromUserId())
                     .toUserId(userId)
                     .msgId(msg.getMsgId())
+                    .sessionId(msg.getSessionId())
                     .isOffline(true)
                     .msgType(MsgType.CHAT)
                     .needAck(Boolean.FALSE)
@@ -171,6 +172,7 @@ public class MessageServiceImpl extends ServiceImpl<ChatMessageMapper, ChatMessa
                         .fromUserId(msg.getFromUserId())
                         .toUserId(userId)
                         .msgId(msg.getMsgId())
+                        .sessionId(msg.getSessionId())
                         .isOffline(true)  // 离线补推标记
                         .msgType(MsgType.CHAT)
                         .needAck(Boolean.FALSE)

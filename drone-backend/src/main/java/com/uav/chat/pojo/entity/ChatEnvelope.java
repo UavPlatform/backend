@@ -30,6 +30,11 @@ public class ChatEnvelope implements Serializable {
     private String msgId;
 
     /**
+     * 所属会话ID，用于客户端将 WebSocket 消息精确归属到会话。
+     */
+    private Long sessionId;
+
+    /**
      * 消息类型：CHAT, NOTICE, ORDER, COMMAND
      */
     private MsgType msgType;

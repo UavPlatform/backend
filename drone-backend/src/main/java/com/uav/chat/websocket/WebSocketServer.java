@@ -115,6 +115,7 @@ public class WebSocketServer {
                     .fromUserId(dto.getFromUserId())
                     .toUserId(userId)
                     .msgId(dto.getMsgId())
+                    .sessionId(dto.getSessionId())
                     .isOffline(Boolean.FALSE)
                     .msgType(MsgType.CHAT)
                     .needAck(Boolean.FALSE)

@@ -29,6 +29,12 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration/chat,classpath:db/migration/task,classpath:db/migration/user
 
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB       # 单次请求的文件大小上限（分片5MB×10倍余量）
+      max-request-size: 55MB    # 单次请求总体上限
+
 log:
   dir: logs
 
@@ -48,3 +54,24 @@ order:
 amap:
   key: ${drone.amap.key}
   security-key: ${drone.amap.security-key}
+
+# ---- 文件上传 ----
+file:
+  storage:
+    type: ${drone.file.type:oss}                          # cos / oss
+    cos-prefix: ${drone.file.cos-prefix:}
+    oss-prefix: ${drone.file.oss-prefix:tmp}
+    max-file-size: ${drone.file.max-size:536870912}       # 500MB
+    max-chunk-size: ${drone.file.chunk-size:5242880}      # 5MB
+    allowed-extensions: ${drone.file.allowed-exts:jpg,jpeg,png,gif,webp,mp4,mov,avi,zip}
+    upload-ttl-hours: 24
+    cos:
+      region: ${drone.file.cos.region}
+      bucket: ${drone.file.cos.bucket}
+      secret-id: ${drone.file.cos.secret-id}
+      secret-key: ${drone.file.cos.secret-key}
+    oss:
+      endpoint: ${drone.file.oss.endpoint}
+      bucket: ${drone.file.oss.bucket}
+      access-key-id: ${drone.file.oss.access-key-id}
+      access-key-secret: ${drone.file.oss.access-key-secret}

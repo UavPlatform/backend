@@ -125,4 +125,14 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
         log.info("订单取消成功，订单号: {}, 用户ID: {}", orderNum, userId);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateExecuteResult(String orderNum, String resultUuid) {
+        MissionOrder order = orderRepository.findByOrderNumForUpdate(orderNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
+        order.setExecuteResult(resultUuid);
+        orderRepository.save(order);
+        log.info("订单 executeResult 更新，订单号: {}, uuid: {}", orderNum, resultUuid);
+    }
 }

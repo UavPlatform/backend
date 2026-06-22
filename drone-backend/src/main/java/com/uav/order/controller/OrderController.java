@@ -64,6 +64,21 @@ public class OrderController {
         return Result.success("获取成功", OrderVO.from(order));
     }
 
+    @OperationLog("创建订单")
+    @RateLimiter(limit = 5, windowSeconds = 60)
+    @Operation(summary = "创建订单", description = "根据任务编号创建飞行订单",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @PostMapping("/create")
+    public Result<OrderVO> createOrder(@RequestParam String taskNum) {
+        if (taskNum == null || taskNum.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST,
+                    ApiErrorCode.INVALID_PARAM, "taskNum 不能为空");
+        }
+        Long userId = UserContext.getUserId();
+        MissionOrder order = orderService.createOrder(userId, taskNum);
+        return Result.success("订单创建成功", OrderVO.from(order));
+    }
+
     @OperationLog("取消订单")
     @RateLimiter(limit = 3, windowSeconds = 60)
     @Operation(summary = "取消订单", description = "取消待支付状态的订单",

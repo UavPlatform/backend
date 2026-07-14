@@ -6,6 +6,8 @@ import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
+import com.uav.server.util.UserContext;
+import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.upload.config.UploadStorageConfig;
 import com.uav.upload.entity.UploadedFile;
 import com.uav.upload.repository.UploadRepository;
@@ -33,6 +35,7 @@ public class UploadRecordServiceImpl implements UploadRecordService {
     private final UploadStorageService uploadStorageService;
     private final UploadStorageConfig config;
     private final OrderRepository orderRepository;
+    private final TaskAssignmentRepository taskAssignmentRepository;
 
     @Override
     public UploadedFile createInitRecord(String uploadId, String fileName, long fileSize,
@@ -108,11 +111,17 @@ public class UploadRecordServiceImpl implements UploadRecordService {
             }
         }
 
-        // 2. 校验订单属于当前用户
+        // 2. 校验操作权限：仅该任务的接单飞手或管理员可交付文件
         MissionOrder order = orderRepository.findByOrderNum(orderNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
-        if (!order.getUserId().equals(userId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND, "无权操作此订单");
+
+        boolean isAdmin = UserContext.getRole() != null && UserContext.getRole() >= 1;
+        boolean isRider = order.getTask() != null
+                && taskAssignmentRepository.findByTaskId(order.getTask().getId())
+                        .map(a -> a.getRiderId().equals(userId)).orElse(false);
+        if (!isRider && !isAdmin) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND,
+                    "仅飞手或管理员可交付文件");
         }
 
         // 3. 生成或获取 executeResult UUID

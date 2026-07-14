@@ -109,4 +109,47 @@ public class WeChatPayServiceImpl implements WeChatPayService {
 
         log.info("支付回调成功, 订单号: {}, 微信流水号: {}", orderNum, transactionId);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void refund(String orderNum, String reason) {
+        PayRecord payRecord = payRecordRepository.findByOrderNum(orderNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND,
+                        ApiErrorCode.PAY_RECORD_NOT_FOUND));
+        if (payRecord.getTransactionId() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.REFUND_FAILED,
+                    "该支付记录无微信流水号，无法退款");
+        }
+
+        // 生成退款单号
+        String outRefundNo = "RF" + orderNum.substring(2)
+                + String.valueOf(System.currentTimeMillis()).substring(7);
+
+        try {
+            WeChatPayUtil.refund(weChatPayConfig,
+                    payRecord.getTransactionId(),
+                    outRefundNo,
+                    reason,
+                    payRecord.getAmount(),
+                    payRecord.getAmount()); // 全额退款
+        } catch (Exception e) {
+            log.error("微信退款失败, 订单号: {}, err: {}", orderNum, e.getMessage());
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.REFUND_FAILED,
+                    "微信退款失败: " + e.getMessage());
+        }
+
+        // 更新支付记录
+        payRecord.setStatus(OrderStatus.REFUNDED);
+        payRecord.setUpdateTime(LocalDateTime.now());
+        payRecordRepository.save(payRecord);
+
+        // 更新订单状态
+        orderRepository.findByOrderNum(orderNum).ifPresent(order -> {
+            order.setOrderStatus(OrderStatus.REFUNDED);
+            orderRepository.save(order);
+        });
+
+        log.info("退款成功, 订单号: {}, 退款单号: {}, 金额: {}元",
+                orderNum, outRefundNo, payRecord.getAmount());
+    }
 }

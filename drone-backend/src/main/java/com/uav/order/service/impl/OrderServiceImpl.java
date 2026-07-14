@@ -135,4 +135,24 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.save(order);
         log.info("订单 executeResult 更新，订单号: {}, uuid: {}", orderNum, resultUuid);
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void disputeOrder(String orderNum, Long userId) {
+        MissionOrder order = orderRepository.findByOrderNumForUpdate(orderNum)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND);
+        }
+
+        if (order.getOrderStatus() != OrderStatus.WAITING_CONFIRM) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_STATUS_INVALID,
+                    "仅待确认状态的订单可发起争议，当前状态: " + order.getOrderStatus().getDesc());
+        }
+
+        order.setOrderStatus(OrderStatus.DISPUTED);
+        orderRepository.save(order);
+        log.info("订单已标记为争议中，订单号: {}, 用户ID: {}", orderNum, userId);
+    }
 }

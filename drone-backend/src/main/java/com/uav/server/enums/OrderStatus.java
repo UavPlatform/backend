@@ -9,7 +9,8 @@ public enum OrderStatus {
     CANCELLED(2, "已取消"),
     REFUNDED(3, "已退款"),
     COMPLETED(4, "已完成"),
-    WAITING_CONFIRM(5, "待确认完成");
+    WAITING_CONFIRM(5, "待确认完成"),
+    DISPUTED(6, "争议中");
 
     private final int code;
     private final String desc;

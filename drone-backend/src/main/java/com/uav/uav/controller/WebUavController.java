@@ -2,12 +2,16 @@ package com.uav.uav.controller;
 
 import com.uav.user.pojo.entity.UserRecord;
 import com.uav.server.result.Result;
+import com.uav.server.service.AmapService;
+import com.uav.uav.pojo.vo.GpsPointVO;
 import com.uav.uav.pojo.vo.UavVo;
 import com.uav.uav.pojo.vo.WebUavStatusVo;
 import com.uav.user.pojo.vo.UserRecordsVO;
 import com.uav.server.annotation.OperationLog;
+import com.uav.uav.service.UavStatusService;
 import com.uav.uav.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -22,7 +26,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.uav.user.controller.UserController.getUserRecordsVOResult;
 
@@ -34,6 +40,12 @@ public class WebUavController {
 
     @Autowired
     private WebUavService webUavService;
+
+    @Autowired
+    private UavStatusService uavStatusService;
+
+    @Autowired
+    private AmapService amapService;
 
     @OperationLog("查询无人机列表")
     @Operation(
@@ -91,6 +103,57 @@ public class WebUavController {
     public Result<WebUavStatusVo> getUavStatus(@RequestParam String deviceId) {
         WebUavStatusVo status = webUavService.getUavStatus(deviceId);
         return Result.success(status);
+    }
+
+    // ---- GPS 轨迹与位置 ----
+
+    @OperationLog("查询飞行轨迹")
+    @Operation(
+            summary = "查询订单飞行轨迹",
+            description = "根据订单号查询无人机执行该订单时的 GPS 轨迹，按时间升序排列",
+            parameters = {@Parameter(name = "orderNum", description = "订单号", required = true)})
+    @GetMapping("/trajectory")
+    public Result<List<GpsPointVO>> getTrajectory(@RequestParam String orderNum) {
+        List<GpsPointVO> points = uavStatusService.getTrajectoryByOrderNum(orderNum).stream()
+                .map(GpsPointVO::from)
+                .toList();
+        return Result.success(points);
+    }
+
+    @OperationLog("查询无人机位置")
+    @Operation(
+            summary = "查询无人机实时位置",
+            description = "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录",
+            parameters = {
+                    @Parameter(name = "uavId", description = "无人机 ID（与 deviceId 二选一）"),
+                    @Parameter(name = "deviceId", description = "设备 ID（与 uavId 二选一）")
+            })
+    @GetMapping("/position")
+    public Result<GpsPointVO> getPosition(@RequestParam(required = false) Long uavId,
+                                          @RequestParam(required = false) String deviceId) {
+        GpsPointVO point = uavStatusService.getLatestPosition(uavId, deviceId);
+        return Result.success(point);
+    }
+
+    // ---- 高德地图服务端 API ----
+
+    @OperationLog("逆地理编码")
+    @Operation(
+            summary = "坐标转地址",
+            description = "调用高德逆地理编码 API，将经纬度转为格式化地址（结果缓存 4 位小数精度）",
+            parameters = {
+                    @Parameter(name = "lng", description = "经度", required = true),
+                    @Parameter(name = "lat", description = "纬度", required = true)
+            })
+    @GetMapping("/reverseGeocode")
+    public Result<Map<String, Object>> reverseGeocode(@RequestParam double lng,
+                                                       @RequestParam double lat) {
+        String address = amapService.reverseGeocode(lng, lat);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("longitude", lng);
+        result.put("latitude", lat);
+        result.put("address", address);
+        return Result.success(result);
     }
 
     @OperationLog("查询用户观看记录")

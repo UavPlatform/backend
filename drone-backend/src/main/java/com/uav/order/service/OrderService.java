@@ -12,4 +12,18 @@ public interface OrderService {
     MissionOrder getOrderDetail(String orderNum, Long userId);
 
     void cancelOrder(String orderNum, Long userId);
+
+    /**
+     * 更新订单的 executeResult（文件上传后绑定）
+     * @param orderNum 订单号
+     * @param resultUuid 32 字符 UUID（去横杠），作为文件目录标识
+     */
+    void updateExecuteResult(String orderNum, String resultUuid);
+
+    /**
+     * 用户对交付结果不满意，将订单置为争议中
+     * @param orderNum 订单号
+     * @param userId   用户 ID
+     */
+    void disputeOrder(String orderNum, Long userId);
 }

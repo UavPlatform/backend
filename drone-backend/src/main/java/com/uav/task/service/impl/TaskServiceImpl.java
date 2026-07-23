@@ -251,6 +251,7 @@ public class TaskServiceImpl implements TaskService {
         taskAssignmentRepository.save(assignment);
 
         orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
+            order.setExecutedAt(LocalDateTime.now());
             order.setOrderStatus(OrderStatus.WAITING_CONFIRM);
             orderRepository.save(order);
         });

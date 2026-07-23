@@ -1,7 +1,7 @@
 package com.uav.order.controller;
 
-import com.uav.order.mapper.OrderReviewRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.order.service.OrderReviewService;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.result.Result;
 import com.uav.order.pojo.vo.OrderListVO;
@@ -38,7 +38,7 @@ public class OrderController {
     private UploadRecordService uploadRecordService;
 
     @Autowired
-    private OrderReviewRepository orderReviewRepository;
+    private OrderReviewService orderReviewService;
 
     @OperationLog("查询订单列表")
     @Operation(summary = "订单列表", description = "获取当前用户的所有订单，按创建时间倒序")
@@ -78,7 +78,7 @@ public class OrderController {
         vo.setFiles(files.stream().map(UploadVO::from).toList());
 
         // 是否已评价
-        vo.setHasReview(orderReviewRepository.existsByOrderNum(orderNum));
+        vo.setHasReview(orderReviewService.hasReview(orderNum));
 
         return Result.success("获取成功", vo);
     }

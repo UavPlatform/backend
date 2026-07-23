@@ -3,6 +3,7 @@ package com.uav.uav.service.impl;
 import com.uav.uav.mapper.GpsRecordRepository;
 import com.uav.uav.pojo.dto.UavStatusDto;
 import com.uav.uav.pojo.entity.UavGpsRecord;
+import com.uav.uav.pojo.vo.GpsPointVO;
 import com.uav.uav.service.UavStatusService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,6 +102,39 @@ public class UavStatusServiceImpl implements UavStatusService {
     @Override
     public String getOrderNumByDevice(String deviceId) {
         return deviceId != null ? deviceOrderMap.get(deviceId) : null;
+    }
+
+    // ---- GPS 查询 ----
+
+    @Override
+    public List<UavGpsRecord> getTrajectoryByOrderNum(String orderNum) {
+        return gpsRecordRepository.findByOrderNumOrderByTimestampAsc(orderNum);
+    }
+
+    @Override
+    public GpsPointVO getLatestPosition(Long uavId, String deviceId) {
+        // 优先从内存查（实时数据，毫秒级延迟）
+        if (uavId != null) {
+            UavStatusDto status = uavStatusMap.get(uavId);
+            if (status != null) return GpsPointVO.from(status);
+        }
+        if (deviceId != null) {
+            UavStatusDto status = deviceStatusMap.get(deviceId);
+            if (status != null) return GpsPointVO.from(status);
+            // 降级：DB 查最近一条
+            UavGpsRecord record = gpsRecordRepository.findFirstByDeviceIdOrderByTimestampDesc(deviceId);
+            if (record != null) return GpsPointVO.from(record);
+        }
+        if (uavId != null) {
+            // 降级：DB 查最近 2 分钟
+            List<UavGpsRecord> records = gpsRecordRepository
+                    .findByUavIdAndTimestampAfterOrderByTimestampAsc(uavId,
+                            System.currentTimeMillis() - 120_000);
+            if (!records.isEmpty()) {
+                return GpsPointVO.from(records.get(records.size() - 1));
+            }
+        }
+        return null;
     }
 
     // ---- 异步批量写库 ----

@@ -3,8 +3,6 @@ package com.uav.uav.controller;
 import com.uav.user.pojo.entity.UserRecord;
 import com.uav.server.result.Result;
 import com.uav.server.service.AmapService;
-import com.uav.uav.mapper.GpsRecordRepository;
-import com.uav.uav.pojo.entity.UavGpsRecord;
 import com.uav.uav.pojo.vo.GpsPointVO;
 import com.uav.uav.pojo.vo.UavVo;
 import com.uav.uav.pojo.vo.WebUavStatusVo;
@@ -40,9 +38,6 @@ public class WebUavController {
 
     @Autowired
     private WebUavService webUavService;
-
-    @Autowired
-    private GpsRecordRepository gpsRecordRepository;
 
     @Autowired
     private UavStatusService uavStatusService;
@@ -117,8 +112,7 @@ public class WebUavController {
             parameters = {@Parameter(name = "orderNum", description = "订单号", required = true)})
     @GetMapping("/trajectory")
     public Result<List<GpsPointVO>> getTrajectory(@RequestParam String orderNum) {
-        List<UavGpsRecord> records = gpsRecordRepository.findByOrderNumOrderByTimestampAsc(orderNum);
-        List<GpsPointVO> points = records.stream()
+        List<GpsPointVO> points = uavStatusService.getTrajectoryByOrderNum(orderNum).stream()
                 .map(GpsPointVO::from)
                 .toList();
         return Result.success(points);
@@ -135,28 +129,8 @@ public class WebUavController {
     @GetMapping("/position")
     public Result<GpsPointVO> getPosition(@RequestParam(required = false) Long uavId,
                                           @RequestParam(required = false) String deviceId) {
-        // 优先从内存查（实时数据，毫秒级延迟）
-        if (uavId != null) {
-            var status = uavStatusService.getUavStatus(uavId);
-            if (status != null) return Result.success(GpsPointVO.from(status));
-        }
-        if (deviceId != null) {
-            var status = uavStatusService.getUavStatus(deviceId);
-            if (status != null) return Result.success(GpsPointVO.from(status));
-            // 降级：DB 查最近一条
-            UavGpsRecord record = gpsRecordRepository.findFirstByDeviceIdOrderByTimestampDesc(deviceId);
-            if (record != null) return Result.success(GpsPointVO.from(record));
-        }
-        if (uavId != null) {
-            // 降级：DB 查最近 2 分钟
-            List<UavGpsRecord> records = gpsRecordRepository
-                    .findByUavIdAndTimestampAfterOrderByTimestampAsc(uavId,
-                            System.currentTimeMillis() - 120_000);
-            if (!records.isEmpty()) {
-                return Result.success(GpsPointVO.from(records.get(records.size() - 1)));
-            }
-        }
-        return Result.success(null);
+        GpsPointVO point = uavStatusService.getLatestPosition(uavId, deviceId);
+        return Result.success(point);
     }
 
     // ---- 高德地图服务端 API ----

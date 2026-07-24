@@ -47,6 +47,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
             }
 
             wrapper.copyBodyToResponse();
+            MDC.clear();
         }
     }
 }

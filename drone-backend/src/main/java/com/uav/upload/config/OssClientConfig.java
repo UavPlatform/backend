@@ -7,11 +7,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * OSS 客户端 Bean 配置，type=oss 时才加载。
- */
 @Configuration
-@ConditionalOnProperty(name = "file.storage.type", havingValue = "oss")
+@ConditionalOnProperty(name = "file.storage.type", havingValue = "oss", matchIfMissing = true)
 @Slf4j
 public class OssClientConfig {
 

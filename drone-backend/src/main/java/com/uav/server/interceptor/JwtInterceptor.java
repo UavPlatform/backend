@@ -114,7 +114,6 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         UserContext.clear();
-        MDC.clear();
     }
 
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {

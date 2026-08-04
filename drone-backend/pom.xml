@@ -171,6 +171,13 @@
             <version>3.18.1</version>
         </dependency>
 
+        <!-- 阿里云内容安全 v2 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>green20220302</artifactId>
+            <version>2.2.11</version>
+        </dependency>
+
         <!-- Flyway: chat 模块数据库迁移（JPA 模块仍由 ddl-auto=update 管理） -->
         <dependency>
             <groupId>org.flywaydb</groupId>

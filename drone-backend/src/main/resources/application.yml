@@ -58,20 +58,15 @@ amap:
 # ---- 文件上传 ----
 file:
   storage:
-    type: ${drone.file.type:oss}                          # cos / oss
-    cos-prefix: ${drone.file.cos-prefix:}
-    oss-prefix: ${drone.file.oss-prefix:tmp}
+    oss-prefix: ${drone.file.oss-prefix:}
+    callback-url: ${drone.file.callback-url:}
     max-file-size: ${drone.file.max-size:536870912}       # 500MB
-    max-chunk-size: ${drone.file.chunk-size:5242880}      # 5MB
     allowed-extensions: ${drone.file.allowed-exts:jpg,jpeg,png,gif,webp,mp4,mov,avi,zip}
     upload-ttl-hours: 24
-    cos:
-      region: ${drone.file.cos.region}
-      bucket: ${drone.file.cos.bucket}
-      secret-id: ${drone.file.cos.secret-id}
-      secret-key: ${drone.file.cos.secret-key}
+    moderation:
+      enabled: ${drone.file.moderation-enabled:false}
     oss:
-      endpoint: ${drone.file.oss.endpoint}
-      bucket: ${drone.file.oss.bucket}
-      access-key-id: ${drone.file.oss.access-key-id}
-      access-key-secret: ${drone.file.oss.access-key-secret}
+      endpoint: ${alioss.endpoint}
+      bucket: ${alioss.bucket-name}
+      access-key-id: ${alioss.access-key-id}
+      access-key-secret: ${alioss.access-key-secret}

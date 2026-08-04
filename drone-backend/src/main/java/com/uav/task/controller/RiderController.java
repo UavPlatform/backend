@@ -83,6 +83,7 @@ public class RiderController {
         return Result.success(taskService.getRiderStats(riderId));
     }
 
+    @RequireRole({0, 1, 2})
     @OperationLog("推荐飞手")
     @Operation(summary = "推荐飞手", description = "按完成任务量降序返回飞手列表")
     @GetMapping("/recommended")

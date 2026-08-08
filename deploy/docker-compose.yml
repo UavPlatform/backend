@@ -1,0 +1,53 @@
+services:
+  mysql:
+    image: docker.m.daocloud.io/library/mysql:8.4
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-drone_db}
+      MYSQL_USER: ${MYSQL_USER:-drone}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    image: crpi-6p1nxczl55pe0ag2-vpc.cn-shenzhen.personal.cr.aliyuncs.com/uav_fuwaki/backend:latest
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      DRONE_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      DRONE_DATASOURCE_HOST: mysql
+      DRONE_DATASOURCE_PORT: "3306"
+      DRONE_DATASOURCE_DATABASE: ${MYSQL_DATABASE:-drone_db}
+      DRONE_DATASOURCE_USERNAME: ${MYSQL_USER:-drone}
+      DRONE_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      DRONE_JWT_SECRET: ${JWT_SECRET}
+      DRONE_JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      DRONE_JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      DRONE_TRTC_SDK_APP_ID: ${TRTC_SDK_APP_ID:-}
+      DRONE_TRTC_SECRET_KEY: ${TRTC_SECRET_KEY:-}
+      DRONE_TRTC_ROOM_EXPIRE: ${TRTC_ROOM_EXPIRE:-86400}
+      DRONE_AMAP_KEY: ${AMAP_KEY:-}
+      DRONE_AMAP_SECURITY_KEY: ${AMAP_SECURITY_KEY:-}
+      JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}"
+    ports:
+      - "${APP_PORT:-8081}:8081"
+    volumes:
+      - backend_logs:/app/logs
+
+volumes:
+  mysql_data:
+  backend_logs:

@@ -24,5 +24,5 @@ public interface UploadRepository extends JpaRepository<UploadedFile, Long> {
     List<UploadedFile> findByUserIdAndIdIn(Long userId, List<Long> ids);
 
     /** 查找过期未完成的上传会话 */
-    List<UploadedFile> findByUploadStatusAndCreateTimeBefore(String uploadStatus, LocalDateTime deadline);
+    List<UploadedFile> findByUploadStatusAndCreateTimeBefore(com.uav.server.enums.FileUploadStatus uploadStatus, LocalDateTime deadline);
 }

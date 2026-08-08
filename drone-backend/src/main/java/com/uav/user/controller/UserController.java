@@ -34,7 +34,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/user")
 @Slf4j
-public class WebUserController {
+public class UserController {
 
     @Autowired
     private UserService userService;
@@ -142,12 +142,16 @@ public class WebUserController {
             }
     )
     @GetMapping("/records")
-    public Result<UserRecordsVO> getLiveRecords(@RequestParam(defaultValue = "0") int page,
-                                                  @RequestParam(defaultValue = "10") int size) {
+    public Result<UserRecordsVO> getLiveRecords(@RequestParam(defaultValue = "0") Integer page,
+                                                  @RequestParam(defaultValue = "10") Integer size) {
         String userName = UserContext.getUsername();
         Pageable pageable = PageRequest.of(page, size);
         Page<UserRecord> recordPage = userRecordRepository.findAllByUserName(userName, pageable);
 
+        return getUserRecordsVOResult(recordPage);
+    }
+
+    public static Result<UserRecordsVO> getUserRecordsVOResult(Page<UserRecord> recordPage) {
         List<UserRecordsVO.RecordItem> records = recordPage.getContent().stream().map(r -> {
             UserRecordsVO.RecordItem item = new UserRecordsVO.RecordItem();
             item.setId(r.getId());

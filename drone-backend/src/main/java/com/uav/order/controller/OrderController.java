@@ -1,5 +1,6 @@
 package com.uav.order.controller;
 
+import com.uav.order.pojo.dto.CreateOrderDTO;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.order.service.OrderReviewService;
 import com.uav.server.enums.ApiErrorCode;
@@ -85,16 +86,12 @@ public class OrderController {
 
     @OperationLog("创建订单")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "创建订单", description = "根据任务编号创建飞行订单",
-            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @Operation(summary = "创建订单", description = "根据任务编号创建飞行订单")
     @PostMapping("/create")
-    public Result<OrderVO> createOrder(@RequestParam String taskNum) {
-        if (taskNum == null || taskNum.isBlank()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST,
-                    ApiErrorCode.INVALID_PARAM, "taskNum 不能为空");
-        }
+    public Result<OrderVO> createOrder(@RequestBody CreateOrderDTO dto) {
+        dto.validate();
         Long userId = UserContext.getUserId();
-        MissionOrder order = orderService.createOrder(userId, taskNum);
+        MissionOrder order = orderService.createOrder(userId, dto.getTaskNum(), dto.getReward());
         return Result.success("订单创建成功", OrderVO.from(order));
     }
 

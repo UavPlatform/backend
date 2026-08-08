@@ -27,7 +27,7 @@
 		<url/>
 	</scm>
 	<properties>
-		<java.version>17</java.version>
+		<java.version>21</java.version>
 	</properties>
 	<repositories>
 		<repository>
@@ -171,14 +171,23 @@
             <version>3.18.1</version>
         </dependency>
 
+        <!-- 阿里云内容安全 v2 -->
+        <dependency>
+            <groupId>com.aliyun</groupId>
+            <artifactId>green20220302</artifactId>
+            <version>2.2.11</version>
+        </dependency>
+
         <!-- Flyway: chat 模块数据库迁移（JPA 模块仍由 ddl-auto=update 管理） -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
+            <version>11.7.0</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
+            <version>11.7.0</version>
         </dependency>
 	</dependencies>
 
@@ -196,7 +205,10 @@
 							<version>${lombok.version}</version>
 						</path>
 					</annotationProcessorPaths>
-				</configuration>
+                    <source>21</source>
+                    <target>21</target>
+                    <compilerArgs>--enable-preview</compilerArgs>
+                </configuration>
 			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

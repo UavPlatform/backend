@@ -1,0 +1,9 @@
+drone.fuwaki.icu {
+    handle /api/* {
+        reverse_proxy localhost:8081
+    }
+
+    handle {
+        respond "Drone API Server" 200
+    }
+}

@@ -22,7 +22,6 @@ public class UploadVO {
     private String uploadStatus;
     private String orderNum;
     private Long userId;
-    private Integer totalChunks;
     private LocalDateTime createTime;
 
     public static UploadVO from(UploadedFile entity) {
@@ -35,10 +34,9 @@ public class UploadVO {
                 .fileSize(entity.getFileSize())
                 .mimeType(entity.getMimeType())
                 .fileSuffix(entity.getFileSuffix())
-                .uploadStatus(entity.getUploadStatus())
+                .uploadStatus(entity.getUploadStatus() != null ? entity.getUploadStatus().name() : null)
                 .orderNum(entity.getOrderNum())
                 .userId(entity.getUserId())
-                .totalChunks(entity.getTotalChunks())
                 .createTime(entity.getCreateTime())
                 .build();
     }

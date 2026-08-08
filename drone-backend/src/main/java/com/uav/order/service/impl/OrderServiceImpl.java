@@ -40,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public MissionOrder createOrder(Long userId, String taskNum) {
+    public MissionOrder createOrder(Long userId, String taskNum, Double reward) {
         Optional<Task> taskOpt = taskRepository.findByTaskNum(taskNum);
         if (taskOpt.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ROUTE_NOT_FOUND);
@@ -55,10 +55,10 @@ public class OrderServiceImpl implements OrderService {
         if (unpaid.isPresent()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
+        // 自动计算价格逻辑注释保留，价格改为前端传 reward
         List<TaskWaypoint> waypoints = task.getWaypoints();
-
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
-        BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, orderConfig.getPricePerMeter());
+        // BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, orderConfig.getPricePerMeter());
 
         String orderNum = OrderIdGenerator.generate(userId);
 
@@ -66,7 +66,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderNum(orderNum);
         order.setUserId(userId);
         order.setTask(task);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(reward != null ? BigDecimal.valueOf(reward) : BigDecimal.ZERO);
         order.setTotalDistance(distance);
         order.setOrderStatus(OrderStatus.PENDING);
 
@@ -78,7 +78,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         log.info("订单创建成功，订单号: {}, 用户ID: {}, 金额: {}元, 距离: {}m",
-                orderNum, userId, totalAmount, distance);
+                orderNum, userId, order.getTotalAmount(), distance);
 
         if (order.getTask() != null) {
             order.getTask().getTaskName();

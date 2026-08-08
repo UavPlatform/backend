@@ -1,18 +1,32 @@
 package com.uav.rider.controller;
 
 import com.uav.rider.pojo.dto.RiderInfoDto;
+import com.uav.rider.pojo.vo.RiderInfoVO;
+import com.uav.rider.service.RiderInfoService;
+import com.uav.server.annotation.RequireRole;
 import com.uav.server.result.Result;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import com.uav.server.util.UserContext;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/info")
+@RequestMapping("/rider/info")
 public class RiderInfoController {
 
-    @PostMapping("/edit")
-    public Result EditSelfInfo(@RequestBody RiderInfoDto riderInfoDto){
-        return Result.success();
+    @Autowired
+    private RiderInfoService riderInfoService;
+
+    @GetMapping
+    public Result<RiderInfoVO> getInfo() {
+        Long userId = UserContext.getUserId();
+        return Result.success(riderInfoService.getInfo(userId));
+    }
+
+    @RequireRole(1)
+    @PatchMapping
+    public Result<RiderInfoVO> editInfo(@Valid @RequestBody RiderInfoDto dto) {
+        Long userId = UserContext.getUserId();
+        return Result.success("保存成功", riderInfoService.editInfo(userId, dto));
     }
 }

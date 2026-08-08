@@ -13,3 +13,7 @@ PREPARE stmt FROM @sql_add_lc; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 UPDATE rider_feed f
 SET like_count = (SELECT COUNT(*) FROM rider_feed_like l WHERE l.feed_id = f.id);
+
+-- 将 role=1 的用户同步到 rider 表
+INSERT IGNORE INTO rider (id)
+SELECT id FROM user WHERE role = 1;

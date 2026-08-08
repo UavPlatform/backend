@@ -12,11 +12,10 @@ import java.util.List;
 
 @Repository
 public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> {
-    List<FeedComment> findByFeedIdOrderByCreateTimeAsc(Long feedId);
-    Page<FeedComment> findByFeedIdOrderByCreateTimeAsc(Long feedId, Pageable pageable);
-    long countByFeedId(Long feedId);
+    Page<FeedComment> findByFeedIdAndDeletedFalseOrderByCreateTimeAsc(Long feedId, Pageable pageable);
+    long countByFeedIdAndDeletedFalse(Long feedId);
 
-    @Query("SELECT c.feedId, COUNT(c) FROM FeedComment c WHERE c.feedId IN :feedIds GROUP BY c.feedId")
+    @Query("SELECT c.feedId, COUNT(c) FROM FeedComment c WHERE c.feedId IN :feedIds AND c.deleted = false GROUP BY c.feedId")
     List<Object[]> countGroupByFeedIdIn(@Param("feedIds") List<Long> feedIds);
 
     void deleteByFeedId(Long feedId);

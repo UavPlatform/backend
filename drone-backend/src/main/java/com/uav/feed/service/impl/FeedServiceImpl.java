@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -154,7 +155,7 @@ public class FeedServiceImpl implements FeedService {
         Map<Long, Long> commentCounts;
 
         if (!feedIds.isEmpty()) {
-            likedFeedIds = likeRepository.findByFeedIdInAndUserId(feedIds, currentUserId)
+            likedFeedIds = likeRepository.findByFeedIdInAndUserIdAndDeletedFalse(feedIds, currentUserId)
                     .stream().map(FeedLike::getFeedId).collect(Collectors.toSet());
             commentCounts = commentRepository.countGroupByFeedIdIn(feedIds).stream()
                     .collect(Collectors.toMap(row -> (Long) row[0], row -> (Long) row[1]));
@@ -196,23 +197,35 @@ public class FeedServiceImpl implements FeedService {
         }
 
         Optional<FeedLike> existing = likeRepository.findByFeedIdAndUserId(feedId, userId);
+        boolean liked;
         if (existing.isPresent()) {
-            likeRepository.delete(existing.get());
+            FeedLike like = existing.get();
+            if (like.isDeleted()) {
+                like.setDeleted(false);
+                like.setDeletedTime(null);
+                liked = true;
+            } else {
+                like.setDeleted(true);
+                like.setDeletedTime(LocalDateTime.now());
+                liked = false;
+            }
+            likeRepository.save(like);
         } else {
             likeRepository.save(FeedLike.builder()
                     .feedId(feedId)
                     .userId(userId)
                     .build());
+            liked = true;
         }
 
-        feedRepository.updateLikeCount(feedId, existing.isPresent() ? -1 : 1);
+        feedRepository.updateLikeCount(feedId, liked ? 1 : -1);
 
         Feed feed = feedRepository.findById(feedId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND,
                         "动态不存在"));
         String userName = userRepository.findById(feed.getUserId()).map(User::getUserName).orElse(null);
         FeedVO vo = toVO(feed, userName, userId);
-        vo.setLiked(existing.isEmpty());
+        vo.setLiked(liked);
         return vo;
     }
 
@@ -221,7 +234,7 @@ public class FeedServiceImpl implements FeedService {
     public Page<FeedCommentVO> listComments(Long feedId, int page, int size) {
         size = Math.min(size, MAX_PAGE_SIZE);
         Page<FeedComment> comments = commentRepository
-                .findByFeedIdOrderByCreateTimeAsc(feedId, PageRequest.of(page, size));
+                .findByFeedIdAndDeletedFalseOrderByCreateTimeAsc(feedId, PageRequest.of(page, size));
         Map<Long, String> userNames = new HashMap<>();
         return comments.map(c -> {
             String name = userNames.computeIfAbsent(c.getUserId(),
@@ -292,16 +305,20 @@ public class FeedServiceImpl implements FeedService {
                         "无权删除该评论");
             }
         }
-        commentRepository.delete(comment);
+        comment.setDeleted(true);
+        comment.setDeletedTime(java.time.LocalDateTime.now());
+        commentRepository.save(comment);
     }
 
     private FeedVO toVO(Feed feed, String userName, Long currentUserId) {
-        boolean liked = likeRepository.findByFeedIdAndUserId(feed.getId(), currentUserId).isPresent();
+        boolean liked = likeRepository.findByFeedIdAndUserId(feed.getId(), currentUserId)
+                .map(like -> !like.isDeleted())
+                .orElse(false);
         return toVO(feed, userName, liked);
     }
 
     private FeedVO toVO(Feed feed, String userName, boolean liked) {
-        Map<Long, Long> commentCounts = Map.of(feed.getId(), commentRepository.countByFeedId(feed.getId()));
+        Map<Long, Long> commentCounts = Map.of(feed.getId(), commentRepository.countByFeedIdAndDeletedFalse(feed.getId()));
         return toVO(feed, userName, liked, commentCounts);
     }
 

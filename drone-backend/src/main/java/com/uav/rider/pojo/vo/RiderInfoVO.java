@@ -20,7 +20,6 @@ public class RiderInfoVO {
     private String location;
     private String selfIntroduction;
     private List<QualificationEntry> qualifications;
-    // stats
     private long todayOrders;
     private long totalCompleted;
     private Double totalEarnings;

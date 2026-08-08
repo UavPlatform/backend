@@ -1,2 +1,54 @@
-drone-backend/application.yml
-drone-backend/src/main/resources/application.properties
+# ===== 全局日志（覆盖所有子目录） =====
+logs/
+*.log
+
+# ===== AI 工具本地配置 =====
+.claude/
+.cursor/
+.aider*
+.continue/
+.cody/
+CLAUDE.md
+.claudeignore
+**/CLAUDE.md
+docs/agents/
+.scratch/
+
+# ===== 密钥和凭证 =====
+*.pem
+*.key
+credentials.json
+.npmrc
+.aws/
+.ssh/
+
+# ===== Java / Maven 构建产物（来自 drone-backend） =====
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# ===== IDE 配置（来自 drone-backend） =====
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+# ===== 本地环境配置 =====
+.env
+drone-backend/src/main/resources/application.yml
+drone-backend/src/main/resources/application-dev.yml
+drone-backend/src/main/resources/application.properties\

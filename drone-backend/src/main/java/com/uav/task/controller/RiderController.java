@@ -77,12 +77,16 @@ public class RiderController {
     }
 
     @OperationLog("完成任务")
-    @Operation(summary = "完成任务", description = "骑手完成已接受的任务",
-            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @Operation(summary = "完成任务", description = "骑手完成已接受的任务，提交执行结果",
+            parameters = {
+                    @Parameter(name = "taskNum", description = "任务编号", required = true),
+                    @Parameter(name = "executeResult", description = "执行结果描述", required = true)
+            })
     @PostMapping("/complete")
-    public Result<Void> completeTask(@RequestParam String taskNum) {
+    public Result<Void> completeTask(@RequestParam String taskNum,
+                                      @RequestParam String executeResult) {
         Long riderId = UserContext.getUserId();
-        taskService.riderCompleteTask(taskNum, riderId);
+        taskService.riderCompleteTask(taskNum, riderId, executeResult);
         return Result.success("任务已完成");
     }
 }

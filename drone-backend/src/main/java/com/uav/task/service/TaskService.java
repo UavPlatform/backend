@@ -25,7 +25,7 @@ public interface TaskService {
 
     void riderCancelTask(String taskNum, Long riderId);
 
-    void riderCompleteTask(String taskNum, Long riderId);
+    void riderCompleteTask(String taskNum, Long riderId, String executeResult);
 
     void userConfirmTask(String taskNum, Long userId);
 }

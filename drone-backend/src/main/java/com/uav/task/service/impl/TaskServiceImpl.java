@@ -214,7 +214,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void riderCompleteTask(String taskNum, Long riderId) {
+    public void riderCompleteTask(String taskNum, Long riderId, String executeResult) {
         Task task = taskRepository.findByTaskNumForUpdate(taskNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
 
@@ -235,6 +235,7 @@ public class TaskServiceImpl implements TaskService {
 
         orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
             order.setExecutedAt(LocalDateTime.now());
+            order.setExecuteResult(executeResult);
             order.setOrderStatus(OrderStatus.WAITING_CONFIRM);
             orderRepository.save(order);
         });

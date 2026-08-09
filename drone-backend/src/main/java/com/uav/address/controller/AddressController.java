@@ -5,6 +5,7 @@ import com.uav.address.pojo.entity.Address;
 import com.uav.address.service.AddressService;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RequireRole;
+import com.uav.server.enums.Role;
 import com.uav.server.result.Result;
 import com.uav.server.util.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequireRole({0, 2})
+@RequireRole({Role.USER, Role.ADMIN})
 @Tag(name = "Address API", description = "用户收货地址簿接口")
 @RestController
 @RequestMapping("/address")

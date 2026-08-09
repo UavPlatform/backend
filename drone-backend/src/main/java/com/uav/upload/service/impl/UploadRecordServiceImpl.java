@@ -5,6 +5,7 @@ import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.FileUploadStatus;
+import com.uav.server.enums.Role;
 import com.uav.server.exception.BusinessException;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.upload.config.UploadStorageConfig;
@@ -88,11 +89,11 @@ public class UploadRecordServiceImpl implements UploadRecordService {
     }
 
     private void validateDeliveryPermission(MissionOrder order, Long userId, Integer role) {
-        boolean isAdmin = role != null && role >= 1;
+        boolean hasDeliveryPrivilege = role != null && role >= Role.RIDER;
         boolean isRider = order.getTask() != null
                 && taskAssignmentRepository.findByTaskId(order.getTask().getId())
                         .map(a -> a.getRiderId().equals(userId)).orElse(false);
-        if (!isRider && !isAdmin) {
+        if (!isRider && !hasDeliveryPrivilege) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ORDER_NOT_FOUND,
                     "仅飞手或管理员可交付文件");
         }

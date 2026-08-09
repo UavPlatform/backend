@@ -14,6 +14,7 @@ import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.calculator.PriceCalculator;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
+import com.uav.server.enums.Role;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.RouteIdGenerator;
@@ -356,7 +357,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public List<RiderStatsVO> getRecommendedRiders() {
-        List<User> riders = userRepository.findByRole(1);
+        List<User> riders = userRepository.findByRole(Role.RIDER);
         if (riders.isEmpty()) {
             return List.of();
         }

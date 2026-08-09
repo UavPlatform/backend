@@ -20,6 +20,12 @@ public interface BillConfigService {
 
     List<BillConfig> listAll();
 
+    /** 缓存中是否存在启用配置（Seeder 幂等判断用，避免每次启动逐 key 查库） */
+    boolean containsKey(String configKey);
+
+    /** 重载本地缓存（Seeder 首次插入后调用，避免缓存窗口期读到默认值兜底） */
+    void refreshCache();
+
     /** 更新配置值（key 不存在或 value 为空 → 400） */
     void updateConfig(String configKey, String configValue);
 }

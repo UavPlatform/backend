@@ -4,6 +4,7 @@ import com.uav.billing.pojo.entity.BillConfig;
 import com.uav.billing.service.BillConfigService;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RequireRole;
+import com.uav.server.enums.Role;
 import com.uav.server.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,7 +20,7 @@ import java.util.List;
 @RequestMapping("/admin/billing")
 @Slf4j
 @RequiredArgsConstructor
-@RequireRole({2})
+@RequireRole({Role.ADMIN})
 public class BillingConfigController {
 
     private final BillConfigService billConfigService;

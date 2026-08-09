@@ -2,6 +2,7 @@ package com.uav.task.controller;
 
 import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
+import com.uav.server.enums.Role;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
@@ -21,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequireRole(1)
+@RequireRole(Role.RIDER)
 @Tag(name = "Rider API", description = "骑手接单接口")
 @RestController
 @RequestMapping("/rider")
@@ -83,7 +84,7 @@ public class RiderController {
         return Result.success(taskService.getRiderStats(riderId));
     }
 
-    @RequireRole({0, 1, 2})
+    @RequireRole({Role.USER, Role.RIDER, Role.ADMIN})
     @OperationLog("推荐飞手")
     @Operation(summary = "推荐飞手", description = "按完成任务量降序返回飞手列表")
     @GetMapping("/recommended")

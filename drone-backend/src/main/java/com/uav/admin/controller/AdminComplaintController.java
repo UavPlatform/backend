@@ -6,6 +6,7 @@ import com.uav.order.service.OrderComplaintService;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.enums.ComplaintStatus;
+import com.uav.server.enums.Role;
 import com.uav.server.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/admin/complaint")
 @Slf4j
 @RequiredArgsConstructor
-@RequireRole({1, 2})
+@RequireRole({Role.RIDER, Role.ADMIN})
 public class AdminComplaintController {
 
     private final OrderComplaintService complaintService;

@@ -3,6 +3,7 @@ package com.uav.task.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.uav.billing.service.BillConfigService;
 import com.uav.server.annotation.RequireRole;
+import com.uav.server.enums.Role;
 import com.uav.task.pojo.dto.PriceEstimateDto;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
@@ -34,7 +35,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 
-@RequireRole({0,2})
+@RequireRole({Role.USER, Role.ADMIN})
 @Tag(name = "Task API", description = "任务创建与管理接口")
 @RestController
 @RequestMapping("/task")

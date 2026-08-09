@@ -6,6 +6,7 @@ import com.uav.user.pojo.entity.User;
 import com.uav.user.service.RiderUavService;
 import com.uav.user.service.RiderRegisterService;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.Role;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +34,7 @@ public class RiderRegisterServiceImpl implements RiderRegisterService {
         user.setUserName(dto.getUserName());
         user.setPassword(PasswordUtil.hash(dto.getPassword()));
         user.setStatus(1);
-        user.setRole(1);
+        user.setRole(Role.RIDER);
         user = userRepository.save(user);
 
         if (dto.getDjiId() != null && !dto.getDjiId().isBlank()) {

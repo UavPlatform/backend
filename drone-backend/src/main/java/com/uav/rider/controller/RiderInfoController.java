@@ -4,6 +4,7 @@ import com.uav.rider.pojo.dto.RiderInfoDto;
 import com.uav.rider.pojo.vo.RiderInfoVO;
 import com.uav.rider.service.RiderInfoService;
 import com.uav.server.annotation.RequireRole;
+import com.uav.server.enums.Role;
 import com.uav.server.result.Result;
 import com.uav.server.util.UserContext;
 import jakarta.validation.Valid;
@@ -23,7 +24,7 @@ public class RiderInfoController {
         return Result.success(riderInfoService.getInfo(userId));
     }
 
-    @RequireRole(1)
+    @RequireRole(Role.RIDER)
     @PatchMapping
     public Result<RiderInfoVO> editInfo(@Valid @RequestBody RiderInfoDto dto) {
         Long userId = UserContext.getUserId();

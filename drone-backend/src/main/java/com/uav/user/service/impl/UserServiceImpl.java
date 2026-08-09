@@ -7,6 +7,7 @@ import com.uav.user.pojo.entity.User;
 import com.uav.user.pojo.vo.RegisterVo;
 import com.uav.user.service.UserService;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.Role;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,7 +75,7 @@ public class UserServiceImpl implements UserService {
         user.setUserName(name);
         user.setPassword(PasswordUtil.hash(password));
         user.setStatus(1);
-        user.setRole(0);
+        user.setRole(Role.USER);
 
         try {
             userRepository.save(user);

@@ -1,5 +1,6 @@
 package com.uav.user.pojo.entity;
 
+import com.uav.server.enums.Role;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -22,5 +23,5 @@ public class User {
     private Integer status;
 
     @Column(nullable = false)
-    private Integer role = 0;
+    private Integer role = Role.USER;
 }

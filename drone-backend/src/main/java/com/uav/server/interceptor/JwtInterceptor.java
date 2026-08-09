@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.annotation.SkipJwt;
+import com.uav.server.enums.Role;
 import com.uav.server.result.Result;
 import com.uav.server.util.JwtUtil;
 import com.uav.server.util.UserContext;
@@ -96,7 +97,7 @@ public class JwtInterceptor implements HandlerInterceptor {
 
         // 仅在端点标注了 @RequireDrone 时才检查无人机绑定
         Integer role = UserContext.getRole();
-        if (role != null && role == 1) {
+        if (role != null && role == Role.RIDER) {
             if (handler instanceof HandlerMethod) {
                 HandlerMethod handlerMethod = (HandlerMethod) handler;
                 boolean requireDrone = handlerMethod.hasMethodAnnotation(RequireDrone.class)

@@ -2,6 +2,7 @@ package com.uav.billing.config;
 
 import com.uav.billing.mapper.BillConfigRepository;
 import com.uav.billing.pojo.entity.BillConfig;
+import com.uav.billing.service.BillConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class BillConfigSeeder implements ApplicationRunner {
 
     private final BillConfigRepository billConfigRepository;
+    private final BillConfigService billConfigService;
 
     /** key → (默认值, 说明)。perKmSteps 不种：留空即回退单档 perKmFee */
     private static final Map<String, String[]> DEFAULTS = new LinkedHashMap<>() {{
@@ -37,17 +39,29 @@ public class BillConfigSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        DEFAULTS.forEach((key, entry) -> {
+        int inserted = 0;
+        for (Map.Entry<String, String[]> entry : DEFAULTS.entrySet()) {
+            String key = entry.getKey();
+            // 缓存（@PostConstruct 先于 ApplicationRunner 执行）已加载启用配置，命中直接跳过，避免逐 key 查库
+            if (billConfigService.containsKey(key)) {
+                continue;
+            }
+            // 缓存未命中（缺失或被禁用）：查库兜底，保留运营禁用/删除的配置不被重新激活
             if (billConfigRepository.findByConfigKey(key).isPresent()) {
-                return;
+                continue;
             }
             BillConfig config = new BillConfig();
             config.setConfigKey(key);
-            config.setConfigValue(entry[0]);
-            config.setDescription(entry[1]);
+            config.setConfigValue(entry.getValue()[0]);
+            config.setDescription(entry.getValue()[1]);
             config.setEnabled(true);
             billConfigRepository.save(config);
-            log.info("初始化计费配置: {} = {}", key, entry[0]);
-        });
+            inserted++;
+            log.info("初始化计费配置: {} = {}", key, entry.getValue()[0]);
+        }
+        if (inserted > 0) {
+            // 首次启动插入后刷新缓存，避免窗口期内 getXxx 全部走默认值兜底
+            billConfigService.refreshCache();
+        }
     }
 }

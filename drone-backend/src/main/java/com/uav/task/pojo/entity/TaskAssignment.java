@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "task_assignment")
+@Table(name = "task_assignment", indexes = {
+        @Index(name = "idx_assign_rider_complete", columnList = "rider_id, complete_time"),
+        @Index(name = "idx_assign_rider_accept", columnList = "rider_id, accept_time"),
+        @Index(name = "idx_assign_task", columnList = "task_id")
+})
 public class TaskAssignment {
 
     @Id

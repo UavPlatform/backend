@@ -40,7 +40,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -354,17 +356,32 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public List<RiderStatsVO> getRecommendedRiders() {
-        // 查询所有骑手（role=1），按完成任务量降序排列
         List<User> riders = userRepository.findByRole(1);
         if (riders.isEmpty()) {
             return List.of();
         }
 
+        List<Long> riderIds = riders.stream().map(User::getId).toList();
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+
+        // 一次批量查询替代 N*3 次
+        Map<Long, Object[]> statsMap = new HashMap<>();
+        for (Object[] row : taskAssignmentRepository.batchRiderStats(riderIds, todayStart)) {
+            statsMap.put((Long) row[0], row);
+        }
+
         List<RiderStatsVO> result = new ArrayList<>();
         for (User rider : riders) {
-            RiderStatsVO vo = getRiderStats(rider.getId());
+            RiderStatsVO vo = new RiderStatsVO();
             vo.setRiderId(rider.getId());
             vo.setRiderName(rider.getUserName());
+
+            Object[] stats = statsMap.get(rider.getId());
+            if (stats != null) {
+                vo.setTodayOrders(((Number) stats[1]).longValue());
+                vo.setTotalCompleted(((Number) stats[2]).longValue());
+                vo.setTotalEarnings(((Number) stats[3]).doubleValue());
+            }
             result.add(vo);
         }
         result.sort(Comparator.comparingLong(RiderStatsVO::getTotalCompleted).reversed());

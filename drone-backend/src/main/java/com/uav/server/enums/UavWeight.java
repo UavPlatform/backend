@@ -3,15 +3,14 @@ package com.uav.server.enums;
 import lombok.Getter;
 
 @Getter
-public enum LicenseGrade {
-    VLOS("VLOS", "视距内"),
-    BVLOS("BVLOS", "超视距"),
-    TEACHER("TEACHER", "教员");
+public enum UavWeight {
+    SMALL("SMALL", "小型"),
+    MEDIUM("MEDIUM", "中型");
 
     private final String code;
     private final String desc;
 
-    LicenseGrade(String code, String desc) {
+    UavWeight(String code, String desc) {
         this.code = code;
         this.desc = desc;
     }

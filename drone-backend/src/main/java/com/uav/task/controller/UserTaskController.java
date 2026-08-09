@@ -1,6 +1,9 @@
 package com.uav.task.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.uav.billing.service.BillConfigService;
 import com.uav.server.annotation.RequireRole;
+import com.uav.task.pojo.dto.PriceEstimateDto;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.server.result.Result;
@@ -9,6 +12,8 @@ import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.vo.AmapConfigVO;
+import com.uav.task.pojo.vo.PriceDetailVO;
+import com.uav.task.pojo.vo.PublishConfigVO;
 import com.uav.task.pojo.vo.TaskPageVO;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.annotation.OperationLog;
@@ -25,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
@@ -40,6 +46,9 @@ public class UserTaskController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private BillConfigService billConfigService;
 
     @Autowired
     private TaskAssignmentRepository taskAssignmentRepository;
@@ -62,6 +71,25 @@ public class UserTaskController {
     public Result<TaskVo> createTask(@RequestBody TaskDto dto) {
         Task saved = taskService.createTask(dto);
         return Result.success("任务创建成功", toTaskVo(saved));
+    }
+
+    @OperationLog("参考价预估")
+    @RateLimiter(limit = 30, windowSeconds = 60)
+    @Operation(summary = "参考价预估", description = "发布前预览平台参考价，与创建任务同口径（起步价+里程+重量阶梯+夜间附加）")
+    @PostMapping("/price/estimate")
+    public Result<PriceDetailVO> estimatePrice(@RequestBody PriceEstimateDto dto) {
+        return Result.success("预估成功", taskService.estimatePrice(dto));
+    }
+
+    @OperationLog("查询发布配置")
+    @Operation(summary = "发布页配置", description = "重量计费类型、协商价下限等发布页展示配置")
+    @GetMapping("/publish/config")
+    public Result<PublishConfigVO> publishConfig() {
+        PublishConfigVO vo = new PublishConfigVO();
+        vo.setWeightTypes(billConfigService.getJson("WEIGHT_TYPES",
+                new TypeReference<List<String>>() {}, List.of("TRANSPORT")));
+        vo.setMinNegotiatedRate(billConfigService.getBigDecimal("MIN_NEGOTIATED_RATE", new BigDecimal("0.5")));
+        return Result.success("获取成功", vo);
     }
 
     @OperationLog("查询任务列表")

@@ -26,6 +26,11 @@ public class TaskVo {
     private BigDecimal totalAmount;
     private BigDecimal totalDistance;
     private String orderStatus;
+    private Double weight;
+    private BigDecimal referencePrice;
+    private String priceDetail;
+    private LocalDateTime plannedTime;
+    private Boolean needManualQuote;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<WaypointVo> waypoints;
@@ -43,6 +48,11 @@ public class TaskVo {
         vo.setTaskType(task.getTaskType());
         vo.setTaskStatus(task.getTaskStatus());
         vo.setDescription(task.getDescription());
+        vo.setWeight(task.getWeight());
+        vo.setReferencePrice(task.getReferencePrice());
+        vo.setPriceDetail(task.getPriceDetail());
+        vo.setPlannedTime(task.getPlannedTime());
+        vo.setNeedManualQuote(task.getNeedManualQuote());
         vo.setCreateTime(task.getCreateTime());
         vo.setUpdateTime(task.getUpdateTime());
         if (assignment != null) {

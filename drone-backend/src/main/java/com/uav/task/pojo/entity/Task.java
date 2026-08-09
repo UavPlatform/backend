@@ -5,6 +5,7 @@ import com.uav.server.enums.TaskType;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -56,6 +57,26 @@ public class Task {
 
     @Column(name = "reward")
     private Double reward;
+
+    /** 货物重量（kg），空 = 未填写 */
+    @Column(name = "weight")
+    private Double weight;
+
+    /** 平台参考价（元，2 位小数） */
+    @Column(name = "reference_price", precision = 10, scale = 2)
+    private BigDecimal referencePrice;
+
+    /** 计费明细 JSON（PriceDetailVO 序列化），展示用 */
+    @Column(name = "price_detail", length = 1000)
+    private String priceDetail;
+
+    /** 计划执行时间（夜间附加费判断口径） */
+    @Column(name = "planned_time")
+    private LocalDateTime plannedTime;
+
+    /** 超重等场景：true = 需平台人工报价 */
+    @Column(name = "need_manual_quote")
+    private Boolean needManualQuote = false;
 
     @Column(name = "create_time", nullable = false)
     private LocalDateTime createTime;

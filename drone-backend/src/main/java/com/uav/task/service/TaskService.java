@@ -1,7 +1,9 @@
 package com.uav.task.service;
 
+import com.uav.task.pojo.dto.PriceEstimateDto;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.vo.PriceDetailVO;
 import org.springframework.data.domain.Page;
 
 import com.uav.task.pojo.vo.RiderStatsVO;
@@ -10,6 +12,9 @@ import java.util.List;
 
 public interface TaskService {
     Task createTask(TaskDto dto);
+
+    /** 发布前预览参考价（与 createTask 同口径，readOnly） */
+    PriceDetailVO estimatePrice(PriceEstimateDto dto);
 
     Page<Task> getTasksByUser(Long userId, int page, int size);
 

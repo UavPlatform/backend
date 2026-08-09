@@ -7,7 +7,6 @@ import com.uav.server.enums.OrderStatus;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.calculator.RoutePriceCalculator;
-import com.uav.server.config.OrderConfig;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.OrderIdGenerator;
@@ -35,9 +34,6 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    @Autowired
-    private OrderConfig orderConfig;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MissionOrder createOrder(Long userId, String taskNum, Double reward) {
@@ -55,10 +51,9 @@ public class OrderServiceImpl implements OrderService {
         if (unpaid.isPresent()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
-        // 自动计算价格逻辑注释保留，价格改为前端传 reward
+        // 挂牌价已在 TaskServiceImpl 计价块算好（参考价/协商价），这里仅透传
         List<TaskWaypoint> waypoints = task.getWaypoints();
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
-        // BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, orderConfig.getPricePerMeter());
 
         String orderNum = OrderIdGenerator.generate(userId);
 

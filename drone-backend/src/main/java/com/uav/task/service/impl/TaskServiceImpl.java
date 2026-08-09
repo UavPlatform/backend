@@ -1,12 +1,17 @@
 package com.uav.task.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.uav.billing.service.BillConfigService;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.mapper.TaskRepository;
+import com.uav.task.pojo.dto.PriceEstimateDto;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.entity.TaskWaypoint;
+import com.uav.server.calculator.PriceCalculator;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
@@ -14,6 +19,7 @@ import com.uav.server.exception.BusinessException;
 import com.uav.server.util.RouteIdGenerator;
 import com.uav.server.util.UserContext;
 import com.uav.order.service.OrderService;
+import com.uav.task.pojo.vo.PriceDetailVO;
 import com.uav.task.pojo.vo.RiderStatsVO;
 import com.uav.task.service.TaskService;
 import com.uav.user.mapper.UserRepository;
@@ -26,8 +32,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -51,6 +61,15 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PriceCalculator priceCalculator;
+
+    @Autowired
+    private BillConfigService billConfigService;
+
+    /** 项目无 ObjectMapper Bean（惯例见 JwtInterceptor），自行创建 */
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -76,7 +95,6 @@ public class TaskServiceImpl implements TaskService {
         task.setTaskStatus(TaskStatus.IDLE);
         task.setUserId(userId);
         task.setDescription(dto.getDescription());
-        task.setReward(dto.getReward());
 
         List<TaskWaypoint> waypoints = dto.getWaypoints().stream()
                 .map(wp -> {
@@ -91,10 +109,46 @@ public class TaskServiceImpl implements TaskService {
                 .collect(Collectors.toList());
 
         task.setWaypoints(waypoints);
+
+        // ---- 计价块：参考价 = 起步价 + 里程费 + 重量阶梯费 + 夜间附加费 ----
+        LocalDateTime plannedTime = parseTaskTime(dto.getTaskTime());
+        BigDecimal distanceMeters = priceCalculator.calculateTotalDistance(waypoints);
+        PriceDetailVO priceDetail = priceCalculator.calculate(dto.getType(), distanceMeters, dto.getWeight(), plannedTime);
+
+        BigDecimal listedPrice = priceDetail.getTotal();
+        if (dto.getReward() != null) {
+            BigDecimal negotiated = BigDecimal.valueOf(dto.getReward());
+            BigDecimal minRate = billConfigService.getBigDecimal("MIN_NEGOTIATED_RATE", new BigDecimal("0.5"));
+            BigDecimal floor = priceDetail.getTotal().multiply(minRate).setScale(2, RoundingMode.HALF_UP);
+            if (negotiated.compareTo(floor) < 0) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                        "协商价不得低于参考价的" + percentLabel(minRate) + "%");
+            }
+            listedPrice = negotiated;
+        }
+        task.setReward(listedPrice.setScale(2, RoundingMode.HALF_UP).doubleValue());
+        task.setReferencePrice(priceDetail.getTotal());
+        task.setWeight(dto.getWeight());
+        task.setPlannedTime(plannedTime);
+        task.setNeedManualQuote(Boolean.TRUE.equals(priceDetail.getNeedManualQuote()));
+        task.setPriceDetail(toJson(priceDetail));
+
         Task saved = taskRepository.save(task);
         orderService.createOrder(userId, saved.getTaskNum(), saved.getReward());
-        log.info("任务创建成功，编号: {}, 用户ID: {}, 类型: {}", saved.getTaskNum(), userId, dto.getType());
+        log.info("任务创建成功，编号: {}, 用户ID: {}, 类型: {}, 挂牌价: {}, 参考价: {}",
+                saved.getTaskNum(), userId, dto.getType(), saved.getReward(), saved.getReferencePrice());
         return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PriceDetailVO estimatePrice(PriceEstimateDto dto) {
+        if (dto.getWaypoints() == null || dto.getWaypoints().isEmpty()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "航点列表不能为空");
+        }
+        LocalDateTime plannedTime = parseTaskTime(dto.getTaskTime());
+        BigDecimal distanceMeters = priceCalculator.estimateDistance(dto.getWaypoints());
+        return priceCalculator.calculate(dto.getTaskType(), distanceMeters, dto.getWeight(), plannedTime);
     }
 
     @Override
@@ -315,5 +369,37 @@ public class TaskServiceImpl implements TaskService {
         }
         result.sort(Comparator.comparingLong(RiderStatsVO::getTotalCompleted).reversed());
         return result;
+    }
+
+    // -----------------------------------------------------------------------
+    // 计价辅助
+    // -----------------------------------------------------------------------
+
+    /** 解析计划执行时间；空 → null；格式错误 → 400 */
+    private LocalDateTime parseTaskTime(String taskTime) {
+        if (taskTime == null || taskTime.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(taskTime.trim(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "任务时间格式错误，应为 yyyy-MM-dd HH:mm:ss");
+        }
+    }
+
+    /** 0.5 → "50"（协商价下限文案用） */
+    private String percentLabel(BigDecimal rate) {
+        return rate.multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString();
+    }
+
+    /** 计费明细 JSON 化；失败仅记日志，不影响主流程 */
+    private String toJson(PriceDetailVO vo) {
+        try {
+            return objectMapper.writeValueAsString(vo);
+        } catch (JsonProcessingException e) {
+            log.warn("计费明细序列化失败: {}", e.getMessage());
+            return null;
+        }
     }
 }

@@ -23,4 +23,10 @@ public interface MessageService extends IService<ChatMessage> {
 
     /** 获取用户所有会话的未读消息数（不更新 lastReadTime，只读） */
     Map<Long, Integer> getUnreadCountMap(Long userId);
+
+    /**
+     * 显式推进指定会话的已读位点（t49：1B-3 之前 sync/connect 会隐式推进）。
+     * 仅会话成员可调用；lastReadTime 推进到当前时间。
+     */
+    void markSessionRead(Long userId, Long sessionId);
 }

@@ -70,4 +70,14 @@ public class MessageController {
         Long userId = com.uav.server.util.UserContext.getUserId();
         return Result.success(messageService.getUnreadCountMap(userId));
     }
+
+    @OperationLog("标记会话已读")
+    @RateLimiter(limit = 30, windowSeconds = 60)
+    @Operation(summary = "标记会话已读", description = "进入会话时由客户端显式调用：推进该会话 lastReadTime 到当前时间（t49 显式已读契约）；仅会话成员可调用")
+    @PostMapping("/read")
+    public Object markSessionRead(@RequestParam Long sessionId) {
+        Long userId = com.uav.server.util.UserContext.getUserId();
+        messageService.markSessionRead(userId, sessionId);
+        return Result.success("已标记已读");
+    }
 }

@@ -5,6 +5,7 @@ import com.uav.server.result.Result;
 import com.uav.uav.pojo.vo.AdminStatisticsVO;
 import com.uav.uav.pojo.vo.LiveUavVO;
 import com.uav.server.annotation.OperationLog;
+import com.uav.server.annotation.RequireRole;
 import com.uav.uav.service.UavManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -20,6 +21,7 @@ import java.util.List;
 @Tag(name = "UAV Management API")
 @RestController
 @RequestMapping("/admin/uav")
+@RequireRole(2)
 @Slf4j
 public class UavManagementController {
 

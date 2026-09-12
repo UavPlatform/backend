@@ -4,7 +4,6 @@ import com.uav.uav.pojo.dto.UavDto;
 import com.uav.server.result.Result;
 import com.uav.uav.pojo.vo.UavVo;
 import com.uav.server.annotation.OperationLog;
-import com.uav.server.annotation.SkipJwt;
 import com.uav.uav.service.AppUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,11 +23,11 @@ public class AppUavController {
     @Autowired
     private AppUavService appUavService;
 
-    @SkipJwt
+    // P0-6：无人机注册必须登录（移除调试残留的 @SkipJwt，匿名可抢注任意 djiId）
     @OperationLog("新增无人机")
     @Operation(
             summary = "新增无人机",
-            description = "添加新的无人机信息",
+            description = "添加新的无人机信息（需登录）",
             responses = {
                     @ApiResponse(
                             responseCode = "200",

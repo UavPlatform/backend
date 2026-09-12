@@ -2,6 +2,7 @@ package com.uav.pay.service.impl;
 
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.pay.MockPayGuard;
 import com.uav.pay.config.WeChatPayConfig;
 import com.uav.pay.mapper.PayRecordRepository;
 import com.uav.pay.pojo.entity.PayRecord;
@@ -11,13 +12,17 @@ import com.uav.pay.util.WeChatPayUtil;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.exception.BusinessException;
+import com.uav.server.exception.PayNotifyException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -31,6 +36,12 @@ public class WeChatPayServiceImpl implements WeChatPayService {
 
     @Autowired
     private WeChatPayConfig weChatPayConfig;
+
+    @Autowired
+    private MockPayGuard mockPayGuard;
+
+    @Autowired
+    private PayRecordAuditService payRecordAuditService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -60,6 +71,25 @@ public class WeChatPayServiceImpl implements WeChatPayService {
         record.setStatus(OrderStatus.PENDING);
         payRecordRepository.save(record);
 
+        // 1B-1a：mock 支付通道（仅 dev/test profile + wechat.pay.mock-enabled=true 双重门禁）。
+        // 复用真实 handleNotify 状态机（PENDING→PAID，含 t3 金额比对）：mock 通道按订单应付金额全额支付，
+        // 并生成 mock 交易流水与 prepayId；openid 由服务端生成，不依赖真实微信身份。
+        if (mockPayGuard.isMockPayActive()) {
+            String mockOpenid = (openid == null || openid.isBlank())
+                    ? "mock-openid-" + userId : openid;
+            String mockTxId = "mock-" + orderNum + "-" + UUID.randomUUID().toString().substring(0, 8);
+            handleNotify(mockTxId, orderNum, "SUCCESS", toCents(order.getTotalAmount()));
+            record.setPrepayId("mock-prepay-" + orderNum);
+            payRecordRepository.save(record);
+            log.info("[MOCK PAY] 订单 {} mock 支付完成, mockTxId={}, mockOpenid={}", orderNum, mockTxId, mockOpenid);
+            return new PayResultVO(orderNum, record.getPrepayId(), null);
+        }
+
+        // 1B-1a：真实链路必须有 openid（微信 JSAPI 支付人身份）
+        if (openid == null || openid.isBlank()) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "openid 不能为空");
+        }
+
         String description = "无人机任务-" + orderNum;
         try {
             var result = WeChatPayUtil.createJsapiOrder(
@@ -77,7 +107,7 @@ public class WeChatPayServiceImpl implements WeChatPayService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handleNotify(String transactionId, String orderNum, String status) {
+    public void handleNotify(String transactionId, String orderNum, String status, Integer callbackAmountCents) {
         if (transactionId != null) {
             PayRecord existingByTransId = payRecordRepository.findByTransactionId(transactionId).orElse(null);
             if (existingByTransId != null) {
@@ -97,17 +127,39 @@ public class WeChatPayServiceImpl implements WeChatPayService {
             return;
         }
 
+        MissionOrder order = orderRepository.findByOrderNum(orderNum).orElse(null);
+        if (order == null) {
+            log.error("支付回调对应订单不存在，拒绝入账: {}", orderNum);
+            payRecordAuditService.writeRecordError(record.getId(), "支付回调对应订单不存在");
+            throw new PayNotifyException("支付回调对应订单不存在: " + orderNum);
+        }
+
+        // P0-3：回调金额必须与订单应支付金额一致，否则拒绝入账并留下审计记录
+        Integer expectedCents = toCents(order.getTotalAmount());
+        if (callbackAmountCents == null || !callbackAmountCents.equals(expectedCents)) {
+            log.error("[资损防护] 支付回调金额不符，拒绝入账。orderNum={}, 期望={}分, 回调={}分",
+                    orderNum, expectedCents, callbackAmountCents);
+            // 留痕走独立事务：主事务随 PayNotifyException 回滚，审计信息必须存活
+            payRecordAuditService.writeRecordError(record.getId(),
+                    "支付回调金额不符: 订单 " + expectedCents + " 分, 回调 " + callbackAmountCents + " 分");
+            throw new PayNotifyException("支付回调金额与订单金额不一致");
+        }
+
         record.setTransactionId(transactionId);
         record.setStatus(OrderStatus.PAID);
         record.setPayTime(LocalDateTime.now());
         payRecordRepository.save(record);
 
-        orderRepository.findByOrderNum(orderNum).ifPresent(order -> {
-            order.setOrderStatus(OrderStatus.PAID);
-            orderRepository.save(order);
-        });
+        order.setOrderStatus(OrderStatus.PAID);
+        orderRepository.save(order);
 
-        log.info("支付回调成功, 订单号: {}, 微信流水号: {}", orderNum, transactionId);
+        log.info("支付回调成功, 订单号: {}, 微信流水号: {}, 金额: {}分", orderNum, transactionId, callbackAmountCents);
+    }
+
+    private Integer toCents(BigDecimal amountYuan) {
+        return amountYuan.multiply(BigDecimal.valueOf(100))
+                .setScale(0, RoundingMode.HALF_UP)
+                .intValueExact();
     }
 
     @Override

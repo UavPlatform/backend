@@ -9,6 +9,7 @@ import com.uav.uav.pojo.vo.WebUavStatusVo;
 import com.uav.user.pojo.vo.UserRecordsVO;
 import com.uav.server.annotation.OperationLog;
 import com.uav.uav.service.UavStatusService;
+import com.uav.server.util.UserContext;
 import com.uav.uav.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -158,8 +160,8 @@ public class WebUavController {
 
     @OperationLog("查询用户观看记录")
     @Operation(
-            summary = "查询用户个人观看记录（管理员权限）",
-            description = "根据用户名查询用户的直播观看记录",
+            summary = "查询观看记录（本人）",
+            description = "普通用户固定查询自己的直播观看记录；管理员可传 userName 代查任意用户",
             responses = {
                     @ApiResponse(
                             responseCode = "200",
@@ -179,11 +181,20 @@ public class WebUavController {
             }
     )
     @GetMapping("/getRecord")
-    public Result<UserRecordsVO> getUserRecord(@RequestParam String userName,
+    public Result<UserRecordsVO> getUserRecord(@RequestParam(required = false) String userName,
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "10") int size) {
+        // P0-5：普通用户一律只能查自己的观看记录；仅管理员可显式指定 userName 代查
+        Integer role = UserContext.getRole();
+        String targetUser;
+        if (role != null && role == 2 && StringUtils.hasText(userName)) {
+            targetUser = userName;
+        } else {
+            targetUser = UserContext.getUsername();
+        }
+
         Pageable pageable = PageRequest.of(page, size);
-        Page<UserRecord> recordPage = webUavService.getUserRecord(userName, pageable);
+        Page<UserRecord> recordPage = webUavService.getUserRecord(targetUser, pageable);
 
         return getUserRecordsVOResult(recordPage);
     }

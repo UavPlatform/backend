@@ -1,5 +1,6 @@
 package com.uav.live.controller;
 
+import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
 import com.uav.user.pojo.entity.UserRecord;
 import com.uav.server.enums.ApiErrorCode;
@@ -9,6 +10,8 @@ import com.uav.live.pojo.vo.PullCredentialsVO;
 import com.uav.live.service.impl.LiveSessionSnapshot;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RateLimiter;
+import com.uav.server.annotation.RequireDrone;
+import com.uav.server.annotation.RequireRole;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.handler.DroneWebSocketHandler;
 import com.uav.server.ws.handler.WsCommandAckResult;
@@ -55,6 +58,9 @@ public class WebLiveController {
     @Autowired
     private LiveSessionService liveSessionService;
 
+    @Autowired
+    private RiderUavRepository riderUavRepository;
+
     @OperationLog("请求开播")
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
@@ -85,7 +91,46 @@ public class WebLiveController {
     @PostMapping("/req")
     public Result<LiveStartVO> startLive(@RequestParam String deviceId) {
         webUavService.getRegisteredUav(deviceId);
+        return doStartLive(deviceId, LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS);
+    }
 
+    /**
+     * 飞手主动开播（1B-4b，裁决 Q3=C）：飞手仅可对「本人绑定（rider_uav）且在线」的设备开播。
+     * 复用 START_LIVE 下发/ACK 与 /live/get 凭证链路，直播态并入 LiveSessionSnapshot，
+     * 停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路（/live/close 对所有发起方生效）。
+     */
+    @RequireRole(1)
+    @RequireDrone
+    @OperationLog("飞手主动开播")
+    @RateLimiter(limit = 5, windowSeconds = 60)
+    @Operation(
+            summary = "飞手主动开播",
+            description = "飞手对本人绑定且在线的设备发送开播请求（1B-4b）；设备归属校验 rider_uav",
+            parameters = {
+                    @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
+            },
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "发送成功 / 已运行 / 等待确认"),
+                    @ApiResponse(responseCode = "403", description = "设备未绑定到当前飞手"),
+                    @ApiResponse(responseCode = "404", description = "设备未注册"),
+                    @ApiResponse(responseCode = "409", description = "设备未连接 / 正在启动中")
+            }
+    )
+    @PostMapping("/rider/req")
+    public Result<LiveStartVO> riderStartLive(@RequestParam String deviceId) {
+        Long riderId = UserContext.getUserId();
+        webUavService.getRegisteredUav(deviceId);
+        if (riderId == null || !riderUavRepository.existsByUserIdAndDjiId(riderId, deviceId)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "设备未绑定到当前飞手");
+        }
+        return doStartLive(deviceId, LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS);
+    }
+
+    /**
+     * 公共开播流程（运营端 /live/req 与飞手 /live/rider/req 共用）：
+     * 在线检查 → 状态互斥 → 生成 roomId/userSig → START_LIVE 下发 + ACK 等待。
+     */
+    private Result<LiveStartVO> doStartLive(String deviceId, long ackTimeoutMillis, long startingTtlMillis) {
         if (!appWebSocketService.isConnected(deviceId)) {
             throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.UAV_NOT_CONNECTED);
         }
@@ -106,7 +151,7 @@ public class WebLiveController {
         String userSig = trtcService.generateUserSig(deviceId);
         WsCommandAckResult ackResult = webSocketHandler.sendStartLiveCommand(
                 deviceId, roomId, deviceId, userSig,
-                LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS
+                ackTimeoutMillis, startingTtlMillis
         );
 
         LiveSessionSnapshot snapshot = liveSessionService.getSnapshot(deviceId);
@@ -128,16 +173,15 @@ public class WebLiveController {
     @OperationLog("获取拉流凭证")
     @Operation(
             summary = "获取拉流凭证",
-            description = "Web端获取视频流的凭证",
+            description = "Web端获取视频流的凭证；TRTC 身份由服务端从登录态生成，客户端不可指定",
             parameters = {
-                    @Parameter(name = "deviceId", description = "无人机设备ID", required = true),
-                    @Parameter(name = "webUserId", description = "Web端用户ID", required = true)
+                    @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
                     @ApiResponse(responseCode = "200", description = "获取成功",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"roomId\": \"drone_xxx\", \"userId\": \"web_xxx\", \"userSig\": \"...\", \"sdkAppId\": 1400000000}}"))),
+                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"roomId\": \"drone_xxx\", \"userId\": \"3\", \"userSig\": \"...\", \"sdkAppId\": 1400000000}}"))),
                     @ApiResponse(responseCode = "409", description = "设备未连接",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
@@ -146,7 +190,6 @@ public class WebLiveController {
     )
     @PostMapping("/get")
     public Result<PullCredentialsVO> getPullCredentials(@RequestParam String deviceId,
-                                                          @RequestParam String webUserId,
                                                           HttpServletRequest request) {
         webUavService.getRegisteredUav(deviceId);
 
@@ -154,8 +197,15 @@ public class WebLiveController {
             throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.UAV_NOT_CONNECTED);
         }
 
+        // P0-9：TRTC 身份一律取当前登录用户，客户端传入的 webUserId 不再参与签名
+        Long loginUserId = UserContext.getUserId();
+        if (loginUserId == null) {
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, ApiErrorCode.INVALID_PARAM, "用户未登录");
+        }
+        String trtcUserId = String.valueOf(loginUserId);
+
         String roomId = trtcService.generateRoomId(deviceId);
-        String userSig = trtcService.generateUserSig(webUserId);
+        String userSig = trtcService.generateUserSig(trtcUserId);
 
         String userName = UserContext.getUsername();
         if (userName != null) {
@@ -163,7 +213,7 @@ public class WebLiveController {
         }
 
         PullCredentialsVO vo = new PullCredentialsVO(
-                roomId, webUserId, userSig, trtcService.getSdkAppId(),
+                roomId, trtcUserId, userSig, trtcService.getSdkAppId(),
                 buildWebSocketUrl(request, deviceId),
                 liveSessionService.getSnapshot(deviceId).getState().name(),
                 liveSessionService.isRunning(deviceId)
@@ -171,22 +221,23 @@ public class WebLiveController {
         return Result.success(vo);
     }
 
-    @OperationLog("结束观看")
+    @OperationLog("结束观看/停止推流")
     @Operation(
-            summary = "结束观看会话",
-            description = "当前用户退出图传观看时，补齐观看记录结束时间",
+            summary = "结束观看并请求停止推流（1A-5a）",
+            description = "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，"
+                    + "则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话"
+                    + "并补齐该设备全体观众的观看记录；设备离线则直接补终态。"
+                    + "协议详见 DroneWebSocketHandler#sendStopLiveCommand javadoc。",
             parameters = {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "关闭成功",
+                    @ApiResponse(responseCode = "200", description = "已停止 / 等待设备确认 / 离线补终态",
                             content = @Content(mediaType = "application/json",
                                     schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"观看记录已结束\"}"))),
-                    @ApiResponse(responseCode = "404", description = "无待关闭记录",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 404, \"errorCode\": \"INVALID_PARAM\", \"message\": \"当前没有待关闭的观看记录\"}")))
+                                            example = "{\"success\": true, \"code\": 200, \"message\": \"设备已确认停止推流\"}"))),
+                    @ApiResponse(responseCode = "404", description = "设备未注册"),
+                    @ApiResponse(responseCode = "409", description = "设备拒绝停止推流（LIVE_STOP_REJECTED）")
             }
     )
     @PostMapping("/close")
@@ -194,17 +245,79 @@ public class WebLiveController {
         webUavService.getRegisteredUav(deviceId);
         String userName = currentUserName();
 
-        List<UserRecord> openRecords = userRecordRepository.findOpenRecords(userName, deviceId);
-        if (openRecords.isEmpty()) {
-            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "当前没有待关闭的观看记录");
+        // 1. 发起方本人不再观看：先补齐其观看记录 end_time（既有语义保留，任何分支都生效）
+        closeCallerOpenRecord(userName, deviceId);
+
+        // 2. 运营端结束观看 = 停止推流（1A-5a 新语义）
+        if (!appWebSocketService.isConnected(deviceId)) {
+            // 设备离线：直播必然已断（WS close 钩子已 markStopped），补齐终态即可
+            liveSessionService.markStopped(deviceId);
+            closeAllViewerRecords(deviceId, "设备离线");
+            log.info("观看记录已结束，用户: {}, 设备: {}（设备离线，直播已结束）", maskedName(), deviceId);
+            return Result.success("无人机已离线，直播已结束");
+        }
+        if (!liveSessionService.isRunning(deviceId) && !liveSessionService.isStarting(deviceId)) {
+            closeAllViewerRecords(deviceId, "直播未在运行");
+            log.info("观看记录已结束，用户: {}, 设备: {}（直播未在运行）", maskedName(), deviceId);
+            return Result.success("直播未在运行，观看记录已结束");
         }
 
-        UserRecord record = openRecords.get(0);
-        record.setEnd_time(LocalDateTime.now());
-        userRecordRepository.save(record);
+        WsCommandAckResult ack = webSocketHandler.sendStopLiveCommand(deviceId, LIVE_ACK_TIMEOUT_MILLIS);
+        if (ack.isSuccess()) {
+            liveSessionService.markStopped(deviceId);
+            closeAllViewerRecords(deviceId, "设备确认停止");
+            log.info("设备 {} 已确认停止推流，观看记录已全部结束", deviceId);
+            return Result.success("设备已确认停止推流");
+        }
+        if (ack.isTimedOut()) {
+            // 不确定设备是否已停：保持状态由设备异步上报 LIVE_STOPPED 事件兜底（LiveEventHandler）
+            log.warn("设备 {} 停止命令 ACK 超时，等待 LIVE_STOPPED 事件兜底", deviceId);
+            return Result.success("停止命令已发送，等待设备确认");
+        }
+        throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.LIVE_STOP_REJECTED, ack.getMessage());
+    }
 
-        log.info("观看记录已结束，用户: {}, 设备: {}", maskedName(), deviceId);
+    @OperationLog("退出观看")
+    @Operation(
+            summary = "退出观看（1B-4b 微端点）",
+            description = "仅结束当前登录用户在该设备的未关闭观看记录（end_time=now），"
+                    + "完全不动推流与直播状态；幂等（无开放记录也返回 200）。"
+                    + "与停止链路（LIVE_STOPPED 统一补齐）叠加后，正常退出与异常退出口径完整。",
+            parameters = {
+                    @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
+            },
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "观看记录已结束（含幂等场景）"),
+                    @ApiResponse(responseCode = "404", description = "设备未注册")
+            }
+    )
+    @PostMapping("/leave")
+    public Result<Void> leaveLive(@RequestParam String deviceId) {
+        webUavService.getRegisteredUav(deviceId);
+        String userName = currentUserName();
+        // 仅收口本人的观看记录；LiveSession 与推流完全不受影响（区别于 /live/close）
+        closeCallerOpenRecord(userName, deviceId);
+        log.info("用户 {} 退出观看，观看记录已结束，设备: {}", maskedName(), deviceId);
         return Result.success("观看记录已结束");
+    }
+
+    private void closeCallerOpenRecord(String userName, String deviceId) {
+        List<UserRecord> openRecords = userRecordRepository.findOpenRecords(userName, deviceId);
+        for (UserRecord record : openRecords) {
+            record.setEnd_time(LocalDateTime.now());
+            userRecordRepository.save(record);
+        }
+    }
+
+    private void closeAllViewerRecords(String deviceId, String reason) {
+        List<UserRecord> openRecords = userRecordRepository.findOpenByDeviceId(deviceId);
+        for (UserRecord record : openRecords) {
+            record.setEnd_time(LocalDateTime.now());
+            userRecordRepository.save(record);
+        }
+        if (!openRecords.isEmpty()) {
+            log.info("设备 {} 观看记录已统一结束（{} 条，原因: {}）", deviceId, openRecords.size(), reason);
+        }
     }
 
     private void ensureOpenRecord(String userName, String deviceId) {

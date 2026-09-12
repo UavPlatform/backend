@@ -40,7 +40,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public MissionOrder createOrder(Long userId, String taskNum, Double reward) {
+    public MissionOrder createOrder(Long userId, String taskNum) {
         Optional<Task> taskOpt = taskRepository.findByTaskNum(taskNum);
         if (taskOpt.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ROUTE_NOT_FOUND);
@@ -55,10 +55,21 @@ public class OrderServiceImpl implements OrderService {
         if (unpaid.isPresent()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
-        // 自动计算价格逻辑注释保留，价格改为前端传 reward
+
+        // P0-2：金额一律由服务端按航点距离计算，客户端传入的 reward 不作为金额依据
         List<TaskWaypoint> waypoints = task.getWaypoints();
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
-        // BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, orderConfig.getPricePerMeter());
+        BigDecimal pricePerMeter = orderConfig.getPricePerMeter();
+        if (pricePerMeter == null || pricePerMeter.signum() <= 0) {
+            log.error("订单计价配置非法（order.price-per-meter={}），拒绝创建订单", pricePerMeter);
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
+                    "订单计价配置缺失，已拒绝创建订单");
+        }
+        BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, pricePerMeter);
+        if (totalAmount == null || totalAmount.signum() <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "订单金额计算为 0（航点不足或距离过近），已拒绝创建订单");
+        }
 
         String orderNum = OrderIdGenerator.generate(userId);
 
@@ -66,7 +77,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderNum(orderNum);
         order.setUserId(userId);
         order.setTask(task);
-        order.setTotalAmount(reward != null ? BigDecimal.valueOf(reward) : BigDecimal.ZERO);
+        order.setTotalAmount(totalAmount);
         order.setTotalDistance(distance);
         order.setOrderStatus(OrderStatus.PENDING);
 

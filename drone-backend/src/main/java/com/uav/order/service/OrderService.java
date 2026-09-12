@@ -5,7 +5,11 @@ import org.springframework.data.domain.Page;
 
 public interface OrderService {
 
-    MissionOrder createOrder(Long userId, String taskNum, Double reward);
+    /**
+     * 按任务航点由服务端计价创建 PENDING 订单（P0-2：金额一律服务端计算，
+     * 客户端传入的 reward 不再作为金额依据）。
+     */
+    MissionOrder createOrder(Long userId, String taskNum);
 
     Page<MissionOrder> listOrders(Long userId, int page, int size);
 

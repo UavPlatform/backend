@@ -250,6 +250,80 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+    /**
+     * 下发 STOP_LIVE 停止推流命令（1A-5a），复用 START_LIVE 的 requestId/ACK 模式。
+     *
+     * <p>协议（1A-5a 定稿）：
+     * <pre>
+     * 命令（后端→设备）:  {"id":"&lt;requestId&gt;","type":"command","name":"STOP_LIVE","deviceId":"&lt;djiId&gt;","timestamp":&lt;ms&gt;,"data":{}}
+     * 同步回执（设备→后端）: {"type":"response","replyTo":"&lt;requestId&gt;","success":true|false,"code":"...","message":"..."}
+     * 异步回执（设备→后端，推荐）: {"type":"event","name":"LIVE_STOPPED","deviceId":"&lt;djiId&gt;","timestamp":&lt;ms&gt;}
+     * </pre>
+     * 同步回执 success=true → 调用方 markStopped；超时 → 由异步 LIVE_STOPPED 事件兜底（LiveEventHandler）。
+     *
+     * @return ack 结果（isSuccess / isTimedOut / code / message）
+     */
+    public WsCommandAckResult sendStopLiveCommand(String deviceId, long ackTimeoutMillis) {
+        if (!isDeviceConnected(deviceId)) {
+            WsCommandAckResult offline = new WsCommandAckResult();
+            offline.setRequestId(null);
+            offline.setSuccess(false);
+            offline.setCode(ApiErrorCode.UAV_NOT_CONNECTED.getCode());
+            offline.setMessage(ApiErrorCode.UAV_NOT_CONNECTED.getDefaultMessage());
+            return offline;
+        }
+
+        String requestId = UUID.randomUUID().toString();
+
+        WsEnvelope payload = new WsEnvelope();
+        payload.setId(requestId);
+        payload.setType("command");
+        payload.setName("STOP_LIVE");
+        payload.setDeviceId(deviceId);
+        payload.setTimestamp(System.currentTimeMillis());
+        payload.setData(Map.of());
+
+        CompletableFuture<WsCommandAckResult> future = new CompletableFuture<>();
+        WsCommandResponseHandler.PendingCommand pendingCommand = new WsCommandResponseHandler.PendingCommand(
+                deviceId, "STOP_LIVE", null, System.currentTimeMillis() + ackTimeoutMillis, future
+        );
+        commandResponseHandler.addPendingCommand(requestId, pendingCommand);
+
+        if (!sendMessage(deviceId, JSON.toJSONString(payload))) {
+            commandResponseHandler.removePendingCommand(requestId);
+            WsCommandAckResult failed = new WsCommandAckResult();
+            failed.setRequestId(requestId);
+            failed.setSuccess(false);
+            failed.setCode(ApiErrorCode.LIVE_REQUEST_SEND_FAILED.getCode());
+            failed.setMessage(ApiErrorCode.LIVE_REQUEST_SEND_FAILED.getDefaultMessage());
+            return failed;
+        }
+
+        try {
+            return future.get(ackTimeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            WsCommandAckResult timeoutResult = new WsCommandAckResult();
+            timeoutResult.setRequestId(requestId);
+            timeoutResult.setSuccess(false);
+            timeoutResult.setTimedOut(true);
+            timeoutResult.setCode(ApiErrorCode.LIVE_ACK_TIMEOUT.getCode());
+            timeoutResult.setMessage(ApiErrorCode.LIVE_ACK_TIMEOUT.getDefaultMessage());
+            return timeoutResult;
+        } catch (Exception e) {
+            commandResponseHandler.removePendingCommand(requestId);
+            WsCommandAckResult failed = new WsCommandAckResult();
+            failed.setRequestId(requestId);
+            failed.setSuccess(false);
+            failed.setCode(ApiErrorCode.INTERNAL_ERROR.getCode());
+            failed.setMessage("等待设备确认失败");
+            return failed;
+        } finally {
+            if (future.isDone()) {
+                commandResponseHandler.removePendingCommand(requestId);
+            }
+        }
+    }
+
     public void registerLiveWebSession(String deviceId, WebSocketSession session) {
         liveWebSessionService.registerSession(deviceId, session);
     }
@@ -278,7 +352,10 @@ public class DroneWebSocketHandler extends TextWebSocketHandler {
         SessionInfo info = sessions.get(deviceId);
         if (info != null && info.session.isOpen()) {
             try {
-                info.session.sendMessage(new TextMessage(message));
+                // Tomcat basic remote 不允许并发写；按 session 串行化（与 WsMessageService 同一锁对象）
+                synchronized (info.session) {
+                    info.session.sendMessage(new TextMessage(message));
+                }
                 info.lastActiveTime = System.currentTimeMillis();
                 return true;
             } catch (IOException e) {

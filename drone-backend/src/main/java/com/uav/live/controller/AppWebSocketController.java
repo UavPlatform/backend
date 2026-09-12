@@ -1,7 +1,8 @@
 package com.uav.live.controller;
 
 import com.uav.live.service.AppWebSocketService;
-import com.uav.server.annotation.SkipJwt;
+import com.uav.server.util.UserContext;
+import com.uav.user.mapper.RiderUavRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,11 +24,13 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @Slf4j
-@SkipJwt
 public class AppWebSocketController {
 
     @Autowired
     private AppWebSocketService appWebSocketService;
+
+    @Autowired
+    private RiderUavRepository riderUavRepository;
 
     @Operation(
             summary = "申请WebSocket连接",
@@ -58,6 +62,19 @@ public class AppWebSocketController {
     )
     @PostMapping("/ws/request")
     public ResponseEntity<Map<String, Object>> requestConnection(@RequestParam String deviceId) {
+        // P0-1：需登录，且仅绑定该设备的飞手（role=1）可为设备申请连接
+        Long userId = UserContext.getUserId();
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "未登录"));
+        }
+        Integer role = UserContext.getRole();
+        if (role == null || role != 1 || !riderUavRepository.existsByUserIdAndDjiId(userId, deviceId)) {
+            log.warn("设备连接申请被拒（无设备归属权）: userId={}, deviceId={}", userId, deviceId);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "无权为该设备申请连接"));
+        }
+
         log.info("设备 {} 申请WebSocket连接", deviceId);
         Map<String, Object> result = new HashMap<>();
 

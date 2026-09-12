@@ -4,6 +4,7 @@ import com.uav.server.result.Result;
 import com.uav.log.pojo.vo.LogFileVO;
 import com.uav.log.pojo.vo.LogVO;
 import com.uav.server.annotation.OperationLog;
+import com.uav.server.annotation.RequireRole;
 import com.uav.log.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,6 +24,7 @@ import java.util.List;
 @Tag(name = "Log API")
 @RestController
 @RequestMapping("/admin/logs")
+@RequireRole(2)
 @Slf4j
 public class LogController {
 

@@ -31,12 +31,14 @@ public class PayNotifyController {
         WxPayNotifyV3Result.DecryptNotifyResult data = result.getResult();
 
         String tradeState = data.getTradeState();
-        log.info("支付回调验签通过, 订单号: {}, 状态: {}", data.getOutTradeNo(), tradeState);
+        Integer callbackAmountCents = data.getAmount() != null ? data.getAmount().getTotal() : null;
+        log.info("支付回调验签通过, 订单号: {}, 状态: {}, 金额: {}分", data.getOutTradeNo(), tradeState, callbackAmountCents);
 
         weChatPayService.handleNotify(
                 data.getTransactionId(),
                 data.getOutTradeNo(),
-                "SUCCESS".equals(tradeState) ? "SUCCESS" : "FAILED");
+                "SUCCESS".equals(tradeState) ? "SUCCESS" : "FAILED",
+                callbackAmountCents);
 
         return ResponseEntity.ok(Map.of("code", "SUCCESS", "message", "OK"));
     }

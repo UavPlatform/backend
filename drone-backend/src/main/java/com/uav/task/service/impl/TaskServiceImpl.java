@@ -1,6 +1,7 @@
 package com.uav.task.service.impl;
 
 import com.uav.order.mapper.OrderRepository;
+import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.mapper.TaskRepository;
 import com.uav.task.pojo.dto.TaskDto;
@@ -26,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -76,6 +78,8 @@ public class TaskServiceImpl implements TaskService {
         task.setTaskStatus(TaskStatus.IDLE);
         task.setUserId(userId);
         task.setDescription(dto.getDescription());
+        // 1A-7a：任务期望执行时间入库（APP P0-4 契约修复，可选字段）
+        task.setTaskTime(dto.getTaskTime());
         task.setReward(dto.getReward());
 
         List<TaskWaypoint> waypoints = dto.getWaypoints().stream()
@@ -92,8 +96,17 @@ public class TaskServiceImpl implements TaskService {
 
         task.setWaypoints(waypoints);
         Task saved = taskRepository.save(task);
-        orderService.createOrder(userId, saved.getTaskNum(), saved.getReward());
-        log.info("任务创建成功，编号: {}, 用户ID: {}, 类型: {}", saved.getTaskNum(), userId, dto.getType());
+        MissionOrder order = orderService.createOrder(userId, saved.getTaskNum());
+        // P0-2：任务奖励以服务端计价为准，客户端 reward 仅作参考
+        if (dto.getReward() != null
+                && BigDecimal.valueOf(dto.getReward()).compareTo(order.getTotalAmount()) != 0) {
+            log.info("任务 {} 客户端 reward={} 与服务端计价 {} 不一致，已按服务端计价入库",
+                    saved.getTaskNum(), dto.getReward(), order.getTotalAmount());
+        }
+        saved.setReward(order.getTotalAmount().doubleValue());
+        saved = taskRepository.save(saved);
+        log.info("任务创建成功，编号: {}, 用户ID: {}, 类型: {}, 订单金额: {}",
+                saved.getTaskNum(), userId, dto.getType(), order.getTotalAmount());
         return saved;
     }
 
@@ -114,6 +127,16 @@ public class TaskServiceImpl implements TaskService {
         if (task.getTaskStatus() == TaskStatus.IN_PROGRESS) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务执行中，无法删除");
         }
+
+        // P0-8：已支付/已完成/待确认的订单属于财务记录，禁止随任务物理删除
+        orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
+            OrderStatus status = order.getOrderStatus();
+            if (status == OrderStatus.PAID || status == OrderStatus.WAITING_CONFIRM
+                    || status == OrderStatus.COMPLETED || status == OrderStatus.REFUNDED) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_STATUS_INVALID,
+                        "任务存在已支付或已完成的订单，禁止删除");
+            }
+        });
 
         taskAssignmentRepository.findByTaskId(task.getId())
                 .ifPresent(ta -> {
@@ -152,7 +175,8 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(readOnly = true)
     public List<Task> getAvailableTasks() {
-        return taskRepository.findByTaskStatusOrderByCreateTimeDesc(TaskStatus.IDLE);
+        // 1B-2a（裁决 Q1=A 托管式支付）：接单大厅仅展示「空闲 且 订单已支付」的任务
+        return taskRepository.findPaidIdleTasks(TaskStatus.IDLE, OrderStatus.PAID);
     }
 
     @Override
@@ -167,6 +191,12 @@ public class TaskServiceImpl implements TaskService {
         if (task.getUserId().equals(riderId)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "不能接自己的任务");
         }
+
+        // 1B-2a（裁决 Q1=A 托管式支付）：接单前置校验——任务对应订单必须已支付
+        orderRepository.findByTaskId(task.getId())
+                .filter(order -> order.getOrderStatus() == OrderStatus.PAID)
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.TASK_NOT_PAID,
+                        ApiErrorCode.TASK_NOT_PAID.getDefaultMessage()));
 
         task.setTaskStatus(TaskStatus.IN_PROGRESS);
         taskRepository.save(task);
@@ -231,7 +261,7 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void riderCompleteTask(String taskNum, Long riderId) {
+    public void riderCompleteTask(String taskNum, Long riderId, String note) {
         Task task = taskRepository.findByTaskNumForUpdate(taskNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
 
@@ -243,11 +273,21 @@ public class TaskServiceImpl implements TaskService {
         if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务状态不允许完成");
         }
+        // 1B-9a：可选完成说明，≤500 字符（task_assignment.complete_note，schema 双轨最小改动）
+        String completeNote = null;
+        if (note != null && !note.isBlank()) {
+            String trimmed = note.trim();
+            if (trimmed.length() > 500) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "完成说明不能超过 500 字");
+            }
+            completeNote = trimmed;
+        }
 
         task.setTaskStatus(TaskStatus.COMPLETED);
         taskRepository.save(task);
 
         assignment.setCompleteTime(LocalDateTime.now());
+        assignment.setCompleteNote(completeNote);
         taskAssignmentRepository.save(assignment);
 
         orderRepository.findByTaskId(task.getId()).ifPresent(order -> {

@@ -30,7 +30,10 @@ public interface TaskService {
 
     void riderCancelTask(String taskNum, Long riderId);
 
-    void riderCompleteTask(String taskNum, Long riderId);
+    /**
+     * 飞手完成任务（1B-9a）：note 为可选完成说明（≤500 字符，落 task_assignment.complete_note）。
+     */
+    void riderCompleteTask(String taskNum, Long riderId, String note);
 
     void userConfirmTask(String taskNum, Long userId);
 

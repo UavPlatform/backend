@@ -108,6 +108,19 @@
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+
+		<!-- 测试数据库（QA-B5）：test 范围 H2（MySQL 兼容模式），不进入生产依赖 -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- 测试聚合门禁：JUnit5 + Mockito + AssertJ + Spring Test -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
@@ -188,6 +201,19 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
             <version>11.7.0</version>
+        </dependency>
+
+        <!-- 1B-9b 交付物存储：MinIO S3 兼容 SDK -->
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.17</version>
+        </dependency>
+        <!-- MinIO SDK 要求 okhttp ≥ 4.11：显式钉版本，避免被传递依赖拉低 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
         </dependency>
 	</dependencies>
 

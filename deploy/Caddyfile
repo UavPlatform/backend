@@ -1,9 +1,25 @@
-drone.fuwaki.icu {
-    handle /api/* {
-        reverse_proxy localhost:8081
-    }
+:8888 {
+	# WebSocket 通道（1A-3 / 修复 WEB P1-10）：/ws/web、/ws/drone、/ws/{sid} 统一走本路由。
+	# 生产后端挂 /api 上下文（docker-compose: SERVER_SERVLET_CONTEXT_PATH=/api），
+	# 故此处将 /ws 前缀重写为 /api/ws 后转发，前端 URL 保持 ws://host/ws/... 不变。
+	# 鉴权头透传（1A-1 WS 协议）：Authorization: Bearer 请求头与 ?token= query
+	# 均默认原样转发（Caddy v2 不剥离 Authorization；rewrite 保留 query string）。
+	handle /ws/* {
+		rewrite * /api{uri}
+		reverse_proxy localhost:8081 {
+			flush_interval -1
+			header_up Connection {>Connection}
+			header_up Upgrade {>Upgrade}
+		}
+	}
 
-    handle {
-        respond "Drone API Server" 200
-    }
+	handle /api/* {
+		reverse_proxy localhost:8081 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		respond "Drone API Server" 200
+	}
 }

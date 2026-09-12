@@ -20,6 +20,39 @@ services:
       retries: 10
       start_period: 30s
 
+  minio:
+    image: docker.m.daocloud.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  minio-init:
+    image: docker.m.daocloud.io/minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-drone-deliverables}
+    entrypoint: >
+      /bin/sh -c '
+      until mc alias set local http://minio:9000 "$$MINIO_ACCESS_KEY" "$$MINIO_SECRET_KEY" >/dev/null 2>&1; do sleep 2; done;
+      mc mb --ignore-existing local/"$$MINIO_BUCKET";
+      echo "minio bucket ready: $$MINIO_BUCKET";
+      exit 0'
+
   backend:
     image: crpi-6p1nxczl55pe0ag2-vpc.cn-shenzhen.personal.cr.aliyuncs.com/uav_fuwaki/backend:latest
     restart: unless-stopped
@@ -37,11 +70,16 @@ services:
       DRONE_JWT_SECRET: ${JWT_SECRET}
       DRONE_JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
       DRONE_JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
-      DRONE_TRTC_SDK_APP_ID: ${TRTC_SDK_APP_ID:-}
+      DRONE_TRTC_SDK_APP_ID: ${TRTC_SDK_APP_ID:-0}
       DRONE_TRTC_SECRET_KEY: ${TRTC_SECRET_KEY:-}
       DRONE_TRTC_ROOM_EXPIRE: ${TRTC_ROOM_EXPIRE:-86400}
       DRONE_AMAP_KEY: ${AMAP_KEY:-}
       DRONE_AMAP_SECURITY_KEY: ${AMAP_SECURITY_KEY:-}
+      SERVER_SERVLET_CONTEXT_PATH: /api
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-drone-deliverables}
       JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}"
     ports:
       - "${APP_PORT:-8081}:8081"
@@ -51,3 +89,4 @@ services:
 volumes:
   mysql_data:
   backend_logs:
+  minio_data:

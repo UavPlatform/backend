@@ -40,6 +40,8 @@ public class OrderController {
 
     @Autowired
     private OrderReviewService orderReviewService;
+
+    @Autowired
     private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
 
     @OperationLog("查询订单列表")

@@ -2,10 +2,13 @@ package com.uav.task.controller;
 
 import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
+import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.order.mapper.OrderRepository;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.vo.RiderStatsVO;
+import com.uav.task.pojo.vo.TaskActionHints;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.result.Result;
 import com.uav.task.pojo.vo.TaskPageVO;
@@ -34,6 +37,9 @@ public class RiderController {
     @Autowired
     private TaskAssignmentRepository taskAssignmentRepository;
 
+    @Autowired
+    private OrderRepository orderRepository;
+
     // ── 只读接口：不需要绑定无人机 ──
 
     @OperationLog("飞手查看任务详情")
@@ -43,7 +49,18 @@ public class RiderController {
     public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {
         Task task = taskService.getTaskByTaskNum(taskNum);
         TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElse(null);
-        return Result.success(TaskVo.from(task, assignment));
+        TaskVo vo = TaskVo.from(task, assignment);
+        // 1B-9a：补齐订单状态与操作提示（状态矩阵数据与用户端同构）
+        MissionOrder order = orderRepository.findByTaskId(task.getId()).orElse(null);
+        if (order != null) {
+            vo.setOrderNum(order.getOrderNum());
+            vo.setTotalAmount(order.getTotalAmount());
+            vo.setTotalDistance(order.getTotalDistance());
+            vo.setOrderStatus(order.getOrderStatus().name());
+        }
+        vo.setActionHint(TaskActionHints.hint(task.getTaskStatus(),
+                order != null ? order.getOrderStatus() : null));
+        return Result.success(vo);
     }
 
     @OperationLog("查看任务广场")
@@ -117,12 +134,16 @@ public class RiderController {
 
     @RequireDrone
     @OperationLog("完成任务")
-    @Operation(summary = "完成任务", description = "骑手完成已接受的任务",
-            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @Operation(summary = "完成任务", description = "骑手完成已接受的任务；note 为可选完成说明（≤500 字）",
+            parameters = {
+                    @Parameter(name = "taskNum", description = "任务编号", required = true),
+                    @Parameter(name = "note", description = "完成说明（可选，≤500 字）", required = false)
+            })
     @PostMapping("/complete")
-    public Result<Void> completeTask(@RequestParam String taskNum) {
+    public Result<Void> completeTask(@RequestParam String taskNum,
+                                     @RequestParam(required = false) String note) {
         Long riderId = UserContext.getUserId();
-        taskService.riderCompleteTask(taskNum, riderId);
+        taskService.riderCompleteTask(taskNum, riderId, note);
         return Result.success("任务已完成");
     }
 }

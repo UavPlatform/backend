@@ -12,7 +12,10 @@ import org.springframework.stereotype.Repository;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Modifying;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -34,4 +37,17 @@ public interface OrderRepository extends JpaRepository<MissionOrder, Long> {
     Page<MissionOrder> findByUserIdOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
     Optional<MissionOrder> findByTaskId(Long taskId);
+
+    /** 1B-9a：超时未验收的订单（WAITING_CONFIRM 且 update_time 早于阈值） */
+    @Query("SELECT o FROM MissionOrder o WHERE o.orderStatus = :status AND o.updateTime <= :cutoff")
+    List<MissionOrder> findByOrderStatusAndUpdateTimeBefore(@Param("status") OrderStatus status,
+                                                            @Param("cutoff") LocalDateTime cutoff);
+
+    /**
+     * 1B-9a 测试/运维辅助：直改 update_time（绕过 @PreUpdate 的 now 覆盖），模拟验收超时时间。
+     * clearAutomatically：更新后清空持久化上下文，避免一级缓存读到旧值。
+     */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE MissionOrder o SET o.updateTime = :time WHERE o.id = :id")
+    int forceUpdateTime(@Param("id") Long id, @Param("time") LocalDateTime time);
 }

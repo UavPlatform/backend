@@ -9,6 +9,7 @@ import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.task.mapper.TaskAssignmentRepository;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.vo.AmapConfigVO;
+import com.uav.task.pojo.vo.TaskActionHints;
 import com.uav.task.pojo.vo.TaskPageVO;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.annotation.OperationLog;
@@ -49,6 +50,9 @@ public class UserTaskController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
 
     @GetMapping("/init")
     public Result<AmapConfigVO> init() {
@@ -108,6 +112,13 @@ public class UserTaskController {
             vo.setTotalDistance(order.getTotalDistance());
             vo.setOrderStatus(order.getOrderStatus().name());
         }
+        // 1B-9a 状态矩阵：任务状态×订单状态 → 操作提示
+        vo.setActionHint(TaskActionHints.hint(task.getTaskStatus(),
+                order != null ? order.getOrderStatus() : null));
+        // 1B-4b：任务→设备映射（deviceId/liveState），用户端据此点亮「观看直播」入口
+        var liveDevice = liveDeviceResolver.resolveForTask(task.getId());
+        vo.setDeviceId(liveDevice.deviceId());
+        vo.setLiveState(liveDevice.liveState());
         return vo;
     }
 

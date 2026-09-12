@@ -25,4 +25,11 @@ public class TaskAssignment {
 
     @Column(name = "complete_time")
     private LocalDateTime completeTime;
+
+    /**
+     * 飞手完成说明（1B-9a）：/rider/complete 可选文本，≤500 字符。
+     * 1B-9b 交付物预留字段设计见 t32 任务 output（本轮不实现上传）。
+     */
+    @Column(name = "complete_note", length = 500)
+    private String completeNote;
 }

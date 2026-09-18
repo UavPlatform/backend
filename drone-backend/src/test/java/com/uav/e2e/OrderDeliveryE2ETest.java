@@ -309,7 +309,7 @@ class OrderDeliveryE2ETest {
         JsonNode live = get("/v3/api-docs", null);
         assertThat(live.path("openapi").asText()).as("OpenAPI 版本").startsWith("3.");
 
-        // 冻结规格 = backend/spec/openapi/drone-backend.openapi.json（归一化后的 SSOT，ADR-0001 D1）
+        // 冻结规格 = backend/spec/openapi/drone-backend.openapi.json（归一化后的 SSOT）
         JsonNode frozen = OpenApiContract.readFrozen();
         Set<String> liveOps = operations(live);
         Set<String> frozenOps = operations(frozen);

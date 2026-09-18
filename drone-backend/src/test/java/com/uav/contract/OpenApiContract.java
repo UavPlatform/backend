@@ -27,13 +27,13 @@ import java.util.regex.Pattern;
 /**
  * OpenAPI 结构契约（SSOT）的读取 / 归一化 / 落盘工具。
  *
- * <p>决策依据见 {@code docs/adr/0001-后端验证体系技术栈与规格单一事实源.md} D1：
+ * <p>导出与门禁约定：
  * <ul>
  *   <li><b>唯一事实源</b>：{@code backend/spec/openapi/drone-backend.openapi.json}（后端仓库持有并提交）。</li>
  *   <li><b>导出物必须归一化</b>：springdoc 在 RANDOM_PORT 下生成 {@code servers[0].url} 含临时端口，
  *       且示例里可能夹带本机端口；不归一化则漂移门禁永远是脏的（T2-R2）。</li>
  *   <li><b>门禁形态</b>：归一化后与冻结规格做<b>整文档</b>深比较（不只是操作集合），
- *       这样字段级增删改同样会红——ADR-0001 §7 第 4 项遗留的「字段级漂移门禁未实现」由此关闭。</li>
+ *       这样字段级增删改同样会红——字段级漂移门禁的缺口由此关闭。</li>
  * </ul>
  *
  * <p>归一化的三条规则（顺序执行，保证同一份实现多次导出<b>逐字节</b>一致）：
@@ -73,7 +73,7 @@ public final class OpenApiContract {
         return (override == null || override.isBlank()) ? DEFAULT_SPEC : Paths.get(override);
     }
 
-    /** 显式导出开关：默认<b>只校验不落盘</b>，避免构建过程静默改写 spec/（ADR-0001 §4 负面项 1）。 */
+    /** 显式导出开关：默认<b>只校验不落盘</b>，避免构建过程静默改写 spec/（规格变更必须有人评审）。 */
     public static boolean exportRequested() {
         return Boolean.getBoolean("openapi.export") || "true".equalsIgnoreCase(System.getenv("OPENAPI_EXPORT"));
     }

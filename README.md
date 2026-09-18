@@ -5,7 +5,6 @@ Web backend code for the drone platform.
 ## OpenAPI 契约（结构单一事实源）
 
 结构事实源：`spec/openapi/drone-backend.openapi.json`（归一化后入库，消费端据此生成类型）。
-决策与门禁分层见 `docs/adr/0004-OpenAPI契约流水线与消费端接入.md`。
 
 | 目的 | 命令（backend 仓根） |
 |---|---|

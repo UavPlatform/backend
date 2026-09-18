@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # 导出后端 OpenAPI 结构契约（SSOT）。
 #
-# 决策依据：docs/adr/0001-后端验证体系技术栈与规格单一事实源.md（D1）
 #   - 事实源文件：backend/spec/openapi/drone-backend.openapi.json（本仓库持有并提交）
 #   - 导出物必须归一化：擦洗随机端口 + servers 占位为相对基址 + 全树排序
 #   - 「脚本不得静默改写 spec/」：本脚本只在人工显式执行时落盘，且落盘后必须评审 diff
@@ -41,7 +40,7 @@ case "$MODE" in
     echo "          bytes=$SIZE  operations=$OPS"
     echo "          sha256=$SHA"
     echo
-    echo "[openapi] 下一步：评审 diff → 提交 → 下游仓库用同一 sha256 对账（ADR-0001 T2-R10/R11）"
+    echo "[openapi] 下一步：评审 diff → 提交 → 下游仓库用同一 sha256 对账"
     ;;
   *)
     echo "用法：bash tools/openapi-export.sh [export|--check]" >&2

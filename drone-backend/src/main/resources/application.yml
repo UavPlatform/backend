@@ -44,7 +44,7 @@ log:
   dir: logs
 
 # ---- OpenAPI 契约（结构 SSOT：spec/openapi/drone-backend.openapi.json）----
-# 导出命令：bash tools/openapi-export.sh（决策见 docs/adr/0001）
+# 导出命令：bash tools/openapi-export.sh
 springdoc:
   api-docs:
     path: /v3/api-docs

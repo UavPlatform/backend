@@ -1,2 +1,3 @@
 drone-backend/application.yml
 drone-backend/src/main/resources/application.properties
+drone-backend/.localdb/

@@ -23,8 +23,6 @@ import com.uav.live.service.TRTCService;
 import com.uav.uav.service.WebUavService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -70,22 +68,10 @@ public class WebLiveController {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "发送成功 / 已运行 / 等待确认",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"roomId\": \"drone_xxx\", \"ackConfirmed\": true}}"))),
-                    @ApiResponse(responseCode = "409", description = "设备未连接 / 正在启动中",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 409, \"errorCode\": \"UAV_NOT_CONNECTED\", \"message\": \"无人机未建立 WebSocket 连接\"}"))),
-                    @ApiResponse(responseCode = "401", description = "未登录",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"UNAUTHORIZED\", \"message\": \"Missing token\"}"))),
-                    @ApiResponse(responseCode = "429", description = "触发限流",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 429, \"errorCode\": \"RATE_LIMITED\", \"message\": \"请求过于频繁\"}")))
+                    @ApiResponse(responseCode = "200", description = "发送成功 / 已运行 / 等待确认"),
+                    @ApiResponse(responseCode = "409", description = "设备未连接 / 正在启动中"),
+                    @ApiResponse(responseCode = "401", description = "未登录"),
+                    @ApiResponse(responseCode = "429", description = "触发限流")
             }
     )
     @PostMapping("/req")
@@ -178,14 +164,8 @@ public class WebLiveController {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "获取成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"roomId\": \"drone_xxx\", \"userId\": \"3\", \"userSig\": \"...\", \"sdkAppId\": 1400000000}}"))),
-                    @ApiResponse(responseCode = "409", description = "设备未连接",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 409, \"errorCode\": \"UAV_NOT_CONNECTED\", \"message\": \"无人机未建立 WebSocket 连接\"}")))
+                    @ApiResponse(responseCode = "200", description = "获取成功"),
+                    @ApiResponse(responseCode = "409", description = "设备未连接")
             }
     )
     @PostMapping("/get")
@@ -232,10 +212,7 @@ public class WebLiveController {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
-                    @ApiResponse(responseCode = "200", description = "已停止 / 等待设备确认 / 离线补终态",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"设备已确认停止推流\"}"))),
+                    @ApiResponse(responseCode = "200", description = "已停止 / 等待设备确认 / 离线补终态"),
                     @ApiResponse(responseCode = "404", description = "设备未注册"),
                     @ApiResponse(responseCode = "409", description = "设备拒绝停止推流（LIVE_STOP_REJECTED）")
             }

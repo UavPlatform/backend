@@ -1,0 +1,5570 @@
+{
+  "components" : {
+    "schemas" : {
+      "AdminDto" : {
+        "properties" : {
+          "name" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminInfo" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "phoneNumber" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminLoginVO" : {
+        "properties" : {
+          "admin" : {
+            "$ref" : "#/components/schemas/AdminInfo"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminOrderVo" : {
+        "description" : "管理端订单信息",
+        "properties" : {
+          "createTime" : {
+            "description" : "创建时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "orderNum" : {
+            "description" : "订单号",
+            "type" : "string"
+          },
+          "orderStatus" : {
+            "description" : "订单状态枚举名（PENDING/PAID/CANCELLED/REFUNDED/COMPLETED/WAITING_CONFIRM/DISPUTED）",
+            "type" : "string"
+          },
+          "orderStatusCode" : {
+            "description" : "订单状态码（0 待支付 / 1 已支付 / 2 已取消 / 3 已退款 / 4 已完成 / 5 待确认完成 / 6 争议中）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "orderStatusDesc" : {
+            "description" : "订单状态中文描述",
+            "type" : "string"
+          },
+          "ownerName" : {
+            "description" : "下单用户名称",
+            "type" : "string"
+          },
+          "taskName" : {
+            "description" : "关联任务名称",
+            "type" : "string"
+          },
+          "taskNum" : {
+            "description" : "关联任务编号",
+            "type" : "string"
+          },
+          "totalAmount" : {
+            "description" : "订单总金额，单位：元",
+            "type" : "number"
+          },
+          "totalDistance" : {
+            "description" : "订单总里程，单位：米",
+            "type" : "number"
+          },
+          "updateTime" : {
+            "description" : "更新时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userId" : {
+            "description" : "下单用户ID",
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminOrderVo" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminOrderVo"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminTaskVo" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminTaskVo"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminStatisticsVO" : {
+        "properties" : {
+          "availableUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "liveUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "offlineUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "onlineUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalUsers" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "unavailableUavs" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminTaskVo" : {
+        "description" : "管理端任务信息（含任务状态与关联订单状态）",
+        "properties" : {
+          "actionHint" : {
+            "description" : "操作提示文案（由任务状态 × 订单状态计算，客户端可直接渲染）",
+            "type" : "string"
+          },
+          "completeNote" : {
+            "description" : "飞手完成说明（未完成或飞手未填写时为 null）",
+            "type" : "string"
+          },
+          "createTime" : {
+            "description" : "创建时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "description" : {
+            "description" : "任务描述",
+            "type" : "string"
+          },
+          "id" : {
+            "description" : "任务ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderNum" : {
+            "description" : "关联订单号（无关联订单时为 null）",
+            "type" : "string"
+          },
+          "orderStatus" : {
+            "description" : "关联订单状态枚举名（PENDING/PAID/CANCELLED/REFUNDED/COMPLETED/WAITING_CONFIRM/DISPUTED；无关联订单时为 null）",
+            "type" : "string"
+          },
+          "orderStatusCode" : {
+            "description" : "关联订单状态码（0 待支付 / 1 已支付 / 2 已取消 / 3 已退款 / 4 已完成 / 5 待确认完成 / 6 争议中；无关联订单时为 null）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "orderStatusDesc" : {
+            "description" : "关联订单状态中文描述（无关联订单时为 null）",
+            "type" : "string"
+          },
+          "ownerName" : {
+            "description" : "发布用户名称",
+            "type" : "string"
+          },
+          "reward" : {
+            "description" : "任务奖励金额，单位：元（服务端按航点距离计价，客户端传入的 reward 仅作参考）",
+            "format" : "double",
+            "type" : "number"
+          },
+          "riderName" : {
+            "description" : "接单飞手名称（未接单时为 null）",
+            "type" : "string"
+          },
+          "taskName" : {
+            "description" : "任务名称",
+            "type" : "string"
+          },
+          "taskNum" : {
+            "description" : "任务编号",
+            "type" : "string"
+          },
+          "taskStatus" : {
+            "description" : "任务状态（IDLE 空闲中 / IN_PROGRESS 执行中 / COMPLETED 执行完毕）",
+            "type" : "string"
+          },
+          "taskStatusDesc" : {
+            "description" : "任务状态中文描述",
+            "type" : "string"
+          },
+          "taskTime" : {
+            "description" : "任务期望执行时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "totalAmount" : {
+            "description" : "关联订单总金额，单位：元（无关联订单时为 null）",
+            "type" : "number"
+          },
+          "totalDistance" : {
+            "description" : "关联订单总里程，单位：米（无关联订单时为 null）",
+            "type" : "number"
+          },
+          "updateTime" : {
+            "description" : "更新时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userId" : {
+            "description" : "发布用户ID",
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AmapConfigVO" : {
+        "properties" : {
+          "key" : {
+            "type" : "string"
+          },
+          "securityKey" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BindUploadDto" : {
+        "properties" : {
+          "fileIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "minItems" : 1,
+            "type" : "array"
+          },
+          "orderNum" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "fileIds", "orderNum" ],
+        "type" : "object"
+      },
+      "ComplaintListVO" : {
+        "properties" : {
+          "complaints" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OrderComplaint"
+            },
+            "type" : "array"
+          },
+          "currentPage" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "GpsPointVO" : {
+        "properties" : {
+          "altitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "battery" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "flightStatus" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "latitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "operation" : {
+            "type" : "string"
+          },
+          "speed" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "timestamp" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "LiveStartVO" : {
+        "description" : "开播（启动图传）结果",
+        "properties" : {
+          "ackConfirmed" : {
+            "description" : "设备是否已确认启动图传（false 表示命令已发送、等待设备确认）",
+            "type" : "boolean"
+          },
+          "code" : {
+            "description" : "结果码（LIVE_STARTED 设备已确认启动 / LIVE_START_PENDING 等待设备确认 / LIVE_ALREADY_RUNNING 图传已在运行中）",
+            "type" : "string"
+          },
+          "liveState" : {
+            "description" : "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
+            "type" : "string"
+          },
+          "requestId" : {
+            "description" : "开播命令请求ID（图传已在运行时为 null）",
+            "type" : "string"
+          },
+          "roomId" : {
+            "description" : "TRTC 房间号",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "LiveUavVO" : {
+        "properties" : {
+          "deviceId" : {
+            "type" : "string"
+          },
+          "isAvailable" : {
+            "type" : "string"
+          },
+          "onlineStatus" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "type" : "string"
+          },
+          "roomId" : {
+            "type" : "string"
+          },
+          "uavName" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "LogFileVO" : {
+        "properties" : {
+          "directory" : {
+            "type" : "boolean"
+          },
+          "lastModified" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "size" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "LogVO" : {
+        "description" : "日志内容",
+        "properties" : {
+          "logs" : {
+            "description" : "日志行列表（按时间顺序）",
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "MessageDTO" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "createTime" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "fromUserId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "msgId" : {
+            "type" : "string"
+          },
+          "sessionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "content", "sessionId" ],
+        "type" : "object"
+      },
+      "OrderComplaint" : {
+        "properties" : {
+          "adminNote" : {
+            "type" : "string"
+          },
+          "createTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderNum" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "enum" : [ "NOT_AS_DESCRIBED", "OTHER", "QUALITY_ISSUE", "SERVICE_ISSUE" ],
+            "type" : "string"
+          },
+          "refundAmount" : {
+            "type" : "number"
+          },
+          "resolveTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "APPROVED", "PENDING", "REJECTED" ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OrderListVO" : {
+        "properties" : {
+          "currentPage" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "orders" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OrderVO"
+            },
+            "type" : "array"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OrderReview" : {
+        "properties" : {
+          "content" : {
+            "type" : "string"
+          },
+          "createTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderNum" : {
+            "type" : "string"
+          },
+          "rating" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OrderVO" : {
+        "properties" : {
+          "deviceId" : {
+            "type" : "string"
+          },
+          "distance" : {
+            "type" : "number"
+          },
+          "executeResult" : {
+            "type" : "string"
+          },
+          "executedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "files" : {
+            "items" : {
+              "$ref" : "#/components/schemas/UploadVO"
+            },
+            "type" : "array"
+          },
+          "hasReview" : {
+            "type" : "boolean"
+          },
+          "liveState" : {
+            "type" : "string"
+          },
+          "orderNum" : {
+            "type" : "string"
+          },
+          "orderStatus" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "taskName" : {
+            "type" : "string"
+          },
+          "totalAmount" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "PayResultVO" : {
+        "properties" : {
+          "orderNum" : {
+            "type" : "string"
+          },
+          "payUrl" : {
+            "type" : "string"
+          },
+          "prepayId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PullCredentialsVO" : {
+        "description" : "TRTC 拉流凭证",
+        "properties" : {
+          "ackConfirmed" : {
+            "description" : "设备图传是否已在运行（true 表示可直接拉流）",
+            "type" : "boolean"
+          },
+          "liveState" : {
+            "description" : "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
+            "type" : "string"
+          },
+          "roomId" : {
+            "description" : "TRTC 房间号",
+            "type" : "string"
+          },
+          "sdkAppId" : {
+            "description" : "TRTC SDK 应用ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userId" : {
+            "description" : "TRTC 用户ID（服务端由当前登录用户ID生成，客户端不可指定）",
+            "type" : "string"
+          },
+          "userSig" : {
+            "description" : "TRTC 用户签名（用于加入房间鉴权）",
+            "type" : "string"
+          },
+          "wsUrl" : {
+            "description" : "设备 WebSocket 连接地址",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecordItem" : {
+        "description" : "单条观看记录",
+        "properties" : {
+          "djiId" : {
+            "description" : "设备ID(DJI ID)",
+            "type" : "string"
+          },
+          "endTime" : {
+            "description" : "观看结束时间（ISO-8601；未结束时为 null）",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "description" : "记录ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "startTime" : {
+            "description" : "观看开始时间（ISO-8601，如 2026-05-31T10:00:00）",
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RegisterVo" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminLoginVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminLoginVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminOrderVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminOrderVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminOrderVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminOrderVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminTaskVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminTaskVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminStatisticsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminStatisticsVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminTaskVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminTaskVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAmapConfigVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AmapConfigVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultComplaintListVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ComplaintListVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultGpsPointVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/GpsPointVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListGpsPointVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/GpsPointVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListLiveUavVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/LiveUavVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListLogFileVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/LogFileVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListMapStringObject" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "additionalProperties" : { },
+              "type" : "object"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListRiderStatsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/RiderStatsVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListRiderUav" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/RiderUav"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListUav" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/Uav"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListUavVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/UavVo"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultLiveStartVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/LiveStartVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultLogVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/LogVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultMapStringObject" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "additionalProperties" : { },
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "type" : "object"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultMapStringString" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "type" : "object"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultOrderComplaint" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/OrderComplaint",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultOrderListVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/OrderListVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultOrderReview" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/OrderReview",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultOrderVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/OrderVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultPayResultVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PayResultVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultPullCredentialsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/PullCredentialsVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultRegisterVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/RegisterVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultReviewListVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ReviewListVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultRiderStatsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/RiderStatsVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultSessionVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/SessionVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultSubmitReviewVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/SubmitReviewVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultTaskPageVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/TaskPageVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultTaskVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/TaskVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultTokenRefreshVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/TokenRefreshVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUav" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/Uav",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUavVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/UavVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUploadSignVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/UploadSignVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUploadVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/UploadVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUserLoginVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/UserLoginVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultUserRecordsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/UserRecordsVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultVoid" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultWebUavStatusVo" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/WebUavStatusVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ReviewListVO" : {
+        "properties" : {
+          "currentPage" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reviews" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OrderReview"
+            },
+            "type" : "array"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RiderInfoDto" : { },
+      "RiderRegisterDto" : {
+        "description" : "飞手注册参数",
+        "properties" : {
+          "djiId" : {
+            "description" : "无人机DJI ID",
+            "type" : "string"
+          },
+          "password" : {
+            "description" : "密码",
+            "type" : "string"
+          },
+          "userName" : {
+            "description" : "用户名",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiderStatsVO" : {
+        "properties" : {
+          "riderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "riderName" : {
+            "type" : "string"
+          },
+          "todayOrders" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalCompleted" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalEarnings" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "RiderUav" : {
+        "properties" : {
+          "createTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "djiId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SessionDTO" : {
+        "properties" : {
+          "avatar" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "type" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "userIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "name", "type", "userIds" ],
+        "type" : "object"
+      },
+      "SessionVO" : {
+        "properties" : {
+          "avatar" : {
+            "type" : "string"
+          },
+          "createTime" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessage" : {
+            "type" : "string"
+          },
+          "lastMessageTime" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "otherUserName" : {
+            "type" : "string"
+          },
+          "ownerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "unreadCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "userIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "SubmitReviewVO" : {
+        "properties" : {
+          "orderNum" : {
+            "type" : "string"
+          },
+          "rating" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskDto" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "reward" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "taskName" : {
+            "type" : "string"
+          },
+          "taskTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [ "AERIAL_PHOTO", "MONITORING", "SURVEY", "TRANSPORT" ],
+            "type" : "string"
+          },
+          "waypoints" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WaypointDto"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskPageVO" : {
+        "properties" : {
+          "currentPage" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "tasks" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TaskVo"
+            },
+            "type" : "array"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskVo" : {
+        "properties" : {
+          "acceptTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "actionHint" : {
+            "type" : "string"
+          },
+          "completeNote" : {
+            "type" : "string"
+          },
+          "createTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "liveState" : {
+            "type" : "string"
+          },
+          "orderNum" : {
+            "type" : "string"
+          },
+          "orderStatus" : {
+            "type" : "string"
+          },
+          "riderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "riderName" : {
+            "type" : "string"
+          },
+          "taskName" : {
+            "type" : "string"
+          },
+          "taskNum" : {
+            "type" : "string"
+          },
+          "taskStatus" : {
+            "enum" : [ "COMPLETED", "IDLE", "IN_PROGRESS" ],
+            "type" : "string"
+          },
+          "taskTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "taskType" : {
+            "enum" : [ "AERIAL_PHOTO", "MONITORING", "SURVEY", "TRANSPORT" ],
+            "type" : "string"
+          },
+          "totalAmount" : {
+            "type" : "number"
+          },
+          "totalDistance" : {
+            "type" : "number"
+          },
+          "updateTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "waypoints" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WaypointVo"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "TokenRefreshVO" : {
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Uav" : {
+        "properties" : {
+          "controllerModel" : {
+            "type" : "string"
+          },
+          "djiId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "isAvailable" : {
+            "type" : "string"
+          },
+          "onlineStatus" : {
+            "type" : "string"
+          },
+          "uavCreateTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "uavName" : {
+            "type" : "string"
+          },
+          "updateTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UavDto" : {
+        "description" : "Parameters for Add Request",
+        "properties" : {
+          "controllerModel" : {
+            "description" : "controller_model",
+            "type" : "string"
+          },
+          "djiId" : {
+            "description" : "dji_id",
+            "type" : "string"
+          },
+          "onlineStatus" : {
+            "description" : "online_status",
+            "type" : "string"
+          },
+          "uavName" : {
+            "description" : "uav_name",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UavRuntimeStatusVo" : {
+        "description" : "无人机实时运行状态",
+        "properties" : {
+          "altitude" : {
+            "description" : "高度，单位：米",
+            "format" : "double",
+            "type" : "number"
+          },
+          "battery" : {
+            "description" : "电池电量（百分比，0-100）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "deviceId" : {
+            "description" : "设备ID(DJI ID)",
+            "type" : "string"
+          },
+          "flightStatus" : {
+            "description" : "飞行状态（0 地面 / 1 飞行中）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "latitude" : {
+            "description" : "纬度",
+            "format" : "double",
+            "type" : "number"
+          },
+          "longitude" : {
+            "description" : "经度",
+            "format" : "double",
+            "type" : "number"
+          },
+          "operation" : {
+            "description" : "当前将要执行的操作（设备上报文案）",
+            "type" : "string"
+          },
+          "receivedAt" : {
+            "description" : "服务端收到该状态的时间戳（毫秒）",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "speed" : {
+            "description" : "速度（设备上报值）",
+            "format" : "double",
+            "type" : "number"
+          },
+          "stale" : {
+            "description" : "状态是否过期（距最近一次上报超过 90 秒为 true）",
+            "type" : "boolean"
+          },
+          "timestamp" : {
+            "description" : "设备上报时间戳（毫秒）",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "uavId" : {
+            "description" : "无人机ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "uavName" : {
+            "description" : "无人机名称",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UavVo" : {
+        "properties" : {
+          "controllerModel" : {
+            "description" : "控制器型号",
+            "type" : "string"
+          },
+          "djiId" : {
+            "description" : "设备ID(DJI ID)",
+            "type" : "string"
+          },
+          "id" : {
+            "description" : "id",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "isAvailable" : {
+            "description" : "是否可用(1可用,0禁用)",
+            "type" : "string"
+          },
+          "uavName" : {
+            "description" : "uavName",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UploadSignDto" : {
+        "properties" : {
+          "fileName" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "fileSize" : {
+            "format" : "int64",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "mimeType" : {
+            "type" : "string"
+          },
+          "orderNum" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "fileName" ],
+        "type" : "object"
+      },
+      "UploadSignVO" : {
+        "properties" : {
+          "expiresAt" : {
+            "type" : "string"
+          },
+          "fileId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "objectKey" : {
+            "type" : "string"
+          },
+          "preSignedUrl" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UploadVO" : {
+        "properties" : {
+          "createTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "fileSize" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "fileSuffix" : {
+            "type" : "string"
+          },
+          "fileUrl" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "mimeType" : {
+            "type" : "string"
+          },
+          "orderNum" : {
+            "type" : "string"
+          },
+          "originalName" : {
+            "type" : "string"
+          },
+          "storagePath" : {
+            "type" : "string"
+          },
+          "uploadId" : {
+            "type" : "string"
+          },
+          "uploadStatus" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UserLoginDto" : {
+        "description" : "Parameters for Login Request(登录参数)",
+        "properties" : {
+          "password" : {
+            "description" : "password",
+            "type" : "string"
+          },
+          "userName" : {
+            "description" : "userName",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UserLoginVO" : {
+        "properties" : {
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UserRecordsVO" : {
+        "description" : "用户观看记录分页结果",
+        "properties" : {
+          "records" : {
+            "description" : "当前页观看记录列表",
+            "items" : {
+              "$ref" : "#/components/schemas/RecordItem"
+            },
+            "type" : "array"
+          },
+          "total" : {
+            "description" : "观看记录总条数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UserRegisterDto" : {
+        "description" : "Parameters for Register Request(注册参数)",
+        "properties" : {
+          "password" : {
+            "description" : "passWord",
+            "type" : "string"
+          },
+          "userName" : {
+            "description" : "userName",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WaypointDto" : {
+        "properties" : {
+          "altitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "latitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "orderIndex" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "WaypointVo" : {
+        "properties" : {
+          "altitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "latitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "orderIndex" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "WebUavStatusVo" : {
+        "description" : "Web 端无人机状态（含连接状态与直播状态）",
+        "properties" : {
+          "djiId" : {
+            "description" : "设备ID(DJI ID)",
+            "type" : "string"
+          },
+          "id" : {
+            "description" : "无人机ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "latestStatus" : {
+            "$ref" : "#/components/schemas/UavRuntimeStatusVo",
+            "description" : "最近一次上报的运行状态（设备暂未上报时为 null）"
+          },
+          "liveState" : {
+            "description" : "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
+            "type" : "string"
+          },
+          "uavName" : {
+            "description" : "无人机名称",
+            "type" : "string"
+          },
+          "wsConnected" : {
+            "description" : "设备 WebSocket 是否已连接",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "Bearer Authentication" : {
+        "bearerFormat" : "JWT",
+        "description" : "请输入JWT Token，格式：直接输入token字符串即可",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  },
+  "info" : {
+    "description" : "无人机项目web后端接口文档",
+    "title" : "无人机项目接口文档",
+    "version" : "1.0"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/admin/complaint/list" : {
+      "get" : {
+        "description" : "分页查看投诉，可按状态筛选",
+        "operationId" : "listComplaints",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "APPROVED", "PENDING", "REJECTED" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultComplaintListVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "投诉列表",
+        "tags" : [ "Admin Complaint API" ]
+      }
+    },
+    "/admin/complaint/{id}/approve" : {
+      "post" : {
+        "description" : "批准后自动发起微信退款，订单状态变更为已退款",
+        "operationId" : "approveComplaint",
+        "parameters" : [ {
+          "description" : "处理备注",
+          "in" : "query",
+          "name" : "adminNote",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "投诉 ID",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "批准投诉并退款",
+        "tags" : [ "Admin Complaint API" ]
+      }
+    },
+    "/admin/complaint/{id}/reject" : {
+      "post" : {
+        "description" : "驳回后订单恢复为已完成",
+        "operationId" : "rejectComplaint",
+        "parameters" : [ {
+          "description" : "投诉 ID",
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "驳回理由",
+          "in" : "query",
+          "name" : "adminNote",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "驳回投诉",
+        "tags" : [ "Admin Complaint API" ]
+      }
+    },
+    "/admin/login" : {
+      "post" : {
+        "description" : "管理员登录接口",
+        "operationId" : "adminLogin",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminLoginVO"
+                }
+              }
+            },
+            "description" : "登录成功"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminLoginVO"
+                }
+              }
+            },
+            "description" : "用户名或密码错误"
+          }
+        },
+        "summary" : "管理员登录",
+        "tags" : [ "Admin Auth API" ]
+      }
+    },
+    "/admin/logs/application" : {
+      "get" : {
+        "description" : "读取应用日志文件（application.log）的最后 N 行",
+        "operationId" : "getApplicationLogs",
+        "parameters" : [ {
+          "description" : "读取行数，默认 100",
+          "in" : "query",
+          "name" : "lines",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLogVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取应用日志",
+        "tags" : [ "Log API" ]
+      }
+    },
+    "/admin/logs/error" : {
+      "get" : {
+        "description" : "读取错误日志文件（error.log）的最后 N 行",
+        "operationId" : "getErrorLogs",
+        "parameters" : [ {
+          "description" : "读取行数，默认 100",
+          "in" : "query",
+          "name" : "lines",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLogVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取错误日志",
+        "tags" : [ "Log API" ]
+      }
+    },
+    "/admin/logs/files" : {
+      "get" : {
+        "description" : "列出日志目录下的文件和子目录",
+        "operationId" : "listFiles_1",
+        "parameters" : [ {
+          "description" : "相对路径，留空表示根目录",
+          "in" : "query",
+          "name" : "path",
+          "required" : false,
+          "schema" : {
+            "default" : "",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListLogFileVO"
+                }
+              }
+            },
+            "description" : "获取成功"
+          }
+        },
+        "summary" : "获取日志文件列表",
+        "tags" : [ "Log API" ]
+      }
+    },
+    "/admin/logs/read" : {
+      "get" : {
+        "description" : "读取指定日志文件的最后 N 行",
+        "operationId" : "readLog",
+        "parameters" : [ {
+          "description" : "日志文件相对路径",
+          "in" : "query",
+          "name" : "file",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "读取行数，默认 200",
+          "in" : "query",
+          "name" : "lines",
+          "required" : false,
+          "schema" : {
+            "default" : 200,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLogVO"
+                }
+              }
+            },
+            "description" : "读取成功"
+          }
+        },
+        "summary" : "读取日志文件内容",
+        "tags" : [ "Log API" ]
+      }
+    },
+    "/admin/orders" : {
+      "get" : {
+        "description" : "支持按订单状态（枚举名或状态码）与订单号/任务号精确过滤；page 从 0 起",
+        "operationId" : "listOrders_1",
+        "parameters" : [ {
+          "description" : "任务编号精确过滤",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "订单号精确过滤",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "订单状态过滤：枚举名（PAID）或状态码（1）",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminOrderVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "全平台订单分页列表",
+        "tags" : [ "Admin Query API" ]
+      }
+    },
+    "/admin/orders/{orderNum}" : {
+      "get" : {
+        "operationId" : "orderDetail",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "path",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminOrderVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "订单详情",
+        "tags" : [ "Admin Query API" ]
+      }
+    },
+    "/admin/tasks" : {
+      "get" : {
+        "description" : "支持按任务状态（枚举名：IDLE/IN_PROGRESS/COMPLETED）与任务号精确过滤；含订单双状态与操作提示",
+        "operationId" : "listTasks_1",
+        "parameters" : [ {
+          "description" : "任务状态过滤：IDLE / IN_PROGRESS / COMPLETED",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "任务编号精确过滤",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "全平台任务分页列表",
+        "tags" : [ "Admin Query API" ]
+      }
+    },
+    "/admin/tasks/{taskNum}" : {
+      "get" : {
+        "description" : "含订单双状态、飞手与完成说明、操作提示",
+        "operationId" : "taskDetail",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "任务详情",
+        "tags" : [ "Admin Query API" ]
+      }
+    },
+    "/admin/uav" : {
+      "get" : {
+        "description" : "管理端查询所有无人机的完整详细信息",
+        "operationId" : "getAllUav",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListUav"
+                }
+              }
+            },
+            "description" : "查询成功"
+          }
+        },
+        "summary" : "查询所有无人机详细信息",
+        "tags" : [ "UAV Management API" ]
+      }
+    },
+    "/admin/uav/available" : {
+      "post" : {
+        "description" : "管理端修改无人机的可用状态",
+        "operationId" : "updateUavAvailable",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "isAvailable",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "修改成功"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "无人机不存在"
+          }
+        },
+        "summary" : "修改无人机可用状态",
+        "tags" : [ "UAV Management API" ]
+      }
+    },
+    "/admin/uav/detail" : {
+      "get" : {
+        "description" : "根据设备ID查询无人机的详细信息",
+        "operationId" : "getUavDetail",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUav"
+                }
+              }
+            },
+            "description" : "查询成功"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUav"
+                }
+              }
+            },
+            "description" : "无人机不存在"
+          }
+        },
+        "summary" : "查询单个无人机详情",
+        "tags" : [ "UAV Management API" ]
+      }
+    },
+    "/admin/uav/live" : {
+      "get" : {
+        "description" : "管理端查询当前正在直播的无人机列表",
+        "operationId" : "getLiveUav",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListLiveUavVO"
+                }
+              }
+            },
+            "description" : "查询成功"
+          }
+        },
+        "summary" : "查询当前正在直播的无人机",
+        "tags" : [ "UAV Management API" ]
+      }
+    },
+    "/admin/uav/statistics" : {
+      "get" : {
+        "description" : "获取系统的统计信息，包括无人机总数、在线数、直播数等",
+        "operationId" : "getStatistics",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminStatisticsVO"
+                }
+              }
+            },
+            "description" : "查询成功"
+          }
+        },
+        "summary" : "获取管理员统计信息",
+        "tags" : [ "UAV Management API" ]
+      }
+    },
+    "/api/ws/request" : {
+      "post" : {
+        "description" : "设备申请建立WebSocket连接",
+        "operationId" : "requestConnection",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "申请成功"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "申请失败"
+          }
+        },
+        "summary" : "申请WebSocket连接",
+        "tags" : [ "APP WebSocket API" ]
+      }
+    },
+    "/appUav/add" : {
+      "post" : {
+        "description" : "添加新的无人机信息（需登录）",
+        "operationId" : "addUav",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UavDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUavVo"
+                }
+              }
+            },
+            "description" : "新增成功"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUavVo"
+                }
+              }
+            },
+            "description" : "参数错误"
+          }
+        },
+        "summary" : "新增无人机",
+        "tags" : [ "AppUav API" ]
+      }
+    },
+    "/appUav/update" : {
+      "put" : {
+        "description" : "更新无人机的基本信息，包括名称、在线状态等",
+        "operationId" : "updateOnlineStatus",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UavDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "更新成功"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "无人机不存在"
+          }
+        },
+        "summary" : "更新无人机信息",
+        "tags" : [ "AppUav API" ]
+      }
+    },
+    "/chat/Message/delete/{msgId}" : {
+      "post" : {
+        "description" : "删除消息",
+        "operationId" : "deleteMessage",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "msgId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "删除消息",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/messages/{sessionId}" : {
+      "get" : {
+        "description" : "按会话 ID 获取历史消息（路径参数是会话 ID，不是消息 ID）",
+        "operationId" : "getMessages",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "sessionId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取消息",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/read" : {
+      "post" : {
+        "description" : "进入会话时由客户端显式调用：推进该会话 lastReadTime 到当前时间（t49 显式已读契约）；仅会话成员可调用",
+        "operationId" : "markSessionRead",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "sessionId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "标记会话已读",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/recall/{msgId}" : {
+      "post" : {
+        "description" : "撤回消息",
+        "operationId" : "recallMessage",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "msgId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "撤回消息",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/send" : {
+      "post" : {
+        "description" : "发送消息",
+        "operationId" : "sendMessage",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MessageDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "发送消息",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/sync" : {
+      "get" : {
+        "description" : "拉取所有会话中上次读取后错过的消息，并更新 lastReadTime",
+        "operationId" : "syncMessages",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "同步离线消息",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/Message/unread/count" : {
+      "get" : {
+        "description" : "获取当前用户每个会话的未读消息数（只读，不更新 lastReadTime）",
+        "operationId" : "getUnreadCount",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "未读消息数",
+        "tags" : [ "chat message API" ]
+      }
+    },
+    "/chat/session/create" : {
+      "post" : {
+        "description" : "创建会话",
+        "operationId" : "createSession",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SessionDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultSessionVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建会话",
+        "tags" : [ "chat session API" ]
+      }
+    },
+    "/chat/session/delete/{sessionId}" : {
+      "post" : {
+        "description" : "删除会话",
+        "operationId" : "deleteSession",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "sessionId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "删除会话",
+        "tags" : [ "chat session API" ]
+      }
+    },
+    "/chat/session/list" : {
+      "get" : {
+        "description" : "列出会话",
+        "operationId" : "listSession",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "列出会话",
+        "tags" : [ "chat session API" ]
+      }
+    },
+    "/info/edit" : {
+      "post" : {
+        "description" : "飞手编辑个人资料；当前为占位实现，仅返回成功",
+        "operationId" : "editSelfInfo",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RiderInfoDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "编辑本人资料",
+        "tags" : [ "Rider Info API" ]
+      }
+    },
+    "/live/close" : {
+      "post" : {
+        "description" : "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话并补齐该设备全体观众的观看记录；设备离线则直接补终态。协议详见 DroneWebSocketHandler#sendStopLiveCommand javadoc。",
+        "operationId" : "closeLive",
+        "parameters" : [ {
+          "description" : "无人机设备ID",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "已停止 / 等待设备确认 / 离线补终态"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "设备未注册"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "设备拒绝停止推流（LIVE_STOP_REJECTED）"
+          }
+        },
+        "summary" : "结束观看并请求停止推流（1A-5a）",
+        "tags" : [ "Web Live API" ]
+      }
+    },
+    "/live/get" : {
+      "post" : {
+        "description" : "Web端获取视频流的凭证；TRTC 身份由服务端从登录态生成，客户端不可指定",
+        "operationId" : "getPullCredentials",
+        "parameters" : [ {
+          "description" : "无人机设备ID",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultPullCredentialsVO"
+                }
+              }
+            },
+            "description" : "获取成功"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultPullCredentialsVO"
+                }
+              }
+            },
+            "description" : "设备未连接"
+          }
+        },
+        "summary" : "获取拉流凭证",
+        "tags" : [ "Web Live API" ]
+      }
+    },
+    "/live/leave" : {
+      "post" : {
+        "description" : "仅结束当前登录用户在该设备的未关闭观看记录（end_time=now），完全不动推流与直播状态；幂等（无开放记录也返回 200）。与停止链路（LIVE_STOPPED 统一补齐）叠加后，正常退出与异常退出口径完整。",
+        "operationId" : "leaveLive",
+        "parameters" : [ {
+          "description" : "无人机设备ID",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "观看记录已结束（含幂等场景）"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "设备未注册"
+          }
+        },
+        "summary" : "退出观看（1B-4b 微端点）",
+        "tags" : [ "Web Live API" ]
+      }
+    },
+    "/live/req" : {
+      "post" : {
+        "description" : "Web端向指定无人机发送开播请求",
+        "operationId" : "startLive",
+        "parameters" : [ {
+          "description" : "无人机设备ID",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "发送成功 / 已运行 / 等待确认"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "未登录"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "设备未连接 / 正在启动中"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "触发限流"
+          }
+        },
+        "summary" : "发送开播请求",
+        "tags" : [ "Web Live API" ]
+      }
+    },
+    "/live/rider/req" : {
+      "post" : {
+        "description" : "飞手对本人绑定且在线的设备发送开播请求（1B-4b）；设备归属校验 rider_uav",
+        "operationId" : "riderStartLive",
+        "parameters" : [ {
+          "description" : "无人机设备ID",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "发送成功 / 已运行 / 等待确认"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "设备未绑定到当前飞手"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "设备未注册"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLiveStartVO"
+                }
+              }
+            },
+            "description" : "设备未连接 / 正在启动中"
+          }
+        },
+        "summary" : "飞手主动开播",
+        "tags" : [ "Web Live API" ]
+      }
+    },
+    "/order/cancel" : {
+      "post" : {
+        "description" : "取消待支付状态的订单",
+        "operationId" : "cancelOrder",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "取消订单",
+        "tags" : [ "Order API" ]
+      }
+    },
+    "/order/complaint" : {
+      "post" : {
+        "description" : "对争议中的订单提交正式投诉，需提供原因和描述",
+        "operationId" : "submitComplaint",
+        "parameters" : [ {
+          "description" : "投诉原因: QUALITY_ISSUE/SERVICE_ISSUE/NOT_AS_DESCRIBED/OTHER",
+          "in" : "query",
+          "name" : "reason",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "NOT_AS_DESCRIBED", "OTHER", "QUALITY_ISSUE", "SERVICE_ISSUE" ],
+            "type" : "string"
+          }
+        }, {
+          "description" : "订单号",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "详细描述",
+          "in" : "query",
+          "name" : "description",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "提交投诉/退款申请",
+        "tags" : [ "Complaint API" ]
+      }
+    },
+    "/order/complaint/{id}/cancel" : {
+      "post" : {
+        "description" : "仅在管理员处理前可取消，取消后订单恢复为已完成",
+        "operationId" : "cancelComplaint",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "取消投诉",
+        "tags" : [ "Complaint API" ]
+      }
+    },
+    "/order/complaint/{orderNum}" : {
+      "get" : {
+        "operationId" : "getComplaint",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "path",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultOrderComplaint"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查看投诉状态",
+        "tags" : [ "Complaint API" ]
+      }
+    },
+    "/order/detail" : {
+      "get" : {
+        "description" : "根据订单号获取详细信息（含交付文件列表）",
+        "operationId" : "getOrderDetail",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultOrderVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "订单详情",
+        "tags" : [ "Order API" ]
+      }
+    },
+    "/order/dispute" : {
+      "post" : {
+        "description" : "将待确认的订单标记为争议中",
+        "operationId" : "disputeOrder",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "不满意交付结果",
+        "tags" : [ "Order API" ]
+      }
+    },
+    "/order/list" : {
+      "get" : {
+        "description" : "获取当前用户的所有订单，按创建时间倒序",
+        "operationId" : "listOrders",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultOrderListVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "订单列表",
+        "tags" : [ "Order API" ]
+      }
+    },
+    "/pay/notify" : {
+      "post" : {
+        "description" : "微信支付平台异步通知入口：验签后按 out_trade_no 与实付金额核对并推进订单状态；应答 code=SUCCESS 表示已受理，其余情况微信会重试。",
+        "operationId" : "handleNotify",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "微信支付结果回调",
+        "tags" : [ "Pay Notify API" ]
+      }
+    },
+    "/pay/{orderNum}" : {
+      "post" : {
+        "description" : "真实链路：调用微信统一下单返回 prepay_id（openid 必填）；mock 链路（仅 dev/test 且 wechat.pay.mock-enabled=true）：openid 可省略，服务端生成 mock 身份并同步完成支付状态流转（PENDING→PAID）",
+        "operationId" : "pay",
+        "parameters" : [ {
+          "description" : "微信 openid（真实链路必填；mock 链路可省略）",
+          "in" : "query",
+          "name" : "openid",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "订单号",
+          "in" : "path",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultPayResultVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "发起支付",
+        "tags" : [ "Pay API" ]
+      }
+    },
+    "/review/my" : {
+      "get" : {
+        "operationId" : "myReviews",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultReviewListVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "我的评价列表",
+        "tags" : [ "Review API" ]
+      }
+    },
+    "/review/submit" : {
+      "post" : {
+        "description" : "对已完成的订单进行评分和评价，一个订单只能评价一次",
+        "operationId" : "submitReview",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "content",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "rating",
+          "required" : true,
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultSubmitReviewVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "提交评价",
+        "tags" : [ "Review API" ]
+      }
+    },
+    "/review/{orderNum}" : {
+      "get" : {
+        "operationId" : "getReview",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "path",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultOrderReview"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查看订单评价",
+        "tags" : [ "Review API" ]
+      }
+    },
+    "/rider/accept" : {
+      "post" : {
+        "description" : "骑手接受指定任务",
+        "operationId" : "acceptTask",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "接受任务",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/cancel" : {
+      "post" : {
+        "description" : "骑手取消已接受的任务，任务回到空闲状态",
+        "operationId" : "cancelTask",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "取消接单",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/complete" : {
+      "post" : {
+        "description" : "骑手完成已接受的任务；note 为可选完成说明（≤500 字）",
+        "operationId" : "completeTask",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "完成说明（可选，≤500 字）",
+          "in" : "query",
+          "name" : "note",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "完成任务",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/drone/bind" : {
+      "post" : {
+        "description" : "飞手绑定新的无人机",
+        "operationId" : "bindDrone",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "djiId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "绑定无人机",
+        "tags" : [ "Rider Register API" ]
+      }
+    },
+    "/rider/drone/list" : {
+      "get" : {
+        "description" : "飞手查看自己绑定的无人机列表",
+        "operationId" : "listDrones",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListRiderUav"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "我的无人机",
+        "tags" : [ "Rider Register API" ]
+      }
+    },
+    "/rider/drone/unbind" : {
+      "delete" : {
+        "description" : "飞手解绑已绑定的无人机",
+        "operationId" : "unbindDrone",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "djiId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "解绑无人机",
+        "tags" : [ "Rider Register API" ]
+      }
+    },
+    "/rider/my-tasks" : {
+      "get" : {
+        "description" : "骑手查看自己正在执行的任务",
+        "operationId" : "getMyActiveTasks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "进行中的任务",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/my-tasks/history" : {
+      "get" : {
+        "description" : "骑手查看自己的全部接单记录",
+        "operationId" : "getMyAllTasks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "接单历史",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/recommended" : {
+      "get" : {
+        "description" : "按完成任务量降序返回飞手列表",
+        "operationId" : "getRecommendedRiders",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListRiderStatsVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "推荐飞手",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/register" : {
+      "post" : {
+        "description" : "飞手注册并绑定无人机，成功返回 JWT 令牌",
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RiderRegisterDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserLoginVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手注册",
+        "tags" : [ "Rider Register API" ]
+      }
+    },
+    "/rider/square" : {
+      "get" : {
+        "description" : "骑手查看所有可接的任务",
+        "operationId" : "listAvailableTasks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "任务广场",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/stats" : {
+      "get" : {
+        "description" : "当前骑手的今日接单数、总完成数、总收益",
+        "operationId" : "getRiderStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultRiderStatsVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手统计",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/task/detail" : {
+      "get" : {
+        "description" : "飞手查看任意任务的详细信息（无需任务归属）",
+        "operationId" : "getTaskDetail_1",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "任务详情",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/task/confirm" : {
+      "post" : {
+        "description" : "骑手完成任务后用户确认收货，订单完结",
+        "operationId" : "confirmTask",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "确认收货",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/create" : {
+      "post" : {
+        "description" : "创建新任务，包含任务类型、航点信息等",
+        "operationId" : "createTask",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TaskDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "创建任务",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/delete" : {
+      "delete" : {
+        "description" : "删除指定ID的任务，只能删除自己创建的任务",
+        "operationId" : "deleteTask",
+        "parameters" : [ {
+          "description" : "任务数据库ID",
+          "in" : "query",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "删除任务",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/detail" : {
+      "get" : {
+        "description" : "根据任务编号获取详细信息，包含航点列表",
+        "operationId" : "getTaskDetail",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取任务详情",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/init" : {
+      "get" : {
+        "description" : "返回高德地图 JS API 所需的 key 与安全密钥",
+        "operationId" : "init",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAmapConfigVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取地图配置",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/list" : {
+      "get" : {
+        "operationId" : "listTasks",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取当前用户的任务列表",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/tasks/{taskNum}/attachments" : {
+      "get" : {
+        "description" : "任务所有者与接单飞手可看；逐条附 presigned 下载 URL（15 分钟有效）",
+        "operationId" : "list",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "附件列表",
+        "tags" : [ "Task Attachment API" ]
+      }
+    },
+    "/tasks/{taskNum}/attachments/download-url" : {
+      "get" : {
+        "description" : "任务所有者或接单飞手可看",
+        "operationId" : "downloadUrl",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "附件对象键",
+          "in" : "query",
+          "name" : "objectKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取交付物下载凭证",
+        "tags" : [ "Task Attachment API" ]
+      }
+    },
+    "/tasks/{taskNum}/attachments/upload-url" : {
+      "post" : {
+        "description" : "仅任务的接单飞手可调用；校验类型（图片 jpeg/png/webp ≤20MB，视频 mp4/mov ≤500MB）后返回 presigned PUT URL（15 分钟有效），客户端直传 MinIO",
+        "operationId" : "uploadUrl",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "内容类型（image/jpeg 等）",
+          "in" : "query",
+          "name" : "contentType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "原始文件名",
+          "in" : "query",
+          "name" : "fileName",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "文件大小（字节）",
+          "in" : "query",
+          "name" : "sizeBytes",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取交付物上传凭证",
+        "tags" : [ "Task Attachment API" ]
+      }
+    },
+    "/upload/bind" : {
+      "post" : {
+        "operationId" : "bindFiles",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BindUploadDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "将文件批量绑定到订单",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/callback" : {
+      "post" : {
+        "description" : "OSS 在上传完成后自动回调此接口",
+        "operationId" : "ossCallback",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "additionalProperties" : {
+                  "type" : "string"
+                },
+                "type" : "object"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "OSS 上传回调",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/confirm/{fileId}" : {
+      "post" : {
+        "description" : "客户端直传 OSS 完成后手动确认，回调模式可跳过此步骤",
+        "operationId" : "confirmUpload",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "fileId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUploadVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "确认上传完成",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/download/{id}" : {
+      "get" : {
+        "description" : "返回 OSS 预签名 GET URL，30 分钟有效",
+        "operationId" : "download",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringString"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取文件下载链接",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/list" : {
+      "get" : {
+        "description" : "支持按 orderNum 筛选，不传则查当前用户全部文件",
+        "operationId" : "listFiles",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "文件列表",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/sign" : {
+      "post" : {
+        "description" : "返回 OSS 预签名 PUT URL，客户端凭此直传文件到 OSS",
+        "operationId" : "sign",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UploadSignDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUploadSignVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取上传凭证",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/upload/{id}" : {
+      "delete" : {
+        "operationId" : "deleteFile",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "删除文件及记录",
+        "tags" : [ "Upload API" ]
+      }
+    },
+    "/user/login" : {
+      "post" : {
+        "description" : "验证用户名和密码，成功返回 JWT 令牌",
+        "operationId" : "login",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserLoginDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserLoginVO"
+                }
+              }
+            },
+            "description" : "登录成功"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserLoginVO"
+                }
+              }
+            },
+            "description" : "用户名或密码错误"
+          }
+        },
+        "summary" : "用户登录",
+        "tags" : [ "Authentication and Authorization API" ]
+      }
+    },
+    "/user/records" : {
+      "get" : {
+        "description" : "获取当前登录用户的直播观看记录，支持分页",
+        "operationId" : "getLiveRecords",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserRecordsVO"
+                }
+              }
+            },
+            "description" : "查询成功"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserRecordsVO"
+                }
+              }
+            },
+            "description" : "未登录"
+          }
+        },
+        "summary" : "查询用户直播记录",
+        "tags" : [ "Authentication and Authorization API" ]
+      }
+    },
+    "/user/refresh" : {
+      "post" : {
+        "description" : "使用 Refresh-Token 获取新的 Access-Token",
+        "operationId" : "refreshToken",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Refresh-Token",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTokenRefreshVO"
+                }
+              }
+            },
+            "description" : "刷新成功"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTokenRefreshVO"
+                }
+              }
+            },
+            "description" : "刷新失败"
+          }
+        },
+        "summary" : "刷新令牌",
+        "tags" : [ "Authentication and Authorization API" ]
+      }
+    },
+    "/user/register" : {
+      "post" : {
+        "description" : "用户注册，返回用户信息",
+        "operationId" : "registerUser",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserRegisterDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultRegisterVo"
+                }
+              }
+            },
+            "description" : "注册成功"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultRegisterVo"
+                }
+              }
+            },
+            "description" : "注册失败"
+          }
+        },
+        "summary" : "用户注册",
+        "tags" : [ "Authentication and Authorization API" ]
+      }
+    },
+    "/webUav/getRecord" : {
+      "get" : {
+        "description" : "普通用户固定查询自己的直播观看记录；管理员可传 userName 代查任意用户",
+        "operationId" : "getUserRecord",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "userName",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultUserRecordsVO"
+                }
+              }
+            },
+            "description" : "查询成功"
+          }
+        },
+        "summary" : "查询观看记录（本人）",
+        "tags" : [ "WebUav API" ]
+      }
+    },
+    "/webUav/getUav" : {
+      "get" : {
+        "description" : "获取所有的无人机列表",
+        "operationId" : "getUav",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "onlineOnly",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListUavVo"
+                }
+              }
+            },
+            "description" : "查询成功"
+          }
+        },
+        "summary" : "查询无人机",
+        "tags" : [ "WebUav API" ]
+      }
+    },
+    "/webUav/position" : {
+      "get" : {
+        "description" : "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录",
+        "operationId" : "getPosition",
+        "parameters" : [ {
+          "description" : "无人机 ID（与 deviceId 二选一）",
+          "in" : "query",
+          "name" : "uavId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "设备 ID（与 uavId 二选一）",
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultGpsPointVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询无人机实时位置",
+        "tags" : [ "WebUav API" ]
+      }
+    },
+    "/webUav/reverseGeocode" : {
+      "get" : {
+        "description" : "调用高德逆地理编码 API，将经纬度转为格式化地址（结果缓存 4 位小数精度）",
+        "operationId" : "reverseGeocode",
+        "parameters" : [ {
+          "description" : "纬度",
+          "in" : "query",
+          "name" : "lat",
+          "required" : true,
+          "schema" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        }, {
+          "description" : "经度",
+          "in" : "query",
+          "name" : "lng",
+          "required" : true,
+          "schema" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "坐标转地址",
+        "tags" : [ "WebUav API" ]
+      }
+    },
+    "/webUav/status" : {
+      "get" : {
+        "description" : "根据设备ID查询平台侧最近一次收到的无人机状态",
+        "operationId" : "getUavStatus",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultWebUavStatusVo"
+                }
+              }
+            },
+            "description" : "查询成功"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultWebUavStatusVo"
+                }
+              }
+            },
+            "description" : "无人机或状态不存在"
+          }
+        },
+        "summary" : "查询单台无人机实时状态",
+        "tags" : [ "WebUav API" ]
+      }
+    },
+    "/webUav/trajectory" : {
+      "get" : {
+        "description" : "根据订单号查询无人机执行该订单时的 GPS 轨迹，按时间升序排列",
+        "operationId" : "getTrajectory",
+        "parameters" : [ {
+          "description" : "订单号",
+          "in" : "query",
+          "name" : "orderNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListGpsPointVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询订单飞行轨迹",
+        "tags" : [ "WebUav API" ]
+      }
+    }
+  },
+  "security" : [ {
+    "Bearer Authentication" : [ ]
+  } ],
+  "servers" : [ {
+    "description" : "相对基址：由部署环境（网关/反向代理）决定",
+    "url" : "/"
+  } ],
+  "tags" : [ {
+    "description" : "任务交付物附件（MinIO presigned URL）",
+    "name" : "Task Attachment API"
+  }, {
+    "description" : "任务创建与管理接口",
+    "name" : "Task API"
+  }, {
+    "description" : "会话相关接口",
+    "name" : "chat session API"
+  }, {
+    "description" : "微信支付结果回调（服务端到服务端，非消费端接口）",
+    "name" : "Pay Notify API"
+  }, {
+    "description" : "支付接口",
+    "name" : "Pay API"
+  }, {
+    "description" : "文件上传管理",
+    "name" : "Upload API"
+  }, {
+    "description" : "管理端业务查询（只读）",
+    "name" : "Admin Query API"
+  }, {
+    "description" : "管理端投诉处理",
+    "name" : "Admin Complaint API"
+  }, {
+    "description" : "聊天消息接口",
+    "name" : "chat message API"
+  }, {
+    "description" : "订单投诉",
+    "name" : "Complaint API"
+  }, {
+    "description" : "订单接口",
+    "name" : "Order API"
+  }, {
+    "description" : "订单评价",
+    "name" : "Review API"
+  }, {
+    "description" : "飞手注册接口",
+    "name" : "Rider Register API"
+  }, {
+    "description" : "飞手资料维护（占位实现，尚未接入持久化）",
+    "name" : "Rider Info API"
+  }, {
+    "description" : "骑手接单接口",
+    "name" : "Rider API"
+  } ]
+}

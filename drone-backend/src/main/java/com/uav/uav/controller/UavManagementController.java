@@ -8,8 +8,6 @@ import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RequireRole;
 import com.uav.uav.service.UavManagementService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -33,17 +31,7 @@ public class UavManagementController {
             summary = "修改无人机可用状态",
             description = "管理端修改无人机的可用状态",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "修改成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", \"data\": null}"
-                                    )
-                            )
-                    ),
+                    @ApiResponse(responseCode = "200", description = "修改成功"),
                     @ApiResponse(
                             responseCode = "404",
                             description = "无人机不存在"
@@ -61,18 +49,7 @@ public class UavManagementController {
             summary = "查询所有无人机详细信息",
             description = "管理端查询所有无人机的完整详细信息",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "查询成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": [{\"id\": 1, \"uavName\": \"无人机1\", \"djiId\": \"123456\"}]}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "查询成功")
             }
     )
     @GetMapping
@@ -86,18 +63,7 @@ public class UavManagementController {
             summary = "查询当前正在直播的无人机",
             description = "管理端查询当前正在直播的无人机列表",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "查询成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": [{\"deviceId\": \"123456\", \"uavName\": \"无人机1\"}]}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "查询成功")
             }
     )
     @GetMapping("/live")
@@ -111,18 +77,7 @@ public class UavManagementController {
             summary = "查询单个无人机详情",
             description = "根据设备ID查询无人机的详细信息",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "查询成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"id\": 1, \"uavName\": \"无人机1\"}}"
-                                    )
-                            )
-                    ),
+                    @ApiResponse(responseCode = "200", description = "查询成功"),
                     @ApiResponse(
                             responseCode = "404",
                             description = "无人机不存在"
@@ -140,18 +95,7 @@ public class UavManagementController {
             summary = "获取管理员统计信息",
             description = "获取系统的统计信息，包括无人机总数、在线数、直播数等",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "查询成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"totalUavs\": 10, \"onlineUavs\": 5}}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "查询成功")
             }
     )
     @GetMapping("/statistics")

@@ -43,6 +43,20 @@ spring:
 log:
   dir: logs
 
+# ---- OpenAPI 契约（结构 SSOT：spec/openapi/drone-backend.openapi.json）----
+# 导出命令：bash tools/openapi-export.sh（决策见 docs/adr/0001）
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  # 统一响应媒体类型：否则 springdoc 按方法签名生成通配内容键，
+  # 消费端（frontend/app/djifly）生成物中同一信封会分裂成两种内容键。
+  default-produces-media-type: application/json
+  default-consumes-media-type: application/json
+
 jwt:
   secret: ${drone.jwt.secret}
   expiration: ${drone.jwt.expiration}
@@ -78,7 +92,7 @@ file:
     moderation:
       enabled: ${drone.file.moderation-enabled:false}
     oss:
-      endpoint: ${alioss.endpoint}
-      bucket: ${alioss.bucket-name}
-      access-key-id: ${alioss.access-key-id}
-      access-key-secret: ${alioss.access-key-secret}
+      endpoint: ${alioss.endpoint:https://oss-cn-hangzhou.aliyuncs.com}
+      bucket: ${alioss.bucket-name:drone-uploads}
+      access-key-id: ${alioss.access-key-id:placeholder}
+      access-key-secret: ${alioss.access-key-secret:placeholder}

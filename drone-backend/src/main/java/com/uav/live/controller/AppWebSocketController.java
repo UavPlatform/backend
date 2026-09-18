@@ -4,8 +4,6 @@ import com.uav.live.service.AppWebSocketService;
 import com.uav.server.util.UserContext;
 import com.uav.user.mapper.RiderUavRepository;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -36,28 +34,8 @@ public class AppWebSocketController {
             summary = "申请WebSocket连接",
             description = "设备申请建立WebSocket连接",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "申请成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"message\": \"连接申请已提交，请在App端发起WebSocket连接\"}"
-                                    )
-                            )
-                    ),
-                    @ApiResponse(
-                            responseCode = "400",
-                            description = "申请失败",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": false, \"message\": \"设备已连接\"}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "申请成功"),
+                    @ApiResponse(responseCode = "400", description = "申请失败")
             }
     )
     @PostMapping("/ws/request")

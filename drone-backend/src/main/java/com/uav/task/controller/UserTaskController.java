@@ -54,6 +54,7 @@ public class UserTaskController {
     @Autowired
     private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
 
+    @Operation(summary = "获取地图配置", description = "返回高德地图 JS API 所需的 key 与安全密钥")
     @GetMapping("/init")
     public Result<AmapConfigVO> init() {
         return Result.success(new AmapConfigVO(amapConfig.getKey(), amapConfig.getSecurityKey()));

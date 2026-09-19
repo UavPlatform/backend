@@ -1,11 +1,8 @@
 package com.uav.chat;
 
 import com.uav.live.service.AppWebSocketService;
-import com.uav.server.util.JwtUtil;
-import com.uav.user.mapper.RiderUavRepository;
-import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.RiderUav;
-import com.uav.user.pojo.entity.User;
+import com.uav.support.RealProtocolTestBase;
+import com.uav.support.TestAccounts;
 import jakarta.websocket.ClientEndpointConfig;
 import jakarta.websocket.CloseReason;
 import jakarta.websocket.ContainerProvider;
@@ -17,47 +14,38 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.net.URI;
-import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * t35 契约测试（裁决 Q12=A 强制单设备在线）：
- * 聊天 /ws/{sid} 被「更新登录」顶掉的旧连接以 4001（replaced by newer login）关闭；
- * 客户端主动登出仍为 1000 语义且可立即重连；4001 语义不外溢到 /ws/drone 设备通道。
+ * 端到端协议测试（t35 / 裁决 Q12=A 强制单设备在线）：
+ * 聊天 {@code /ws/{sid}} 被「更新登录」顶掉的旧连接以 4001（replaced by newer login）关闭；
+ * 客户端主动登出仍为 1000 语义且可立即重连；4001 语义不外溢到 {@code /ws/drone} 设备通道。
+ *
+ * <p>真实驱动方式（R9/O4）：Jakarta WebSocket 客户端握手真实 TCP 端口，因此继承
+ * {@link RealProtocolTestBase}（{@code RANDOM_PORT}，不含 {@code @Transactional}）。
+ *
+ * <p>R5 隔离方式：WebSocket 连接跨事务边界，无法用事务回滚。本类改用真实注册产生
+ * <b>唯一 userId</b>（{@code TestAccounts} 每次调用分配唯一用户名与 DJI ID），
+ * 会话状态按 userId 隔离，测试间不共享键；<b>不再以 {@code System.nanoTime()} 兜底</b>。
+ * 每个用例结束时关闭自己建立的 WS 会话（显式清理）。
+ *
+ * <p>R3：握手 token 由 {@link TestAccounts} 真实注册/登录取得，不再 {@code JwtUtil.generateToken} 自签。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class ChatKickCloseCodeTest {
-
-    @LocalServerPort
-    int port;
+class ChatKickCloseCodeE2EIT extends RealProtocolTestBase {
 
     @Autowired
-    JwtUtil jwtUtil;
-
-    @Autowired
-    UserRepository userRepository;
-
-    @Autowired
-    RiderUavRepository riderUavRepository;
-
-    @Autowired
-    AppWebSocketService appWebSocketService;
+    private AppWebSocketService appWebSocketService;
 
     private final CopyOnWriteArrayList<Session> sessions = new CopyOnWriteArrayList<>();
 
     @AfterEach
-    void tearDown() {
+    void closeSessions() {
         for (Session s : sessions) {
             try {
                 s.close();
@@ -70,9 +58,8 @@ class ChatKickCloseCodeTest {
     @Test
     @DisplayName("顶号：旧连接收到 close 4001（replaced by newer login），新连接保持在线")
     void replacedConnectionGets4001() throws Exception {
-        long userId = 3_000_000 + (Math.abs(UUID.randomUUID().getLeastSignificantBits()) % 1_000_000);
-        String token = jwtUtil.generateToken(userId, "kick" + userId, 0);
-        URI uri = URI.create("ws://localhost:" + port + "/ws/" + userId + "?token=" + token);
+        TestAccounts.Account account = accounts().registerUser();
+        URI uri = URI.create(wsBaseUrl() + "/ws/" + account.id() + "?token=" + account.token());
 
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         TrackingEndpoint first = new TrackingEndpoint();
@@ -98,9 +85,8 @@ class ChatKickCloseCodeTest {
     @Test
     @DisplayName("正常登出：客户端主动关闭仍为 1000 语义，且可立即重连")
     void normalLogoutStillWorks() throws Exception {
-        long userId = 5_000_000 + (Math.abs(UUID.randomUUID().getLeastSignificantBits()) % 1_000_000);
-        String token = jwtUtil.generateToken(userId, "logout" + userId, 0);
-        URI uri = URI.create("ws://localhost:" + port + "/ws/" + userId + "?token=" + token);
+        TestAccounts.Account account = accounts().registerUser();
+        URI uri = URI.create(wsBaseUrl() + "/ws/" + account.id() + "?token=" + account.token());
 
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         TrackingEndpoint endpoint = new TrackingEndpoint();
@@ -123,8 +109,9 @@ class ChatKickCloseCodeTest {
     @Test
     @DisplayName("设备通道不受 4001 语义影响：同 deviceId 二次连接不关闭旧会话")
     void droneChannelUnaffectedByKickSemantics() throws Exception {
-        String deviceId = "kick-dev-" + UUID.randomUUID().toString().substring(0, 8);
-        User rider = newUser(1);
+        // 真实注册飞手：djiId 即绑定设备号，token 由服务端签发
+        TestAccounts.Account rider = accounts().registerRider();
+        String deviceId = rider.djiId();
 
         TrackingEndpoint first = connectDevice(rider, deviceId);
         TrackingEndpoint second = connectDevice(rider, deviceId);
@@ -139,28 +126,14 @@ class ChatKickCloseCodeTest {
 
     // ---------- helpers ----------
 
-    private User newUser(int role) {
-        User user = new User();
-        user.setUserName("kick" + UUID.randomUUID().toString().substring(0, 8));
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(role);
-        return userRepository.save(user);
-    }
-
-    private TrackingEndpoint connectDevice(com.uav.user.pojo.entity.User rider, String deviceId) throws Exception {
-        RiderUav binding = new RiderUav();
-        binding.setUserId(rider.getId());
-        binding.setDjiId(deviceId);
-        riderUavRepository.save(binding);
-
+    private TrackingEndpoint connectDevice(TestAccounts.Account rider, String deviceId) throws Exception {
         appWebSocketService.requestConnection(deviceId); // pending 门
 
-        String token = jwtUtil.generateToken(rider.getId(), rider.getUserName(), 1);
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         TrackingEndpoint endpoint = new TrackingEndpoint();
         Session session = container.connectToServer(endpoint, ClientEndpointConfig.Builder.create().build(),
-                URI.create("ws://localhost:" + port + "/ws/drone?deviceId=" + deviceId + "&token=" + token));
+                URI.create(wsBaseUrl() + "/ws/drone?deviceId=" + deviceId
+                        + "&token=" + rider.token()));
         sessions.add(session);
         return endpoint;
     }

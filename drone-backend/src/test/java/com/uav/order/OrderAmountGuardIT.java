@@ -1,31 +1,23 @@
-package com.uav.security;
+package com.uav.order;
 
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.calculator.RoutePriceCalculator;
 import com.uav.server.enums.OrderStatus;
-import com.uav.server.enums.TaskType;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.UserContext;
+import com.uav.support.IntegrationTestBase;
+import com.uav.support.UniqueNames;
 import com.uav.task.mapper.TaskRepository;
 import com.uav.task.pojo.dto.TaskDto;
-import com.uav.task.pojo.dto.WaypointDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.service.TaskService;
-import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.User;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,42 +25,36 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * P0-2 防护测试：订单金额一律由服务端按航点距离计算，客户端 reward 篡改无效；
  * 计价为 0 的订单（航点不足）被拒绝。
+ *
+ * <p>归位说明（O1/P5）：本类原先位于 {@code security/}，但其断言的是<b>订单计价业务规则</b>，
+ * 按模块归属迁至 {@code order/}；类名遵循 O5（表达被测对象，不带工单号）。
+ *
+ * <p>层次与驱动（O6/R2/R4/R9）：进程内集成测试，继承 {@link IntegrationTestBase}
+ * （{@code MOCK} + {@code @AutoConfigureMockMvc} + {@code @Transactional}），不声明真实端口；
+ * 本类不发起 HTTP 请求（直接调用服务），也没有鉴权断言，故不需要 token。
+ *
+ * <p>隔离与造数（R5/R7/R8）：事务回滚隔离（删除原手工清理与 {@code userIds} 列表）；
+ * 用户与任务 DTO 走共享工厂（{@code fixtures.user(0)}、{@code fixtures.twoWaypointTask()}、
+ * {@code fixtures.oneWaypointTask(...)}）；ThreadLocal 由基类 {@code @AfterEach} 统一清理。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Transactional
-class OrderAmountGuardTest {
+class OrderAmountGuardIT extends IntegrationTestBase {
 
     @Autowired
-    UserRepository userRepository;
+    private TaskService taskService;
 
     @Autowired
-    TaskService taskService;
+    private OrderRepository orderRepository;
 
     @Autowired
-    OrderRepository orderRepository;
-
-    @Autowired
-    TaskRepository taskRepository;
-
-    private final List<Long> userIds = new ArrayList<>();
-
-    private long rid;
-
-    @AfterEach
-    void restoreContext() {
-        UserContext.clear();
-        userIds.clear();
-    }
+    private TaskRepository taskRepository;
 
     @Test
     @DisplayName("篡改 reward（99999 元）不影响订单金额：服务端按 0.05 元/米计价")
     void tamperedRewardIgnored() {
-        rid = System.nanoTime();
-        User user = newUser();
+        User user = fixtures.user(0);
         UserContext.setUser(user.getId(), user.getUserName(), 0);
 
-        TaskDto dto = twoWaypointTask();
+        TaskDto dto = fixtures.twoWaypointTask();
         dto.setReward(99999.0);   // 客户端尝试把金额改成 99999 元
 
         Task saved = taskService.createTask(dto);
@@ -87,11 +73,10 @@ class OrderAmountGuardTest {
     @Test
     @DisplayName("reward 为 null（0 元下单尝试）也被服务端计价为正数金额")
     void nullRewardStillPriced() {
-        rid = System.nanoTime();
-        User user = newUser();
+        User user = fixtures.user(0);
         UserContext.setUser(user.getId(), user.getUserName(), 0);
 
-        TaskDto dto = twoWaypointTask();
+        TaskDto dto = fixtures.twoWaypointTask();
         dto.setReward(null);
 
         Task saved = taskService.createTask(dto);
@@ -104,19 +89,10 @@ class OrderAmountGuardTest {
     @Test
     @DisplayName("航点不足导致计价为 0 时下单被拒")
     void zeroAmountOrderRejected() {
-        rid = System.nanoTime();
-        User user = newUser();
+        User user = fixtures.user(0);
         UserContext.setUser(user.getId(), user.getUserName(), 0);
 
-        TaskDto dto = new TaskDto();
-        dto.setTaskName("single-" + rid);
-        dto.setType(TaskType.SURVEY);
-        WaypointDto only = new WaypointDto();
-        only.setOrderIndex(0);
-        only.setLongitude(121.0);
-        only.setLatitude(31.0);
-        only.setAltitude(100.0);
-        dto.setWaypoints(List.of(only));
+        TaskDto dto = fixtures.oneWaypointTask(UniqueNames.unique("single"));
 
         assertThatThrownBy(() -> taskService.createTask(dto))
                 .isInstanceOf(BusinessException.class)
@@ -126,48 +102,12 @@ class OrderAmountGuardTest {
     @Test
     @DisplayName("PENDING 订单任务可删除（既有取消路径不受影响）")
     void deleteTaskWithUnpaidOrderAllowed() {
-        rid = System.nanoTime();
-        User user = newUser();
+        User user = fixtures.user(0);
         UserContext.setUser(user.getId(), user.getUserName(), 0);
 
-        Task saved = taskService.createTask(twoWaypointTask());
+        Task saved = taskService.createTask(fixtures.twoWaypointTask());
         taskService.deleteTask(saved.getId(), user.getId());
 
         assertThat(taskRepository.findById(saved.getId())).isEmpty();
-    }
-
-    // ---------- helpers ----------
-
-    private User newUser() {
-        User user = new User();
-        user.setUserName("amt" + rid);
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(0);
-        user = userRepository.save(user);
-        userIds.add(user.getId());
-        return user;
-    }
-
-    private TaskDto twoWaypointTask() {
-        TaskDto dto = new TaskDto();
-        dto.setTaskName("amt-task-" + rid);
-        dto.setType(TaskType.SURVEY);
-        dto.setReward(9.9);
-
-        WaypointDto a = new WaypointDto();
-        a.setOrderIndex(0);
-        a.setLongitude(121.0);
-        a.setLatitude(31.0);
-        a.setAltitude(100.0);
-
-        WaypointDto b = new WaypointDto();
-        b.setOrderIndex(1);
-        b.setLongitude(121.01);
-        b.setLatitude(31.0);
-        b.setAltitude(100.0);
-
-        dto.setWaypoints(List.of(a, b));
-        return dto;
     }
 }

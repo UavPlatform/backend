@@ -2,10 +2,12 @@ package com.uav.e2e;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.uav.contract.OpenApiContract;
+import com.uav.support.OpenApiContract;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.pay.mapper.PayRecordRepository;
+import com.uav.support.RealProtocolTestBase;
+import com.uav.support.UniqueNames;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,8 +15,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -39,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>真实数据库</b>：连接外部隔离 MySQL/MariaDB 实例（T4_DB_* 环境变量），
  *       不使用 H2、不 mock repository/service。</li>
  *   <li><b>真实账号与真实 JWT</b>：用户/飞手经 /user/register、/user/login、/rider/register 拿令牌，
- *       令牌只来自 HTTP 响应体；禁止 jwtUtil.generateToken 自签（既有测试有 52 处此类写法）。</li>
+ *       令牌只来自 HTTP 响应体；禁止自签 JWT 绕过认证链路（R3；迁移前测试树有 52 处此类写法，
+ *       计数与复核命令见 docs/evidence/backend-test-baseline-2026-09-18.md，本类为 0 处调用）。</li>
  *   <li><b>无静默降级</b>：T4_DB_* 任一缺失时本类被 JUnit 显式禁用（skip），绝不回退 H2。</li>
  * </ul>
  *
@@ -55,6 +56,26 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>为何 profile 用 test 而非专用 e2e：com.uav.pay.MockPayGuard 把 mock 支付白名单硬编码为 [dev, test]
  * （src/main，测试不可改），非白名单 profile 会拒绝启用 mock 支付。故复用 test profile 满足门禁，
  * 同时用下面显式 properties 把数据源整体指向真实库（显式属性优先级最高，不依赖 profile 文件覆盖顺序）。
+ *
+ * <p>层次与驱动（O4/R9/R2/R4）：本类继承 {@link com.uav.support.RealProtocolTestBase}
+ * （{@code RANDOM_PORT}，不含 {@code @Transactional}），是 R4 的<b>真实端口白名单成员</b>——
+ * 它真实消费 `@LocalServerPort`（{@code base = "http://127.0.0.1:" + port}）与真库连接，
+ * 因此不得降级为 MOCK；真实提交的隔离由「每次运行 create-drop 全新 schema + 唯一命名」提供（R5）。
+ *
+ * <p><b>环境门控与诚实性（O6/§9）</b>：需 {@code T4_DB_*} 指向<b>真实 MySQL</b>；缺省时本类
+ * 由类级 {@code @EnabledIfEnvironmentVariable}（5 个变量，作用全部 4 个用例）整体<b>跳过</b>而非失败，
+ * <b>绝不回退 H2</b>，也<b>不接受 MariaDB 顶替</b>——{@code effectiveJdbcUrlPointsAtOwnDatabase}
+ * 断言后端 {@code DatabaseProductName} 含 "mysql" 正是这条红线。
+ * 注意：缺环境时 failsafe 报「4 skipped」是<b>绿但未执行</b>，0 条断言真实执行，
+ * 不得当作端到端已覆盖的正向证据。
+ *
+ * <p>为何两条用例必须留在本类而非拆分（O3 边界裁决）：{@code specConstrainsTheE2eSurface}
+ * 依赖 RANDOM_PORT 对<b>运行中实例</b>发起真实 HTTP（读 {@code /v3/api-docs}）；
+ * {@code qaB16DeclaredForeignKeyIsStillMissing} 是<b>真实数据库</b> schema 的特征化断言（依赖 {@code T4_DB_*}）。
+ * 两者的前提恰是真实协议与真实库，不属于 O3 排除的「上下文加载、规格断言、特征化断言等<b>非端到端</b>用例」；
+ * 拆分到 contract/ 只会重复环境门控或退化为静默跳过。
+ *
+ * <p>R8：ThreadLocal 由基类 {@code @AfterEach} 统一清理，本类不再手工清理。
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -98,19 +119,15 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "drone.amap.key=t4-e2e-placeholder-amap-key",
                 "drone.amap.security-key=t4-e2e-placeholder-amap-security-key"
         })
-@ActiveProfiles("test")
 @EnabledIfEnvironmentVariable(named = "T4_DB_HOST", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_PORT", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_NAME", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_USER", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_PASSWORD", matches = ".+")
-class OrderDeliveryE2ETest {
+class OrderDeliveryE2EIT extends RealProtocolTestBase {
 
-    private static final String RUN_ID = Long.toString(System.nanoTime());
+    private static final String RUN_ID = UniqueNames.unique("e2e");
     private static final String PASSWORD = "E2e!pw123456";
-
-    @LocalServerPort
-    int port;
 
     /** 直接构造 Jackson 2 mapper：Boot 4 容器里没有 Jackson 2 类型的 JSON mapper bean，故不注入。 */
     private final ObjectMapper json = new ObjectMapper();
@@ -328,7 +345,7 @@ class OrderDeliveryE2ETest {
         // ── A7（已升级）：servers 不再需要「显式忽略」 ──
         // 导出统一走 OpenApiContract.canonicalize：随机端口被擦洗、servers 固定为相对基址，
         // 因此整份文档（含 servers/info）都可纳入门禁；字段级漂移由
-        // OpenApiContractGateTest#frozenSpecMatchesRunningImplementation 做整文档深比较兜住。
+        // com.uav.contract.OpenApiContractGateE2EIT#frozenSpecMatchesRunningImplementation 做整文档深比较兜住。
         assertThat(frozen.path("servers").path(0).path("url").asText())
                 .as("冻结规格的 servers 应已归一化为相对基址（导出时擦除随机端口）").isEqualTo("/");
 

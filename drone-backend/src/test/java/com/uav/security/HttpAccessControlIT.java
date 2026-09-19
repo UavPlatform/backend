@@ -8,27 +8,19 @@ import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
 import com.uav.live.service.AppWebSocketService;
-import com.uav.server.util.JwtUtil;
+import com.uav.support.IntegrationTestBase;
+import com.uav.support.TestAccounts;
+import com.uav.support.UniqueNames;
 import com.uav.uav.mapper.UavRepository;
 import com.uav.uav.pojo.entity.Uav;
 import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
-import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.RiderUav;
-import com.uav.user.pojo.entity.User;
 import com.uav.user.pojo.entity.UserRecord;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,20 +32,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * P0-2/4/5/6/7/9 防护测试（HTTP 层越权场景全部被拒）。
+ * HTTP 层越权防护测试（P0-2/4/5/6/7/9）：跨用户/跨角色的访问必须被拒。
+ *
+ * <p>层次与驱动（O6/R2/R4）：进程内 MockMvc 集成测试，继承 {@link IntegrationTestBase}
+ * （MOCK + {@code @AutoConfigureMockMvc} + {@code @Transactional}），不自称端到端。
+ *
+ * <p>身份来源（R3）：需要合法 token 的场景一律走 {@link TestAccounts} 的真实注册/登录接口，
+ * 不再用 {@code JwtUtil.generateToken} 自签绕过认证链路；造数走共享基建（R7），
+ * ThreadLocal 由基类统一清理（R8），事务回滚即隔离（R5），故不再保留手工唯一名与手工删除。
+ *
+ * <p>例外：本类需要一个 {@code Uav} 实体行，而 R7 的共享工厂只覆盖用户/飞手/任务，故此处保留
+ * 局部造数（属 R7 明文范围之外，不构成重复造数违规）。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class HttpAccessControlTest {
-
-    @Autowired
-    WebApplicationContext wac;
-
-    @Autowired
-    JwtUtil jwtUtil;
-
-    @Autowired
-    UserRepository userRepository;
+class HttpAccessControlIT extends IntegrationTestBase {
 
     @Autowired
     RiderUavRepository riderUavRepository;
@@ -76,67 +67,49 @@ class HttpAccessControlTest {
     @Autowired
     AppWebSocketService appWebSocketService;
 
-    MockMvc mockMvc;
-
-    private final List<Long> userIds = new ArrayList<>();
-
-    private long rid;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        rid = System.nanoTime();
-    }
-
-    @AfterEach
-    void cleanUp() {
-        // 测试用户清理（上下文共享 H2，避免影响其它用例的唯一约束）
-        userIds.forEach(id -> userRepository.findById(id).ifPresent(userRepository::delete));
-    }
-
     // ---------- ② 管理端点角色门 ----------
 
     @Test
     @DisplayName("/admin/uav 普通用户访问 403")
     void adminUavForbiddenForNormalUser() throws Exception {
-        User user = newUser("nu" + rid, 0);
-        mockMvc.perform(get("/admin/uav").header("Authorization", bearer(user)))
+        TestAccounts.Account user = accounts().registerUser();
+        mockMvc.perform(get("/admin/uav").header("Authorization", user.authorization()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("/admin/uav 飞手访问 403")
     void adminUavForbiddenForRider() throws Exception {
-        User rider = newUser("rid" + rid, 1);
-        mockMvc.perform(get("/admin/uav/statistics").header("Authorization", bearer(rider)))
+        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rid"), null);
+        mockMvc.perform(get("/admin/uav/statistics").header("Authorization", rider.authorization()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("/admin/uav 管理员访问 200")
     void adminUavOkForAdmin() throws Exception {
-        User admin = newUser("ad" + rid, 2);
-        mockMvc.perform(get("/admin/uav").header("Authorization", bearer(admin)))
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/admin/uav").header("Authorization", admin.authorization()))
                 .andExpect(status().isOk());
     }
 
     @Test
     @DisplayName("/admin/logs 普通用户访问 403（日志泄露防护）")
     void adminLogsForbiddenForNormalUser() throws Exception {
-        User user = newUser("nu2" + rid, 0);
-        mockMvc.perform(get("/admin/logs/files").header("Authorization", bearer(user)))
+        TestAccounts.Account user = accounts().registerUser();
+        mockMvc.perform(get("/admin/logs/files").header("Authorization", user.authorization()))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/admin/logs/application").header("Authorization", bearer(user)))
+        mockMvc.perform(get("/admin/logs/application").header("Authorization", user.authorization()))
                 .andExpect(status().isForbidden());
-        mockMvc.perform(get("/admin/logs/error").header("Authorization", bearer(user)))
+        mockMvc.perform(get("/admin/logs/error").header("Authorization", user.authorization()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @DisplayName("/admin/logs/files 管理员访问 200")
     void adminLogsOkForAdmin() throws Exception {
-        User admin = newUser("ad2" + rid, 2);
-        mockMvc.perform(get("/admin/logs/files").header("Authorization", bearer(admin)))
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/admin/logs/files").header("Authorization", admin.authorization()))
                 .andExpect(status().isOk());
     }
 
@@ -145,32 +118,32 @@ class HttpAccessControlTest {
     @Test
     @DisplayName("/webUav/getRecord 普通用户传他人 userName 时强制查自己")
     void getRecordForcedToSelf() throws Exception {
-        User other = newUser("other" + rid, 0);
+        TestAccounts.Account other = accounts().registerUser();
         UserRecord otherRecord = new UserRecord();
-        otherRecord.setUserName(other.getUserName());
-        otherRecord.setDjiId("dev-" + rid);
+        otherRecord.setUserName(other.userName());
+        otherRecord.setDjiId(UniqueNames.djiId());
         otherRecord.setStart_time(java.time.LocalDateTime.now());
         userRecordRepository.save(otherRecord);
 
-        User self = newUser("self" + rid, 0);
+        TestAccounts.Account self = accounts().registerUser();
         // self 显式传了 other 的 userName，但服务端必须按登录态查询 → 结果为空
         mockMvc.perform(get("/webUav/getRecord")
-                        .param("userName", other.getUserName())
-                        .header("Authorization", bearer(self)))
+                        .param("userName", other.userName())
+                        .header("Authorization", self.authorization()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(0))
                 .andExpect(jsonPath("$.data.records.length()").value(0));
 
         // 自查本人记录 → 能看到自己的一条
         UserRecord selfRecord = new UserRecord();
-        selfRecord.setUserName(self.getUserName());
-        selfRecord.setDjiId("dev-" + rid);
+        selfRecord.setUserName(self.userName());
+        selfRecord.setDjiId(UniqueNames.djiId());
         selfRecord.setStart_time(java.time.LocalDateTime.now());
         userRecordRepository.save(selfRecord);
 
         mockMvc.perform(get("/webUav/getRecord")
-                        .param("userName", other.getUserName())
-                        .header("Authorization", bearer(self)))
+                        .param("userName", other.userName())
+                        .header("Authorization", self.authorization()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1));
     }
@@ -178,17 +151,17 @@ class HttpAccessControlTest {
     @Test
     @DisplayName("/webUav/getRecord 管理员可代查他人记录")
     void getRecordAdminOverride() throws Exception {
-        User other = newUser("other2" + rid, 0);
+        TestAccounts.Account other = accounts().registerUser();
         UserRecord record = new UserRecord();
-        record.setUserName(other.getUserName());
-        record.setDjiId("dev2-" + rid);
+        record.setUserName(other.userName());
+        record.setDjiId(UniqueNames.djiId());
         record.setStart_time(java.time.LocalDateTime.now());
         userRecordRepository.save(record);
 
-        User admin = newUser("ad3" + rid, 2);
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
         mockMvc.perform(get("/webUav/getRecord")
-                        .param("userName", other.getUserName())
-                        .header("Authorization", bearer(admin)))
+                        .param("userName", other.userName())
+                        .header("Authorization", admin.authorization()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(1));
     }
@@ -200,49 +173,49 @@ class HttpAccessControlTest {
     void appUavAddAnonymousRejected() throws Exception {
         mockMvc.perform(post("/appUav/add")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"uavName\":\"n" + rid + "\",\"onlineStatus\":\"1\",\"djiId\":\"d" + rid
-                                + "\",\"controllerModel\":\"m\"}"))
+                        .content("{\"uavName\":\"" + UniqueNames.unique("n") + "\",\"onlineStatus\":\"1\",\"djiId\":\""
+                                + UniqueNames.djiId() + "\",\"controllerModel\":\"m\"}"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("/appUav/add 登录后可注册无人机")
     void appUavAddAuthenticatedOk() throws Exception {
-        User user = newUser("uavowner" + rid, 0);
+        TestAccounts.Account user = accounts().registerUser();
         mockMvc.perform(post("/appUav/add")
-                        .header("Authorization", bearer(user))
+                        .header("Authorization", user.authorization())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"uavName\":\"n2" + rid + "\",\"onlineStatus\":\"1\",\"djiId\":\"d2" + rid
-                                + "\",\"controllerModel\":\"m\"}"))
+                        .content("{\"uavName\":\"" + UniqueNames.unique("n2") + "\",\"onlineStatus\":\"1\",\"djiId\":\""
+                                + UniqueNames.djiId() + "\",\"controllerModel\":\"m\"}"))
                 .andExpect(status().isOk());
     }
 
     // ---------- ⑦ 聊天读历史/撤回越权 ----------
 
-    private record ChatFixture(Long sessionId, String msgId, User member, User outsider) { }
+    private record ChatFixture(Long sessionId, String msgId, TestAccounts.Account member, TestAccounts.Account outsider) { }
 
     private ChatFixture newChatFixture() {
-        User member = newUser("cm" + rid, 0);
-        User outsider = newUser("co" + rid, 0);
+        TestAccounts.Account member = accounts().registerUser();
+        TestAccounts.Account outsider = accounts().registerUser();
         long now = System.currentTimeMillis();
         ChatSession session = ChatSession.builder()
-                .name("s" + rid)
+                .name(UniqueNames.unique("s"))
                 .type(1)
-                .ownerId(member.getId())
-                .userIds(List.of(member.getId()))
+                .ownerId(member.id())
+                .userIds(List.of(member.id()))
                 .createTime(now)
                 .build();
         chatSessionMapper.insert(session);
         chatUserSessionMapper.insert(ChatUserSession.builder()
                 .sessionId(session.getId())
-                .userId(member.getId())
+                .userId(member.id())
                 .joinTime(now)
                 .lastReadTime(0L)
                 .build());
-        String msgId = "msg-" + rid;
+        String msgId = UniqueNames.unique("msg");
         chatMessageMapper.insert(ChatMessage.builder()
                 .msgId(msgId)
-                .fromUserId(member.getId())
+                .fromUserId(member.id())
                 .sessionId(session.getId())
                 .content("hello")
                 .status(0)
@@ -258,11 +231,11 @@ class HttpAccessControlTest {
         ChatFixture fixture = newChatFixture();
 
         mockMvc.perform(get("/chat/Message/messages/" + fixture.sessionId())
-                        .header("Authorization", bearer(fixture.outsider())))
+                        .header("Authorization", fixture.outsider().authorization()))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(get("/chat/Message/messages/" + fixture.sessionId())
-                        .header("Authorization", bearer(fixture.member())))
+                        .header("Authorization", fixture.member().authorization()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].payload.text").value("hello"));
@@ -274,7 +247,7 @@ class HttpAccessControlTest {
         ChatFixture fixture = newChatFixture();
 
         mockMvc.perform(post("/chat/Message/recall/" + fixture.msgId())
-                        .header("Authorization", bearer(fixture.outsider())))
+                        .header("Authorization", fixture.outsider().authorization()))
                 .andExpect(status().isForbidden());
 
         Integer statusAfterOutsider = chatMessageMapper
@@ -283,7 +256,7 @@ class HttpAccessControlTest {
         assertThat(statusAfterOutsider).isEqualTo(0);
 
         mockMvc.perform(post("/chat/Message/recall/" + fixture.msgId())
-                        .header("Authorization", bearer(fixture.member())))
+                        .header("Authorization", fixture.member().authorization()))
                 .andExpect(status().isOk());
 
         Integer statusAfterSender = chatMessageMapper
@@ -297,11 +270,11 @@ class HttpAccessControlTest {
     @Test
     @DisplayName("/live/get：客户端传入 webUserId 不参与签名，身份改为登录用户")
     void liveGetIdentityFromContext() throws Exception {
-        User user = newUser("lv" + rid, 0);
-        String deviceId = "live-dev-" + rid;
+        TestAccounts.Account user = accounts().registerUser();
+        String deviceId = UniqueNames.unique("live-dev");
 
         Uav uav = new Uav();
-        uav.setUavName("ln" + rid);
+        uav.setUavName(UniqueNames.unique("ln"));
         uav.setDjiId(deviceId);
         uav.setOnlineStatus('1');
         uav.setControllerModel("cm");
@@ -314,9 +287,9 @@ class HttpAccessControlTest {
         mockMvc.perform(post("/live/get")
                         .param("deviceId", deviceId)
                         .param("webUserId", "999888")   // 攻击者尝试冒充 TRTC 身份 999888
-                        .header("Authorization", bearer(user)))
+                        .header("Authorization", user.authorization()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.userId").value(String.valueOf(user.getId())))
+                .andExpect(jsonPath("$.data.userId").value(String.valueOf(user.id())))
                 .andExpect(jsonPath("$.data.userSig").isNotEmpty());
     }
 
@@ -325,42 +298,25 @@ class HttpAccessControlTest {
     @Test
     @DisplayName("/api/ws/request：匿名 401、未绑定飞手 403、绑定飞手 200")
     void wsRequestRequiresLoginAndOwnership() throws Exception {
-        mockMvc.perform(post("/api/ws/request").param("deviceId", "req-a-" + rid))
+        mockMvc.perform(post("/api/ws/request").param("deviceId", UniqueNames.unique("req-a")))
                 .andExpect(status().isUnauthorized());
 
-        User rider = newUser("rq" + rid, 1);
+        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rq"), null);
         mockMvc.perform(post("/api/ws/request")
-                        .param("deviceId", "req-b-" + rid)
-                        .header("Authorization", bearer(rider)))
+                        .param("deviceId", UniqueNames.unique("req-b"))
+                        .header("Authorization", rider.authorization()))
                 .andExpect(status().isForbidden());
 
-        User boundRider = newUser("rq2" + rid, 1);
-        String boundDevice = "req-c-" + rid;
+        TestAccounts.Account boundRider = accounts().registerRider(UniqueNames.userName("rq2"), null);
+        String boundDevice = UniqueNames.unique("req-c");
         RiderUav binding = new RiderUav();
-        binding.setUserId(boundRider.getId());
+        binding.setUserId(boundRider.id());
         binding.setDjiId(boundDevice);
         riderUavRepository.save(binding);
 
         mockMvc.perform(post("/api/ws/request")
                         .param("deviceId", boundDevice)
-                        .header("Authorization", bearer(boundRider)))
+                        .header("Authorization", boundRider.authorization()))
                 .andExpect(status().isOk());
-    }
-
-    // ---------- helpers ----------
-
-    private User newUser(String name, int role) {
-        User user = new User();
-        user.setUserName(name);
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(role);
-        user = userRepository.save(user);
-        userIds.add(user.getId());
-        return user;
-    }
-
-    private String bearer(User user) {
-        return "Bearer " + jwtUtil.generateToken(user.getId(), user.getUserName(), user.getRole());
     }
 }

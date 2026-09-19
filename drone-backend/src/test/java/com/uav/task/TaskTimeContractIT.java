@@ -1,30 +1,15 @@
 package com.uav.task;
 
-import com.uav.server.enums.TaskType;
-import com.uav.server.util.JwtUtil;
 import com.uav.server.util.UserContext;
+import com.uav.support.IntegrationTestBase;
+import com.uav.support.TestAccounts;
 import com.uav.task.pojo.dto.TaskDto;
-import com.uav.task.pojo.dto.WaypointDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.service.TaskService;
-import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.User;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,51 +18,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 1A-7a 契约测试（APP P0-4）：任务时间字段全链路。
+ * 契约测试（APP P0-4）：任务时间字段全链路。
  * /task/create 接收 "yyyy-MM-dd HH:mm:ss" 格式 taskTime（Flutter 发布页线上格式，空格分隔）→
  * 落库 → /task/list 与 /task/detail 原格式返回；taskTime 可选（缺省 null 不报错）。
+ * MockMvc 集成测试（R9/O4）。
+ *
+ * <p>R2/R4：继承 {@link IntegrationTestBase}（MOCK + {@code @AutoConfigureMockMvc}），
+ * 删除无实际用途的 {@code RANDOM_PORT} 与 {@code @LocalServerPort} 字段，不再手工
+ * {@code MockMvcBuilders.webAppContextSetup}；R3：token 由 {@link TestAccounts} 真实登录取得。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class TaskTimeContractTest {
-
-    @LocalServerPort
-    int port;
+class TaskTimeContractIT extends IntegrationTestBase {
 
     @Autowired
-    WebApplicationContext wac;
-
-    @Autowired
-    JwtUtil jwtUtil;
-
-    @Autowired
-    UserRepository userRepository;
-
-    @Autowired
-    TaskService taskService;
-
-    MockMvc mockMvc;
-
-    private long rid;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        rid = System.nanoTime();
-    }
-
-    @AfterEach
-    void restoreContext() {
-        UserContext.clear();
-    }
+    private TaskService taskService;
 
     @Test
     @DisplayName("发布携带 taskTime 落库，detail/list 原格式返回")
     void taskTimeRoundTrip() throws Exception {
-        User user = newUser();
-        String token = bearer(user);
+        TestAccounts.Account user = accounts().registerUser();
+        String token = user.authorization();
         String createBody = "{"
-                + "\"taskName\":\"tt-" + rid + "\","
+                + "\"taskName\":\"tt-contract\","
                 + "\"type\":\"SURVEY\","
                 + "\"description\":\"契约测试\","
                 + "\"taskTime\":\"2026-09-12 14:30:00\","
@@ -114,40 +75,13 @@ class TaskTimeContractTest {
     @Test
     @DisplayName("taskTime 可选：不传时正常创建（null 落库）")
     void taskTimeOptional() {
-        User user = newUser();
-        UserContext.setUser(user.getId(), user.getUserName(), 0);
+        TestAccounts.Account user = accounts().registerUser();
+        UserContext.setUser(user.id(), user.userName(), user.role());
 
-        TaskDto dto = new TaskDto();
-        dto.setTaskName("no-time-" + rid);
-        dto.setType(TaskType.SURVEY);
-        WaypointDto a = new WaypointDto();
-        a.setOrderIndex(0);
-        a.setLongitude(121.0);
-        a.setLatitude(31.0);
-        a.setAltitude(100.0);
-        WaypointDto b = new WaypointDto();
-        b.setOrderIndex(1);
-        b.setLongitude(121.01);
-        b.setLatitude(31.0);
-        b.setAltitude(100.0);
-        dto.setWaypoints(List.of(a, b));
+        TaskDto dto = fixtures.twoWaypointTask();
+        dto.setTaskTime(null);
 
         Task saved = taskService.createTask(dto);
         assertThat(saved.getTaskTime()).isNull();
-    }
-
-    // ---------- helpers ----------
-
-    private User newUser() {
-        User user = new User();
-        user.setUserName("tt" + rid);
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(0);
-        return userRepository.save(user);
-    }
-
-    private String bearer(User user) {
-        return "Bearer " + jwtUtil.generateToken(user.getId(), user.getUserName(), user.getRole());
     }
 }

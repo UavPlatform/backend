@@ -2,16 +2,15 @@ package com.uav.live;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.jayway.jsonpath.JsonPath;
 import com.uav.live.service.AppWebSocketService;
 import com.uav.live.service.LiveSessionService;
-import com.uav.server.util.JwtUtil;
+import com.uav.support.RealProtocolTestBase;
+import com.uav.support.TestAccounts;
+import com.uav.support.UniqueNames;
 import com.uav.uav.mapper.UavRepository;
 import com.uav.uav.pojo.entity.Uav;
-import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
-import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.RiderUav;
-import com.uav.user.pojo.entity.User;
 import com.uav.user.pojo.entity.UserRecord;
 import jakarta.websocket.ClientEndpointConfig;
 import jakarta.websocket.ContainerProvider;
@@ -19,101 +18,72 @@ import jakarta.websocket.Endpoint;
 import jakarta.websocket.EndpointConfig;
 import jakarta.websocket.Session;
 import jakarta.websocket.WebSocketContainer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 1A-5a 端到端协议测试：运营端 POST /live/close → 设备通道收到 STOP_LIVE →
+ * 端到端协议测试（1A-5a）：运营端 {@code POST /live/close} → 设备通道收到 STOP_LIVE →
  * 设备同步回执（response/replyTo）→ 直播会话终态 IDLE + 全体观看记录 end_time 补齐。
  * 同时覆盖：ACK 超时 → 异步 LIVE_STOPPED 事件兜底；设备离线补终态；直播未运行分支。
+ *
+ * <p>真实驱动方式（R9/O4）：设备通道 {@code /ws/drone} 与 ACK 时序均为真实 WebSocket，
+ * 因此继承 {@link RealProtocolTestBase}（{@code RANDOM_PORT}，不含 {@code @Transactional}）；
+ * REST 调用同步升级为真实 TCP（JDK HttpClient，见 {@link #post}），不再用 MockMvc 混合两套请求栈。
+ *
+ * <p>R5 隔离方式：无事务可回滚，唯一性由 {@link TestAccounts}（唯一身份）与
+ * {@code UniqueNames}（唯一 deviceId）保证，<b>不再以 {@code System.nanoTime()} 兜底</b>；
+ * 每个用例结束关闭自己建立的 WS 会话（显式清理）。
+ *
+ * <p>R3：运营端与观看者 token 均由 {@link TestAccounts} 真实注册取得，设备握手用真实飞手 token。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class LiveStopProtocolTest {
-
-    @LocalServerPort
-    int port;
+class LiveStopProtocolE2EIT extends RealProtocolTestBase {
 
     @Autowired
-    WebApplicationContext wac;
+    private UavRepository uavRepository;
 
     @Autowired
-    JwtUtil jwtUtil;
+    private UserRecordRepository userRecordRepository;
 
     @Autowired
-    UserRepository userRepository;
+    private AppWebSocketService appWebSocketService;
 
     @Autowired
-    RiderUavRepository riderUavRepository;
+    private LiveSessionService liveSessionService;
 
-    @Autowired
-    UavRepository uavRepository;
-
-    @Autowired
-    UserRecordRepository userRecordRepository;
-
-    @Autowired
-    AppWebSocketService appWebSocketService;
-
-    @Autowired
-    LiveSessionService liveSessionService;
-
-    MockMvc mockMvc;
-
-    private long rid;
-
-    @BeforeEach
-    void setUp() {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-        rid = System.nanoTime();
-    }
-
-    @AfterEach
-    void tearDown() {
-        // 无需清理：H2 数据按唯一 rid 隔离，WS 会话由设备端断开兜底
-    }
+    private final HttpClient http = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     @Test
     @DisplayName("确认停止：设备收到 STOP_LIVE 并回执 → 会话转 IDLE、全体观看记录补 end_time")
     void confirmedStopFlow() throws Exception {
-        String deviceId = "stop-a-" + rid;
+        String deviceId = UniqueNames.unique("stop-a");
         DeviceFixture fixture = connectDevice(deviceId, true);
-        liveSessionService.markRunning(deviceId, "drone_" + deviceId, "req-" + rid);
+        liveSessionService.markRunning(deviceId, "drone_" + deviceId, UniqueNames.unique("req"));
 
-        User caller = newCallerUser();
-        User otherViewer = newViewerUser();
-        UserRecord callerRecord = openRecord(caller.getUserName(), deviceId);
-        UserRecord otherRecord = openRecord(otherViewer.getUserName(), deviceId);
+        TestAccounts.Account caller = newCallerAccount();
+        TestAccounts.Account otherViewer = newViewerAccount();
+        UserRecord callerRecord = openRecord(caller.userName(), deviceId);
+        UserRecord otherRecord = openRecord(otherViewer.userName(), deviceId);
 
-        mockMvc.perform(post("/live/close")
-                        .param("deviceId", deviceId)
-                        .header("Authorization", bearer(caller)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+        String closeBody = post("/live/close?deviceId=" + deviceId, caller.authorization());
+        assertThat((Boolean) JsonPath.read(closeBody, "$.success")).isTrue();
 
         assertThat(fixture.device.stopCommandLatch.await(5, TimeUnit.SECONDS)).isTrue();
         String stopPayload = fixture.device.firstStopPayload();
@@ -133,21 +103,18 @@ class LiveStopProtocolTest {
     @Test
     @DisplayName("ACK 超时：发起方记录先关、其他观众记录等待确认，LIVE_STOPPED 事件兜底补齐")
     void ackTimeoutFallsBackToLiveStoppedEvent() throws Exception {
-        String deviceId = "stop-b-" + rid;
+        String deviceId = UniqueNames.unique("stop-b");
         DeviceFixture fixture = connectDevice(deviceId, false); // 设备不回 ACK
-        liveSessionService.markRunning(deviceId, "drone_" + deviceId, "req-" + rid);
+        liveSessionService.markRunning(deviceId, "drone_" + deviceId, UniqueNames.unique("req"));
 
-        User caller = newCallerUser();
-        User otherViewer = newViewerUser();
-        UserRecord callerRecord = openRecord(caller.getUserName(), deviceId);
-        UserRecord otherRecord = openRecord(otherViewer.getUserName(), deviceId);
+        TestAccounts.Account caller = newCallerAccount();
+        TestAccounts.Account otherViewer = newViewerAccount();
+        UserRecord callerRecord = openRecord(caller.userName(), deviceId);
+        UserRecord otherRecord = openRecord(otherViewer.userName(), deviceId);
 
         long start = System.currentTimeMillis();
-        mockMvc.perform(post("/live/close")
-                        .param("deviceId", deviceId)
-                        .header("Authorization", bearer(caller)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("停止命令已发送，等待设备确认"));
+        String closeBody = post("/live/close?deviceId=" + deviceId, caller.authorization());
+        assertThat((String) JsonPath.read(closeBody, "$.message")).isEqualTo("停止命令已发送，等待设备确认");
         long elapsed = System.currentTimeMillis() - start;
         assertThat(elapsed).isGreaterThanOrEqualTo(4000L); // ACK 超时窗口生效
 
@@ -171,19 +138,16 @@ class LiveStopProtocolTest {
     @Test
     @DisplayName("设备离线：直接补终态并结束全体观看记录")
     void deviceOfflineClosesRecords() throws Exception {
-        String deviceId = "stop-c-" + rid;
+        String deviceId = UniqueNames.unique("stop-c");
         registerUav(deviceId);
 
-        User caller = newCallerUser();
-        User otherViewer = newViewerUser();
-        UserRecord callerRecord = openRecord(caller.getUserName(), deviceId);
-        UserRecord otherRecord = openRecord(otherViewer.getUserName(), deviceId);
+        TestAccounts.Account caller = newCallerAccount();
+        TestAccounts.Account otherViewer = newViewerAccount();
+        UserRecord callerRecord = openRecord(caller.userName(), deviceId);
+        UserRecord otherRecord = openRecord(otherViewer.userName(), deviceId);
 
-        mockMvc.perform(post("/live/close")
-                        .param("deviceId", deviceId)
-                        .header("Authorization", bearer(caller)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("无人机已离线，直播已结束"));
+        String closeBody = post("/live/close?deviceId=" + deviceId, caller.authorization());
+        assertThat((String) JsonPath.read(closeBody, "$.message")).isEqualTo("无人机已离线，直播已结束");
 
         assertThat(liveSessionService.isRunning(deviceId)).isFalse();
         assertThat(userRecordRepository.findById(callerRecord.getId()).orElseThrow().getEnd_time()).isNotNull();
@@ -193,17 +157,14 @@ class LiveStopProtocolTest {
     @Test
     @DisplayName("直播未运行：仅补观看记录，不向设备下发 STOP_LIVE")
     void notRunningSkipsCommand() throws Exception {
-        String deviceId = "stop-d-" + rid;
+        String deviceId = UniqueNames.unique("stop-d");
         DeviceFixture fixture = connectDevice(deviceId, true); // connectDevice 内部已注册 uav
 
-        User caller = newCallerUser();
-        UserRecord callerRecord = openRecord(caller.getUserName(), deviceId);
+        TestAccounts.Account caller = newCallerAccount();
+        UserRecord callerRecord = openRecord(caller.userName(), deviceId);
 
-        mockMvc.perform(post("/live/close")
-                        .param("deviceId", deviceId)
-                        .header("Authorization", bearer(caller)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("直播未在运行，观看记录已结束"));
+        String closeBody = post("/live/close?deviceId=" + deviceId, caller.authorization());
+        assertThat((String) JsonPath.read(closeBody, "$.message")).isEqualTo("直播未在运行，观看记录已结束");
 
         Thread.sleep(500); // 留出潜在误下发的时间窗
         assertThat(fixture.device.stopCommandLatch.getCount()).isEqualTo(1); // 未收到任何 STOP_LIVE
@@ -224,20 +185,18 @@ class LiveStopProtocolTest {
     }
 
     private DeviceFixture connectDevice(String deviceId, boolean autoAck) throws Exception {
-        User rider = newUser("rider" + rid + "-" + deviceId.hashCode(), 1);
-        RiderUav binding = new RiderUav();
-        binding.setUserId(rider.getId());
-        binding.setDjiId(deviceId);
-        riderUavRepository.save(binding);
+        TestAccounts.Account rider = accounts().registerRider();
+        // /ws/drone 握手要求该 deviceId 已绑定到当前飞手：把本例设备真实绑定到同一 riderId
+        fixtures.bindDrone(rider.id(), deviceId);
         registerUav(deviceId);
 
         appWebSocketService.requestConnection(deviceId); // pending 门
 
-        String token = jwtUtil.generateToken(rider.getId(), rider.getUserName(), 1);
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         DeviceEndpoint endpoint = new DeviceEndpoint(autoAck);
         Session session = container.connectToServer(endpoint, ClientEndpointConfig.Builder.create().build(),
-                URI.create("ws://localhost:" + port + "/ws/drone?deviceId=" + deviceId + "&token=" + token));
+                URI.create(wsBaseUrl() + "/ws/drone?deviceId=" + deviceId
+                        + "&token=" + rider.token()));
         assertThat(endpoint.opened.await(10, TimeUnit.SECONDS)).isTrue();
 
         // afterConnectionEstablished 异步 markAsConnected，轮询等待注册完成
@@ -322,21 +281,12 @@ class LiveStopProtocolTest {
 
     // ---------- 公共助手 ----------
 
-    private User newCallerUser() {
-        return newUser("caller" + rid, 0);
+    private TestAccounts.Account newCallerAccount() {
+        return accounts().registerUser();
     }
 
-    private User newViewerUser() {
-        return newUser("viewer" + rid, 0);
-    }
-
-    private User newUser(String name, int role) {
-        User user = new User();
-        user.setUserName(name + "-" + UUID.randomUUID().toString().substring(0, 6));
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(role);
-        return userRepository.save(user);
+    private TestAccounts.Account newViewerAccount() {
+        return accounts().registerUser();
     }
 
     private UserRecord openRecord(String userName, String deviceId) {
@@ -347,11 +297,22 @@ class LiveStopProtocolTest {
         return userRecordRepository.save(record);
     }
 
-    private String bearer(User user) {
-        return "Bearer " + jwtUtil.generateToken(user.getId(), user.getUserName(), user.getRole());
+    /** 真实 TCP POST（RANDOM_PORT 下不再用 MockMvc），返回响应体供 JSON 断言。 */
+    private String post(String urlAndParams, String bearer) throws Exception {
+        HttpResponse<String> response = http.send(HttpRequest.newBuilder(
+                                URI.create(baseUrl() + urlAndParams))
+                        .timeout(Duration.ofSeconds(60))
+                        .header("Authorization", bearer)
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(response.statusCode()).as("POST %s 期望 200，响应=%s", urlAndParams, response.body())
+                .isEqualTo(200);
+        return response.body();
     }
 
-    private void awaitFalse(java.util.function.BooleanSupplier retryCondition, long timeout, TimeUnit unit) throws InterruptedException {
+    private void awaitFalse(java.util.function.BooleanSupplier retryCondition, long timeout, TimeUnit unit)
+            throws InterruptedException {
         long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
         while (retryCondition.getAsBoolean() && System.currentTimeMillis() < deadline) {
             Thread.sleep(50);

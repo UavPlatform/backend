@@ -4,17 +4,11 @@ import com.uav.admin.config.AdminSeedInitializer;
 import com.uav.admin.mapper.AdminRepository;
 import com.uav.admin.pojo.entity.Admin;
 import com.uav.server.util.PasswordUtil;
-import org.junit.jupiter.api.AfterEach;
+import com.uav.support.IntegrationTestBase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,16 +17,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * P1-13 防护测试：种子管理员可正常登录（不再因 data.sql 明文密码必 500）。
- * 覆盖：登录成功返回 token、token 具备管理员角色（可访问 /admin/uav）、
- * 密码错误 401、播种幂等、历史明文密码启动时原地修复。
+ * 种子管理员防护测试（P1-13）：种子管理员可正常登录（不再因 data.sql 明文密码必 500）。
+ * 覆盖：登录成功返回 token、token 具备管理员角色（可访问 /admin/uav）、密码错误 401、
+ * 播种幂等、历史明文密码启动时原地修复。
+ *
+ * <p>层次与驱动（O6/R2/R4）：进程内 MockMvc 集成测试，继承 {@link IntegrationTestBase}
+ * （MOCK + {@code @AutoConfigureMockMvc} + {@code @Transactional}）。
+ *
+ * <p>隔离方式（R5）：{@link AdminSeedInitializer} 是 {@code ApplicationRunner}，在上下文启动时**已真实提交**
+ * 种子管理员行，这部分不在测试事务内、也不假设可回滚；而本类用例对 {@code admin} 行的删除/改写
+ * （明文修复、幂等重播）都发生在测试线程的 {@code @Transactional} 事务中，用例结束即整体回滚到
+ * 启动播种后的状态。因此原先「{@code @AfterEach} 手工重播 {@code seed()} 恢复共享 H2」的做法不再需要，
+ * 已删除手工清理，隔离由事务回滚保证。
+ *
+ * <p>必要适配（为在事务内保持原语义，非重写断言）：{@code adminRepository.deleteAll()} 之后补一次
+ * {@code adminRepository.flush()}。在 {@code @Transactional} 下 Hibernate 把 INSERT 排在 DELETE 之前，
+ * 不先落库删除就重播同一 {@code name} 会撞 {@code admin.name} 唯一索引（23505-240）；flush 只调整
+ * SQL 发出顺序。未迁移前每条写操作各自提交，因此从未暴露该顺序问题，故这不属于「迁移引入的缺陷」，
+ * 而是「迁入事务后保持原语义」的必要适配。断言语义不变。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class AdminSeedLoginTest {
-
-    @Autowired
-    WebApplicationContext wac;
+class AdminSeedLoginIT extends IntegrationTestBase {
 
     @Autowired
     AdminRepository adminRepository;
@@ -40,23 +44,9 @@ class AdminSeedLoginTest {
     @Autowired
     AdminSeedInitializer seedInitializer;
 
-    MockMvc mockMvc;
-
-    private String savedHash;
-
-    private String savedPhoneNumber;
-
-    @AfterEach
-    void restoreSeedAdmin() {
-        // 恢复共享 H2 中的种子行，保证其余用例与其它测试类不受影响
-        seedInitializer.seed();
-    }
-
     @Test
     @DisplayName("种子管理员 admin/123456 登录成功并返回 token")
     void seedAdminLoginReturnsToken() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-
         mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"admin\",\"password\":\"123456\"}"))
@@ -69,8 +59,6 @@ class AdminSeedLoginTest {
     @Test
     @DisplayName("种子管理员 token 具备管理员角色（可访问 /admin/uav）")
     void seedAdminTokenHasAdminRole() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-
         String body = mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"admin\",\"password\":\"123456\"}"))
@@ -86,8 +74,6 @@ class AdminSeedLoginTest {
     @Test
     @DisplayName("密码错误登录被拒（401）")
     void seedAdminWrongPasswordRejected() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(wac).build();
-
         mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"admin\",\"password\":\"wrong-password\"}"))
@@ -98,8 +84,7 @@ class AdminSeedLoginTest {
     @DisplayName("播种幂等：重复 seed 不改写已存在的 BCrypt 密码")
     void seedingIsIdempotent() {
         Admin admin = adminRepository.findByName("admin").orElseThrow();
-        savedHash = admin.getPassword();
-        savedPhoneNumber = admin.getPhoneNumber();
+        String savedHash = admin.getPassword();
         assertThat(savedHash).startsWith("$2");
 
         seedInitializer.seed();
@@ -114,6 +99,9 @@ class AdminSeedLoginTest {
     void legacyPlaintextPasswordRepaired() {
         // 模拟存量部署：data.sql 时代插入的明文密码行
         adminRepository.deleteAll();
+        // R5 事务隔离下必须显式 flush：Hibernate 的动作队列先执行 INSERT 再执行 DELETE，
+        // 否则同一事务内「删旧 admin 行 + 插新 admin 行」会先撞 name 唯一索引。
+        adminRepository.flush();
         Admin legacy = new Admin();
         legacy.setName("admin");
         legacy.setPassword("123456");   // 明文

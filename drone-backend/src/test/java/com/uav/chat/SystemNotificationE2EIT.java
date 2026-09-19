@@ -3,18 +3,11 @@ package com.uav.chat;
 import com.uav.chat.pojo.entity.ChatEnvelope;
 import com.uav.chat.pojo.enums.MsgType;
 import com.uav.chat.service.MessageService;
-import com.uav.order.mapper.OrderRepository;
-import com.uav.order.pojo.entity.MissionOrder;
-import com.uav.server.enums.OrderStatus;
-import com.uav.server.enums.TaskType;
-import com.uav.server.util.JwtUtil;
 import com.uav.server.util.UserContext;
-import com.uav.task.pojo.dto.TaskDto;
-import com.uav.task.pojo.dto.WaypointDto;
+import com.uav.support.RealProtocolTestBase;
+import com.uav.support.TestAccounts;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.service.TaskService;
-import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.User;
 import jakarta.websocket.ClientEndpointConfig;
 import jakarta.websocket.ContainerProvider;
 import jakarta.websocket.Endpoint;
@@ -22,20 +15,18 @@ import jakarta.websocket.EndpointConfig;
 import jakarta.websocket.MessageHandler;
 import jakarta.websocket.Session;
 import jakarta.websocket.WebSocketContainer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -44,54 +35,42 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 1B-3 端到端测试（裁决 Q9=A）：六类状态变更点向对方系统通知会话插入结构化系统消息；
- * 在线经聊天 WS 实时推送，离线由既有 /chat/Message/sync 补偿。
+ * 端到端协议测试（1B-3 / 裁决 Q9=A）：六类状态变更点向对方系统通知会话插入结构化系统消息；
+ * 在线经聊天 WS 实时推送，离线由既有 {@code /chat/Message/sync} 补偿。
+ *
+ * <p>真实驱动方式（R9/O4）：在线推送断言依赖真实 WS 握手与跨线程投递，离线补偿走真实 TCP
+ * {@code /chat/Message/sync}，因此继承 {@link RealProtocolTestBase}（{@code RANDOM_PORT}）。
+ *
+ * <p><b>R5 例外且强制：本类不得使用 {@code @Transactional}。</b>系统通知经
+ * {@code TransactionSynchronization.afterCommit()} 派发（见 {@code SystemNotifyInterceptor}），
+ * 回滚事务中 {@code afterCommit()} 永不执行，若加 {@code @Transactional} 这些断言会静默失去覆盖。
+ *
+ * <p>R5 隔离方式：继承的基类不含事务，数据真实提交；唯一性由 {@link TestAccounts}（唯一用户名/身份）
+ * 与共享工厂（唯一任务名）保证，<b>不再以 {@code System.nanoTime()} 兜底</b>；
+ * 每类用例自行关闭建立的 WS 会话。
+ *
+ * <p>R3：全部身份与 token 均来自 {@link TestAccounts} 真实注册/登录。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class SystemNotificationFlowTest {
-
-    @LocalServerPort
-    int port;
+class SystemNotificationE2EIT extends RealProtocolTestBase {
 
     @Autowired
-    org.springframework.web.context.WebApplicationContext wac;
+    private TaskService taskService;
 
     @Autowired
-    JwtUtil jwtUtil;
+    private MessageService messageService;
 
-    @Autowired
-    UserRepository userRepository;
-
-    @Autowired
-    OrderRepository orderRepository;
-
-    @Autowired
-    TaskService taskService;
-
-    @Autowired
-    MessageService messageService;
-
-    private long rid;
-
-    @BeforeEach
-    void setUp() {
-        rid = System.nanoTime();
-    }
-
-    @AfterEach
-    void restoreContext() {
-        UserContext.clear();
-    }
+    private final HttpClient http = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     @Test
     @DisplayName("① 支付成功：订单 PENDING→PAID → 所有者收到 ORDER_PAID 系统消息")
     void paymentSuccessNotifiesOwner() {
-        User owner = newUser(0);
+        TestAccounts.Account owner = accounts().registerUser();
         Task task = createTask(owner);
         markPaid(task);
 
-        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.getId());
+        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.id());
         Optional<ChatEnvelope> hit = findByName(unread, "ORDER_PAID");
         assertThat(hit).isPresent();
         assertThat(hit.orElseThrow().getMsgType()).isEqualTo(MsgType.ORDER);
@@ -102,32 +81,32 @@ class SystemNotificationFlowTest {
     @Test
     @DisplayName("② 接单：IDLE→IN_PROGRESS → 所有者收到 TASK_ACCEPTED（含 riderId）")
     void acceptNotifiesOwner() {
-        User owner = newUser(0);
-        User rider = newUser(1);
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
         Task task = createPaidTask(owner);
-        UserContext.setUser(rider.getId(), rider.getUserName(), 1); // 接单 actor = 飞手
-        taskService.acceptTask(task.getTaskNum(), rider.getId());
+        UserContext.setUser(rider.id(), rider.userName(), rider.role()); // 接单 actor = 飞手
+        taskService.acceptTask(task.getTaskNum(), rider.id());
 
-        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.getId());
+        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.id());
         Optional<ChatEnvelope> hit = findByName(unread, "TASK_ACCEPTED");
         assertThat(hit).isPresent();
         assertThat(hit.orElseThrow().getMsgType()).isEqualTo(MsgType.NOTICE);
         assertThat(hit.orElseThrow().getPayload().get("data"))
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                .containsEntry("riderId", rider.getId().intValue());
+                .containsEntry("riderId", rider.id().intValue());
     }
 
     @Test
     @DisplayName("③ 取消：IN_PROGRESS→IDLE → 所有者收到 TASK_CANCELLED")
     void cancelNotifiesOwner() {
-        User owner = newUser(0);
-        User rider = newUser(1);
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
         Task task = createPaidTask(owner);
-        UserContext.setUser(rider.getId(), rider.getUserName(), 1);
-        taskService.acceptTask(task.getTaskNum(), rider.getId());
-        taskService.riderCancelTask(task.getTaskNum(), rider.getId());
+        UserContext.setUser(rider.id(), rider.userName(), rider.role());
+        taskService.acceptTask(task.getTaskNum(), rider.id());
+        taskService.riderCancelTask(task.getTaskNum(), rider.id());
 
-        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.getId());
+        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.id());
         assertThat(findByName(unread, "TASK_CANCELLED")).isPresent();
         assertThat(findByName(unread, "TASK_ACCEPTED")).isPresent(); // 接单通知同样在流中
     }
@@ -135,14 +114,14 @@ class SystemNotificationFlowTest {
     @Test
     @DisplayName("④⑤ 完成+待验收：IN_PROGRESS→COMPLETED 与订单→WAITING_CONFIRM 各产生一条通知")
     void completionProducesTaskAndOrderNotifications() {
-        User owner = newUser(0);
-        User rider = newUser(1);
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
         Task task = createPaidTask(owner);
-        UserContext.setUser(rider.getId(), rider.getUserName(), 1);
-        taskService.acceptTask(task.getTaskNum(), rider.getId());
-        taskService.riderCompleteTask(task.getTaskNum(), rider.getId(), null);
+        UserContext.setUser(rider.id(), rider.userName(), rider.role());
+        taskService.acceptTask(task.getTaskNum(), rider.id());
+        taskService.riderCompleteTask(task.getTaskNum(), rider.id(), null);
 
-        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.getId());
+        List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.id());
         assertThat(findByName(unread, "TASK_COMPLETED")).isPresent();
         assertThat(findByName(unread, "ORDER_WAITING_CONFIRM")).isPresent();
     }
@@ -150,14 +129,14 @@ class SystemNotificationFlowTest {
     @Test
     @DisplayName("⑥ 确认完成：订单 WAITING_CONFIRM→COMPLETED → 接单飞手收到 ORDER_CONFIRMED")
     void confirmNotifiesRider() {
-        User owner = newUser(0);
-        User rider = newUser(1);
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
         Task task = createPaidTask(owner);
-        taskService.acceptTask(task.getTaskNum(), rider.getId());
-        taskService.riderCompleteTask(task.getTaskNum(), rider.getId(), null);
-        taskService.userConfirmTask(task.getTaskNum(), owner.getId());
+        taskService.acceptTask(task.getTaskNum(), rider.id());
+        taskService.riderCompleteTask(task.getTaskNum(), rider.id(), null);
+        taskService.userConfirmTask(task.getTaskNum(), owner.id());
 
-        List<ChatEnvelope> riderUnread = messageService.getUnreadMessages(rider.getId());
+        List<ChatEnvelope> riderUnread = messageService.getUnreadMessages(rider.id());
         Optional<ChatEnvelope> hit = findByName(riderUnread, "ORDER_CONFIRMED");
         assertThat(hit).isPresent();
         assertThat(hit.orElseThrow().getMsgType()).isEqualTo(MsgType.ORDER);
@@ -166,18 +145,11 @@ class SystemNotificationFlowTest {
     @Test
     @DisplayName("离线补偿：未连接 WS 时经 /chat/Message/sync 可拉到结构化系统消息")
     void offlineCompensationViaSyncEndpoint() throws Exception {
-        User owner = newUser(0);
+        TestAccounts.Account owner = accounts().registerUser();
         Task task = createTask(owner);
         markPaid(task);
 
-        var mockMvc = org.springframework.test.web.servlet.setup.MockMvcBuilders
-                .webAppContextSetup(wac).build();
-        var response = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .get("/chat/Message/sync")
-                        .header("Authorization", "Bearer " + jwtUtil.generateToken(
-                                owner.getId(), owner.getUserName(), owner.getRole())))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        String response = get("/chat/Message/sync", owner.authorization());
 
         assertThat(response).contains("ORDER_PAID");
         assertThat(response).contains("\"type\":\"ORDER\"");
@@ -186,14 +158,13 @@ class SystemNotificationFlowTest {
     @Test
     @DisplayName("实时推送：接收方在线时状态变更经聊天 WS 推送结构化信封（msgType=2）")
     void realtimePushToConnectedRecipient() throws Exception {
-        User owner = newUser(0);
+        TestAccounts.Account owner = accounts().registerUser();
         Task task = createTask(owner);
 
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         OwnerInboxEndpoint endpoint = new OwnerInboxEndpoint();
         Session session = container.connectToServer(endpoint, ClientEndpointConfig.Builder.create().build(),
-                URI.create("ws://localhost:" + port + "/ws/" + owner.getId() + "?token="
-                        + jwtUtil.generateToken(owner.getId(), owner.getUserName(), 0)));
+                URI.create(wsBaseUrl() + "/ws/" + owner.id() + "?token=" + owner.token()));
         try {
             assertThat(endpoint.opened.await(10, TimeUnit.SECONDS)).isTrue();
             markPaid(task);
@@ -212,42 +183,17 @@ class SystemNotificationFlowTest {
 
     // ---------- helpers ----------
 
-    private User newUser(int role) {
-        User user = new User();
-        user.setUserName("ntf" + rid + "-" + role + "-" + UUID.randomUUID().toString().substring(0, 6));
-        user.setPassword("irrelevant");
-        user.setStatus(1);
-        user.setRole(role);
-        return userRepository.save(user);
-    }
-
-    private Task createTask(User owner) {
-        UserContext.setUser(owner.getId(), owner.getUserName(), owner.getRole());
-        TaskDto dto = new TaskDto();
-        dto.setTaskName("ntf-task-" + rid);
-        dto.setType(TaskType.SURVEY);
-        WaypointDto a = new WaypointDto();
-        a.setOrderIndex(0);
-        a.setLongitude(121.0);
-        a.setLatitude(31.0);
-        a.setAltitude(100.0);
-        WaypointDto b = new WaypointDto();
-        b.setOrderIndex(1);
-        b.setLongitude(121.01);
-        b.setLatitude(31.0);
-        b.setAltitude(100.0);
-        dto.setWaypoints(List.of(a, b));
-        Task saved = taskService.createTask(dto);
-        return saved;
+    /** 造任务：任务名唯一（唯一命名由共享工厂保证）。 */
+    private Task createTask(TestAccounts.Account owner) {
+        UserContext.setUser(owner.id(), owner.userName(), owner.role());
+        return taskService.createTask(fixtures.twoWaypointTask());
     }
 
     private void markPaid(Task task) {
-        MissionOrder order = orderRepository.findByTaskId(task.getId()).orElseThrow();
-        order.setOrderStatus(OrderStatus.PAID);
-        orderRepository.save(order);
+        fixtures.markOrderPaid(task);
     }
 
-    private Task createPaidTask(User owner) {
+    private Task createPaidTask(TestAccounts.Account owner) {
         Task task = createTask(owner);
         markPaid(task);
         return task;
@@ -257,6 +203,19 @@ class SystemNotificationFlowTest {
         return unread.stream()
                 .filter(e -> e.getPayload() != null && name.equals(e.getPayload().get("name")))
                 .findFirst();
+    }
+
+    /** 真实 TCP GET（RANDOM_PORT 下不再用 MockMvc）。 */
+    private String get(String path, String authorization) throws Exception {
+        HttpResponse<String> response = http.send(HttpRequest.newBuilder(
+                                URI.create(baseUrl() + path))
+                        .timeout(Duration.ofSeconds(30))
+                        .header("Authorization", authorization)
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        assertThat(response.statusCode()).as("GET %s 期望 200，响应=%s", path, response.body()).isEqualTo(200);
+        return response.body();
     }
 
     /** 接收方模拟：收集下行信封，对含 ORDER_PAID 的消息放行闩锁。 */

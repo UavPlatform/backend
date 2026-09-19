@@ -1,11 +1,10 @@
 package com.uav.contract;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.uav.support.OpenApiContract;
+import com.uav.support.RealProtocolTestBase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.test.context.ActiveProfiles;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,19 +21,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>{@link #exportContract()}：把运行中的 {@code /v3/api-docs} 归一化后写入
  *       {@code target/openapi/}；<b>仅当</b>显式给定 {@code -Dopenapi.export=true}（或 {@code OPENAPI_EXPORT=true}）
- *       才落到 {@code spec/openapi/drone-backend.openapi.json}。日常 {@code mvn test} 只读不写。</li>
+ *       才落到 {@code spec/openapi/drone-backend.openapi.json}。日常只读不写。</li>
  *   <li>{@link #frozenSpecMatchesRunningImplementation()}：把运行中实现归一化后与冻结规格做整文档深比较。
  *       任何端点/参数/字段/枚举的增删改都会让门禁变红——这就是「实现漂移」的唯一判据。</li>
  * </ul>
  *
+ * <p>驱动方式与分层（R4/R9/O4/O6）：本测试经 {@code @LocalServerPort} + {@code java.net.http} 真实拉取
+ * {@code http://127.0.0.1:<port>/v3/api-docs}，属真实 TCP 驱动的端到端门禁，因此命名 {@code *E2EIT} 并继承
+ * {@link RealProtocolTestBase}（{@code RANDOM_PORT}、无 {@code @Transactional}）。它是真实的进程间
+ * 结构契约校验，不是进程内 MockMvc 测试，故不自称「集成测试」。
+ *
  * <p>跑在本机 H2（profile=test）上，不依赖 T4_DB_* 真库环境变量，因此可以在 CI 里常态阻断。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class OpenApiContractGateTest {
-
-    @LocalServerPort
-    int port;
+class OpenApiContractGateE2EIT extends RealProtocolTestBase {
 
     @Test
     @DisplayName("契约导出：/v3/api-docs → 归一化 → target/openapi（-Dopenapi.export=true 时才写 spec/）")

@@ -4,17 +4,12 @@ import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.order.service.impl.OrderAutoConfirmService;
 import com.uav.server.enums.OrderStatus;
-import com.uav.task.pojo.entity.Task;
-import com.uav.task.mapper.TaskRepository;
 import com.uav.server.enums.TaskStatus;
-import org.junit.jupiter.api.BeforeEach;
+import com.uav.support.IntegrationTestBase;
+import com.uav.task.pojo.entity.Task;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -23,44 +18,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 1B-9a 骨架测试：验收超时自动确认。
  * 默认关闭 → 零行为变化；开启 → 仅超时（update_time 早于阈值）的 WAITING_CONFIRM 订单被置为 COMPLETED。
+ *
+ * <p>层次与驱动（O6/R2/R4/R9）：进程内集成测试，继承 {@link IntegrationTestBase}
+ * （{@code MOCK} + {@code @AutoConfigureMockMvc} + {@code @Transactional}），不声明真实端口。
+ * 本类不发起 HTTP 请求（直接调用服务方法），基类提供的 MockMvc 只用于统一上下文、profile 与清理。
+ *
+ * <p>隔离（R5）：事务回滚；过期时间沿用既有 JPQL {@code forceUpdateTime} 直改（绕过 {@code @PreUpdate}）。
+ * 造数走共享工厂（R7），ThreadLocal 由基类 {@code @AfterEach} 清理（R8），
+ * 唯一命名由共享 {@code UniqueNames} 提供，不再以 {@code System.nanoTime()} 兜底。
  */
-@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Transactional
-class AutoConfirmTest {
+class AutoConfirmIT extends IntegrationTestBase {
 
     @Autowired
-    OrderRepository orderRepository;
+    private OrderRepository orderRepository;
 
     @Autowired
-    TaskRepository taskRepository;
+    private OrderAutoConfirmService autoConfirmService;
 
-    @Autowired
-    OrderAutoConfirmService autoConfirmService;
-
-    private long rid;
-
-    @BeforeEach
-    void setUp() {
-        rid = System.nanoTime();
-    }
-
+    /** 造一个 WAITING_CONFIRM 订单，并把 update_time 直改为指定时间以模拟过期/未过期。 */
     private MissionOrder seedWaitingConfirmOrder(LocalDateTime updateTime) {
-        Task task = new Task();
-        task.setTaskNum("AC-" + rid + "-" + updateTime.toLocalTime().toNanoOfDay());
-        task.setTaskName("ac-task-" + rid);
-        task.setUserId(1L);
-        task.setTaskStatus(TaskStatus.COMPLETED);
-        task = taskRepository.save(task);
-
-        MissionOrder order = new MissionOrder();
-        order.setOrderNum("ON-AC-" + rid + "-" + updateTime.toLocalTime().toNanoOfDay());
-        order.setUserId(1L);
-        order.setTask(task);
-        order.setTotalAmount(new java.math.BigDecimal("9.90"));
-        order.setTotalDistance(new java.math.BigDecimal("198.00"));
-        order.setOrderStatus(OrderStatus.WAITING_CONFIRM);
-        order = orderRepository.save(order);
+        var owner = fixtures.user(0);
+        Task task = fixtures.task(owner, TaskStatus.COMPLETED, 9.9);
+        MissionOrder order = fixtures.order(owner, task, OrderStatus.WAITING_CONFIRM, "9.90");
 
         // 用 JPQL 直改 update_time（绕过 @PreUpdate 的 now 覆盖），模拟过期时间
         orderRepository.forceUpdateTime(order.getId(), updateTime);

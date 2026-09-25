@@ -17,8 +17,6 @@ import com.uav.server.util.JwtUtil;
 import com.uav.server.util.UserContext;
 import com.uav.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -52,15 +50,8 @@ public class UserController {
             summary = "用户登录",
             description = "验证用户名和密码，成功返回 JWT 令牌",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "登录成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"token\": \"eyJ...\", \"refreshToken\": \"eyJ...\"}}"))),
-                    @ApiResponse(responseCode = "401", description = "用户名或密码错误",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"INVALID_PARAM\", \"message\": \"用户名或密码错误\"}")))
+                    @ApiResponse(responseCode = "200", description = "登录成功"),
+                    @ApiResponse(responseCode = "401", description = "用户名或密码错误")
             }
     )
     @PostMapping("/login")
@@ -81,15 +72,8 @@ public class UserController {
             summary = "刷新令牌",
             description = "使用 Refresh-Token 获取新的 Access-Token",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "刷新成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"token\": \"eyJ...\"}}"))),
-                    @ApiResponse(responseCode = "401", description = "刷新失败",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"UNAUTHORIZED\", \"message\": \"无效的刷新令牌\"}")))
+                    @ApiResponse(responseCode = "200", description = "刷新成功"),
+                    @ApiResponse(responseCode = "401", description = "刷新失败")
             }
     )
     @PostMapping("/refresh")
@@ -105,15 +89,8 @@ public class UserController {
             summary = "用户注册",
             description = "用户注册，返回用户信息",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "注册成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"id\": 123, \"userName\": \"test\"}}"))),
-                    @ApiResponse(responseCode = "400", description = "注册失败",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 400, \"errorCode\": \"INVALID_PARAM\", \"message\": \"用户名已存在\"}")))
+                    @ApiResponse(responseCode = "200", description = "注册成功"),
+                    @ApiResponse(responseCode = "400", description = "注册失败")
             }
     )
     @PostMapping("/register")
@@ -128,17 +105,8 @@ public class UserController {
             summary = "查询用户直播记录",
             description = "获取当前登录用户的直播观看记录，支持分页",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "查询成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"获取成功\", "
-                                                    + "\"data\": {\"records\": [{\"id\": 1, \"djiId\": \"xxx\", "
-                                                    + "\"startTime\": \"2026-05-31T10:00:00\", \"endTime\": \"2026-05-31T11:00:00\"}], "
-                                                    + "\"total\": 1, \"totalPages\": 1}}"))),
-                    @ApiResponse(responseCode = "401", description = "未登录",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"UNAUTHORIZED\", \"message\": \"Missing token\"}")))
+                    @ApiResponse(responseCode = "200", description = "查询成功"),
+                    @ApiResponse(responseCode = "401", description = "未登录")
             }
     )
     @GetMapping("/records")

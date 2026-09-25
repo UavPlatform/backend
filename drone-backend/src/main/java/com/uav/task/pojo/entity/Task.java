@@ -1,5 +1,6 @@
 package com.uav.task.pojo.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import jakarta.persistence.*;
@@ -55,6 +56,14 @@ public class Task {
     @Column(name = "description")
     private String description;
 
+    /**
+     * 任务期望执行时间（1A-7a taskTime 契约修复，APP P0-4）。
+     * 列由 ddl-auto=update 增量添加（schema 双轨现状下最小改动）。
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Column(name = "task_time")
+    private LocalDateTime taskTime;
+
     @Column(name = "reward")
     private Double reward;
 
@@ -69,10 +78,6 @@ public class Task {
     /** 计费明细 JSON（PriceDetailVO 序列化），展示用 */
     @Column(name = "price_detail", length = 1000)
     private String priceDetail;
-
-    /** 计划执行时间（夜间附加费判断口径） */
-    @Column(name = "planned_time")
-    private LocalDateTime plannedTime;
 
     /** 超重等场景：true = 需平台人工报价 */
     @Column(name = "need_manual_quote")

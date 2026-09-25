@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,7 +37,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public MissionOrder createOrder(Long userId, String taskNum, Double reward) {
+    public MissionOrder createOrder(Long userId, String taskNum, Double listedPrice) {
         Optional<Task> taskOpt = taskRepository.findByTaskNum(taskNum);
         if (taskOpt.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ROUTE_NOT_FOUND);
@@ -51,9 +52,23 @@ public class OrderServiceImpl implements OrderService {
         if (unpaid.isPresent()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
-        // 挂牌价已在 TaskServiceImpl 计价块算好（参考价/协商价），这里仅透传
+        // 挂牌价已在 TaskServiceImpl 计价块算好（bill_config 参考价 → 协商价校验下限），
+        // 这里仅透传，不再自行计价
         List<TaskWaypoint> waypoints = task.getWaypoints();
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
+
+        // 校验（保留 1A P0-2 安全止血的语义）：金额必须是服务端算出的正值。
+        // listedPrice 为 null 属服务端计价链路异常；为 0 属航点不足/距离过近。
+        if (listedPrice == null) {
+            log.error("订单挂牌价缺失（TaskServiceImpl 计价块未传值），拒绝创建订单");
+            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
+                    "订单计价缺失，已拒绝创建订单");
+        }
+        BigDecimal totalAmount = BigDecimal.valueOf(listedPrice).setScale(2, RoundingMode.HALF_UP);
+        if (totalAmount.signum() <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "订单金额计算为 0（航点不足或距离过近），已拒绝创建订单");
+        }
 
         String orderNum = OrderIdGenerator.generate(userId);
 
@@ -61,7 +76,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderNum(orderNum);
         order.setUserId(userId);
         order.setTask(task);
-        order.setTotalAmount(reward != null ? BigDecimal.valueOf(reward) : BigDecimal.ZERO);
+        order.setTotalAmount(totalAmount);
         order.setTotalDistance(distance);
         order.setOrderStatus(OrderStatus.PENDING);
 

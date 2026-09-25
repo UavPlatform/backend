@@ -4,11 +4,10 @@ import com.uav.server.result.Result;
 import com.uav.log.pojo.vo.LogFileVO;
 import com.uav.log.pojo.vo.LogVO;
 import com.uav.server.annotation.OperationLog;
+import com.uav.server.annotation.RequireRole;
 import com.uav.log.service.LogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +22,7 @@ import java.util.List;
 @Tag(name = "Log API")
 @RestController
 @RequestMapping("/admin/logs")
+@RequireRole(2)
 @Slf4j
 public class LogController {
 
@@ -37,17 +37,7 @@ public class LogController {
                     @Parameter(name = "path", description = "相对路径，留空表示根目录")
             },
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "获取成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": [{\"name\": \"2026-06-01\", \"path\": \"logs/2026-06-01\", \"directory\": true, \"size\": 0, \"lastModified\": \"2026-06-01 16:00:00\"}]}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "获取成功")
             }
     )
     @GetMapping("/files")
@@ -64,17 +54,7 @@ public class LogController {
                     @Parameter(name = "lines", description = "读取行数，默认 200")
             },
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "读取成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"data\": {\"logs\": [\"2026-06-01 10:00:00 INFO ...\", \"...\"]}}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "读取成功")
             }
     )
     @GetMapping("/read")
@@ -85,6 +65,8 @@ public class LogController {
     }
 
     @OperationLog("获取应用日志")
+    @Operation(summary = "获取应用日志", description = "读取应用日志文件（application.log）的最后 N 行",
+            parameters = {@Parameter(name = "lines", description = "读取行数，默认 100")})
     @GetMapping("/application")
     public Result<LogVO> getApplicationLogs(@RequestParam(defaultValue = "100") int lines) {
         List<String> logs = logService.getApplicationLogs(lines);
@@ -92,6 +74,8 @@ public class LogController {
     }
 
     @OperationLog("获取错误日志")
+    @Operation(summary = "获取错误日志", description = "读取错误日志文件（error.log）的最后 N 行",
+            parameters = {@Parameter(name = "lines", description = "读取行数，默认 100")})
     @GetMapping("/error")
     public Result<LogVO> getErrorLogs(@RequestParam(defaultValue = "100") int lines) {
         List<String> logs = logService.getErrorLogs(lines);

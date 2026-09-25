@@ -51,4 +51,6 @@ build/
 .env
 drone-backend/src/main/resources/application.yml
 drone-backend/src/main/resources/application-dev.yml
-drone-backend/src/main/resources/application.properties\
+drone-backend/src/main/resources/application.properties
+drone-backend/application.yml
+drone-backend/.localdb/

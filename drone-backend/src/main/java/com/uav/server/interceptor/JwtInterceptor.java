@@ -89,7 +89,8 @@ public class JwtInterceptor implements HandlerInterceptor {
                 boolean allowed = java.util.Arrays.stream(requireRole.value())
                         .anyMatch(r -> r == (userRole != null ? userRole : -1));
                 if (!allowed) {
-                    sendUnauthorized(response, "权限不足");
+                    // 已登录但角色不符 → 403（未认证才是 401）
+                    sendForbidden(response, "权限不足");
                     return false;
                 }
             }
@@ -103,7 +104,7 @@ public class JwtInterceptor implements HandlerInterceptor {
                 boolean requireDrone = handlerMethod.hasMethodAnnotation(RequireDrone.class)
                         || handlerMethod.getBeanType().isAnnotationPresent(RequireDrone.class);
                 if (requireDrone && !riderUavRepository.existsByUserId(UserContext.getUserId())) {
-                    sendUnauthorized(response, "请先绑定至少一台无人机");
+                    sendForbidden(response, "请先绑定至少一台无人机");
                     return false;
                 }
             }
@@ -121,6 +122,13 @@ public class JwtInterceptor implements HandlerInterceptor {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
         Result<Void> result = Result.fail(401, "UNAUTHORIZED", message);
+        response.getWriter().write(objectMapper.writeValueAsString(result));
+    }
+
+    private void sendForbidden(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json;charset=UTF-8");
+        Result<Void> result = Result.fail(403, "FORBIDDEN", message);
         response.getWriter().write(objectMapper.writeValueAsString(result));
     }
 

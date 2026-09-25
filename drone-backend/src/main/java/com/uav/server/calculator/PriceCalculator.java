@@ -69,7 +69,7 @@ public class PriceCalculator {
     // 参考价
     // -----------------------------------------------------------------------
 
-    public PriceDetailVO calculate(TaskType type, BigDecimal distanceMeters, Double weightKg, LocalDateTime plannedTime) {
+    public PriceDetailVO calculate(TaskType type, BigDecimal distanceMeters, Double weightKg, LocalDateTime taskTime) {
         BigDecimal baseFee = big("baseFee", new BigDecimal("30"));
         BigDecimal baseDistanceKm = big("baseDistanceKm", new BigDecimal("3"));
 
@@ -106,7 +106,7 @@ public class PriceCalculator {
         }
 
         // 夜间附加费 = 前三项和 × nightRate
-        boolean isNight = isNight(plannedTime);
+        boolean isNight = isNight(taskTime);
         BigDecimal nightFee = BigDecimal.ZERO;
         if (isNight) {
             BigDecimal nightRate = big("nightRate", new BigDecimal("0.2"));
@@ -181,14 +181,14 @@ public class PriceCalculator {
     }
 
     /**
-     * 夜间判断：按任务计划时间（不用 now() 兜底，防 UTC 容器时区漂移）。
+     * 夜间判断：按任务期望执行时间 taskTime（不用 now() 兜底，防 UTC 容器时区漂移）。
      * 支持跨午夜区间（nightStart=22, nightEnd=6）。
      */
-    private boolean isNight(LocalDateTime plannedTime) {
-        if (plannedTime == null) return false;
+    private boolean isNight(LocalDateTime taskTime) {
+        if (taskTime == null) return false;
         int start = billConfigService.getInt("nightStart", 22);
         int end = billConfigService.getInt("nightEnd", 6);
-        LocalTime time = plannedTime.toLocalTime();
+        LocalTime time = taskTime.toLocalTime();
         LocalTime startTime = LocalTime.of(start, 0);
         LocalTime endTime = LocalTime.of(end, 0);
         if (start < end) {

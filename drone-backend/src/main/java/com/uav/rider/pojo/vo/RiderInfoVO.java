@@ -8,6 +8,8 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+// TODO(yx9926): 随 feature/wmc 合并进入 main，当前仅被无人调用的
+// RiderInfoService 引用（见该类上的 TODO）。  —— wmc 合并时标注，2026-09-25
 @Data
 @Builder
 public class RiderInfoVO {

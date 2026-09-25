@@ -4,11 +4,8 @@ import com.uav.uav.pojo.dto.UavDto;
 import com.uav.server.result.Result;
 import com.uav.uav.pojo.vo.UavVo;
 import com.uav.server.annotation.OperationLog;
-import com.uav.server.annotation.SkipJwt;
 import com.uav.uav.service.AppUavService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -24,37 +21,14 @@ public class AppUavController {
     @Autowired
     private AppUavService appUavService;
 
-    @SkipJwt
+    // P0-6：无人机注册必须登录（移除调试残留的 @SkipJwt，匿名可抢注任意 djiId）
     @OperationLog("新增无人机")
     @Operation(
             summary = "新增无人机",
-            description = "添加新的无人机信息",
+            description = "添加新的无人机信息（需登录）",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "新增成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\", "
-                                                    + "\"data\": {\"id\": 1, \"uavName\": \"无人机1\"}}"
-                                    )
-                            )
-                    ),
-                    @ApiResponse(
-                            responseCode = "400",
-                            description = "参数错误",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": false, \"code\": 400, "
-                                                    + "\"errorCode\": \"INVALID_PARAM\", "
-                                                    + "\"message\": \"无人机信息缺失\"}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "新增成功"),
+                    @ApiResponse(responseCode = "400", description = "参数错误")
             }
     )
     @PostMapping("/add")
@@ -68,30 +42,8 @@ public class AppUavController {
             summary = "更新无人机信息",
             description = "更新无人机的基本信息，包括名称、在线状态等",
             responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "更新成功",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"操作成功\"}"
-                                    )
-                            )
-                    ),
-                    @ApiResponse(
-                            responseCode = "404",
-                            description = "无人机不存在",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(
-                                            type = "object",
-                                            example = "{\"success\": false, \"code\": 404, "
-                                                    + "\"errorCode\": \"UAV_NOT_FOUND\", "
-                                                    + "\"message\": \"无人机不存在\"}"
-                                    )
-                            )
-                    )
+                    @ApiResponse(responseCode = "200", description = "更新成功"),
+                    @ApiResponse(responseCode = "404", description = "无人机不存在")
             }
     )
     @PutMapping("/update")

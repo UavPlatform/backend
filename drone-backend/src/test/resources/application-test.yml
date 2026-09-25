@@ -1,0 +1,41 @@
+# ===== 测试专用配置（profile: test）=====
+# 说明：
+# - QA-B5 方案：引入 test 范围 H2（MySQL 兼容模式），生产依赖零变化；
+#   Flyway 关闭（其迁移为 MySQL 方言），JPA 表由 create-drop 生成，
+#   MyBatis-Plus 管理的 chat 表由 test classpath schema.sql 提供（与 V1 迁移同构）。
+# - profile 专属配置优先级高于工作目录外置 application.yml，测试不受本机环境影响。
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:drone_backend_test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+  flyway:
+    enabled: false
+
+jwt:
+  secret: test-jwt-secret-0123456789abcdef0123456789abcdef
+  expiration: 3600000
+  refresh-expiration: 604800000
+
+trtc:
+  sdk-app-id: 1400000000
+  secret-key: test-trtc-secret-key-0123456789abcdef
+  room-expire: 86400
+
+amap:
+  key: amap-test-key
+  security-key: amap-test-security-key
+
+logging:
+  level:
+    root: warn
+    com.uav: info

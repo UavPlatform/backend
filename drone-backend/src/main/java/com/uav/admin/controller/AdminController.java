@@ -10,8 +10,6 @@ import com.uav.server.util.JwtUtil;
 import com.uav.server.util.UserContext;
 import com.uav.admin.service.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,15 +32,8 @@ public class AdminController {
             summary = "管理员登录",
             description = "管理员登录接口",
             responses = {
-                    @ApiResponse(responseCode = "200", description = "登录成功",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": true, \"code\": 200, \"message\": \"登录成功\", "
-                                                    + "\"data\": {\"token\": \"eyJ...\", \"admin\": {\"id\": 1, \"name\": \"admin\"}}}"))),
-                    @ApiResponse(responseCode = "401", description = "用户名或密码错误",
-                            content = @Content(mediaType = "application/json",
-                                    schema = @Schema(type = "object",
-                                            example = "{\"success\": false, \"code\": 401, \"errorCode\": \"INVALID_PARAM\", \"message\": \"用户名或密码错误\"}")))
+                    @ApiResponse(responseCode = "200", description = "登录成功"),
+                    @ApiResponse(responseCode = "401", description = "用户名或密码错误")
             }
     )
     @PostMapping("/login")

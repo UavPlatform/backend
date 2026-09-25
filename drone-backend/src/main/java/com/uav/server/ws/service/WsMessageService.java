@@ -17,7 +17,10 @@ public class WsMessageService {
     public void send(WebSocketSession session, WsEnvelope envelope) {
         try {
             if (session != null && session.isOpen()) {
-                session.sendMessage(new TextMessage(JSON.toJSONString(envelope)));
+                // Tomcat basic remote 不允许并发写；按 session 串行化（与 DroneWebSocketHandler 同一锁对象）
+                synchronized (session) {
+                    session.sendMessage(new TextMessage(JSON.toJSONString(envelope)));
+                }
             }
         } catch (IOException e) {
             log.warn("发送 WebSocket 消息失败: {}", e.getMessage());
@@ -41,7 +44,9 @@ public class WsMessageService {
     public void sendText(WebSocketSession session, String message) {
         try {
             if (session != null && session.isOpen()) {
-                session.sendMessage(new TextMessage(message));
+                synchronized (session) {
+                    session.sendMessage(new TextMessage(message));
+                }
             }
         } catch (IOException e) {
             log.warn("发送 WebSocket 文本消息失败: {}", e.getMessage());

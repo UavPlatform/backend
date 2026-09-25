@@ -41,6 +41,9 @@ public class OrderController {
     @Autowired
     private OrderReviewService orderReviewService;
 
+    @Autowired
+    private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
+
     @OperationLog("查询订单列表")
     @Operation(summary = "订单列表", description = "获取当前用户的所有订单，按创建时间倒序")
     @GetMapping("/list")
@@ -72,27 +75,19 @@ public class OrderController {
         }
         Long userId = UserContext.getUserId();
         MissionOrder order = orderService.getOrderDetail(orderNum, userId);
-        OrderVO vo = OrderVO.from(order);
+        // 1B-4b：任务→设备映射（deviceId/liveState），用户端据此点亮「观看直播」入口
+        var liveDevice = liveDeviceResolver.resolveForTask(
+                order.getTask() != null ? order.getTask().getId() : null);
+        OrderVO vo = OrderVO.from(order, liveDevice.deviceId(), liveDevice.liveState());
 
-        // 查关联的交付文件
+        // 查关联的交付文件（并行功能线：订单交付文件）
         List<UploadedFile> files = uploadRecordService.listByOrder(orderNum, 0, 100).getContent();
         vo.setFiles(files.stream().map(UploadVO::from).toList());
 
-        // 是否已评价
+        // 是否已评价（并行功能线）
         vo.setHasReview(orderReviewService.hasReview(orderNum));
 
         return Result.success("获取成功", vo);
-    }
-
-    @OperationLog("创建订单")
-    @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "创建订单", description = "根据任务编号创建飞行订单")
-    @PostMapping("/create")
-    public Result<OrderVO> createOrder(@RequestBody CreateOrderDTO dto) {
-        dto.validate();
-        Long userId = UserContext.getUserId();
-        MissionOrder order = orderService.createOrder(userId, dto.getTaskNum(), dto.getReward());
-        return Result.success("订单创建成功", OrderVO.from(order));
     }
 
     @OperationLog("取消订单")

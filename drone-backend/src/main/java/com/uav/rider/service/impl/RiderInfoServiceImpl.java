@@ -21,6 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+// TODO(yx9926): 随 feature/wmc 合并进入 main，当前【无人调用】——
+// @Service 仍会注册 Bean，但不影响启动；调用方 RiderInfoController 在 main 上
+// 仍是占位实现，真实接线在 feat/feed 分支。  —— wmc 合并时标注，2026-09-25
 @Service
 @RequiredArgsConstructor
 public class RiderInfoServiceImpl implements RiderInfoService {

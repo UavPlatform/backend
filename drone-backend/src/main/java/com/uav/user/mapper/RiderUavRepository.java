@@ -13,6 +13,8 @@ public interface RiderUavRepository extends JpaRepository<RiderUav, Long> {
 
     boolean existsByDjiId(String djiId);
 
+    boolean existsByUserIdAndDjiId(Long userId, String djiId);
+
     int deleteByUserIdAndDjiId(Long userId, String djiId);
 
     boolean existsByUserId(Long userId);

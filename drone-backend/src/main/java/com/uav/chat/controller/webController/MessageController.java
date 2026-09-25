@@ -47,10 +47,10 @@ public class MessageController {
     }
     @OperationLog("获取消息")
     @RateLimiter(limit = 30, windowSeconds = 60)
-    @Operation(summary = "获取消息", description = "获取消息")
-    @GetMapping("/messages/{msgId}")
-    public Object getMessages(@Valid @PathVariable Long msgId) {
-        return Result.success(messageService.getMessages(msgId));
+    @Operation(summary = "获取消息", description = "按会话 ID 获取历史消息（路径参数是会话 ID，不是消息 ID）")
+    @GetMapping("/messages/{sessionId}")
+    public Object getMessages(@Valid @PathVariable Long sessionId) {
+        return Result.success(messageService.getMessages(sessionId));
     }
 
     @OperationLog("同步离线消息")
@@ -69,5 +69,15 @@ public class MessageController {
     public Object getUnreadCount() {
         Long userId = com.uav.server.util.UserContext.getUserId();
         return Result.success(messageService.getUnreadCountMap(userId));
+    }
+
+    @OperationLog("标记会话已读")
+    @RateLimiter(limit = 30, windowSeconds = 60)
+    @Operation(summary = "标记会话已读", description = "进入会话时由客户端显式调用：推进该会话 lastReadTime 到当前时间（t49 显式已读契约）；仅会话成员可调用")
+    @PostMapping("/read")
+    public Object markSessionRead(@RequestParam Long sessionId) {
+        Long userId = com.uav.server.util.UserContext.getUserId();
+        messageService.markSessionRead(userId, sessionId);
+        return Result.success("已标记已读");
     }
 }

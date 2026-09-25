@@ -3,10 +3,15 @@ package com.uav.server.ws.handler;
 import com.alibaba.fastjson.JSONObject;
 import com.uav.server.ws.service.WsMessageService;
 import com.uav.live.service.LiveSessionService;
+import com.uav.user.mapper.UserRecordRepository;
+import com.uav.user.pojo.entity.UserRecord;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 @Slf4j
@@ -17,6 +22,9 @@ public class LiveEventHandler implements WsMessageHandler {
 
     @Autowired
     private WsMessageService messageService;
+
+    @Autowired
+    private UserRecordRepository userRecordRepository;
 
     @Override
     public String getType() {
@@ -30,7 +38,7 @@ public class LiveEventHandler implements WsMessageHandler {
 
     @Override
     public boolean supports(String type, String name) {
-        return "event".equalsIgnoreCase(type) && 
+        return "event".equalsIgnoreCase(type) &&
                ("LIVE_STARTED".equalsIgnoreCase(name) || "LIVE_STOPPED".equalsIgnoreCase(name));
     }
 
@@ -64,7 +72,15 @@ public class LiveEventHandler implements WsMessageHandler {
 
     private void handleLiveStopped(String deviceId) {
         liveSessionService.markStopped(deviceId);
-        log.info("设备 {} 直播已停止", deviceId);
+        // 1A-5a：直播终态确定，全体观众的观看记录统一补齐 end_time
+        List<UserRecord> openRecords = userRecordRepository.findOpenByDeviceId(deviceId);
+        for (UserRecord record : openRecords) {
+            record.setEnd_time(LocalDateTime.now());
+            userRecordRepository.save(record);
+        }
+        if (!openRecords.isEmpty()) {
+            log.info("设备 {} 直播已停止，观看记录已统一结束（{} 条）", deviceId, openRecords.size());
+        }
     }
 
     private JSONObject extractData(JSONObject json) {

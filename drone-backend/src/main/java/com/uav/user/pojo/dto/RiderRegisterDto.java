@@ -17,4 +17,8 @@ public class RiderRegisterDto implements Serializable {
 
     @Schema(description = "无人机DJI ID")
     private String djiId;
+
+    @Schema(description = "机型ID（/api/aircraft-models 返回）：提供 djiId 时可同时映射机型；"
+            + "不传则绑定为未映射设备，吊运应征将被 AIRCRAFT_MODEL_REQUIRED 拒绝")
+    private Long aircraftModelId;
 }

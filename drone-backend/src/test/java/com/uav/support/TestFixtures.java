@@ -1,5 +1,6 @@
 package com.uav.support;
 
+import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.OrderStatus;
@@ -27,7 +28,7 @@ import java.util.List;
  * <p>本工厂做「直连仓储造数」，造出的实体字段按各测试类的既有私有方法机械收编，语义保持不变
  * （例如用户密码在绕过登录的场景下沿用占位值 {@code irrelevant}）。只有无人机绑定（{@code rider_uav}）是例外：
  * {@link #bindDrone(User)} / {@link #bindDrone(User, String)} 必须走生产绑定路径
- * {@link RiderUavService#bindDrone(Long, String)}（非空校验 + 全局唯一校验），不得直接
+ * {@link RiderUavService#bindDrone(Long, String, Long)}（非空校验 + 机型校验 + 全局唯一校验），不得直接
  * {@code riderUavRepository.save} 造出与生产不一致的绑定状态。需要「真实身份」时走
  * {@link TestAccounts} 的真实注册/登录接口；需要「真实业务链路」时由测试调用对应 Service。
  *
@@ -47,6 +48,9 @@ public class TestFixtures {
 
     @Autowired
     private RiderUavService riderUavService;
+
+    @Autowired
+    private AircraftModelRepository aircraftModelRepository;
 
     @Autowired
     private TaskRepository taskRepository;
@@ -110,8 +114,9 @@ public class TestFixtures {
     }
 
     /**
-     * 用指定 DJI ID 绑定，走生产绑定路径 {@link RiderUavService#bindDrone(Long, String)}
-     * （非空校验 + 全局唯一校验，与 {@code /rider/register} 带 djiId 时同一条代码路径），
+     * 用指定 DJI ID 绑定（机型映射为默认种子 {@link #defaultAircraftModelId()}），
+     * 走生产绑定路径 {@link RiderUavService#bindDrone(Long, String, Long)}
+     * （非空校验 + 机型校验 + 全局唯一校验，与 {@code /rider/drone/bind} 同一条代码路径），
      * 而不是直接 {@code riderUavRepository.save} 造出与生产不一致的绑定状态。
      * DJI ID 全库唯一，重复会触发生产侧「该无人机已被绑定」。
      */
@@ -120,21 +125,37 @@ public class TestFixtures {
     }
 
     /**
-     * 用 userId 绑定指定 DJI ID（核心入口）：走生产绑定路径
-     * {@link RiderUavService#bindDrone(Long, String)}（非空校验 + 全局唯一校验，与
-     * {@code /rider/register} 带 djiId 时同一条代码路径），而不是直接
+     * 用 userId 绑定指定 DJI ID（核心入口，机型为默认种子 FC30）：走生产绑定路径
+     * {@link RiderUavService#bindDrone(Long, String, Long)}，而不是直接
      * {@code riderUavRepository.save} 造出与生产不一致的绑定状态。
      *
      * <p>供真实协议测试把设备绑定到 {@link TestAccounts.Account#id()} 指定的真实飞手上
      * （例如 LiveRiderStartE2EIT 需要 {@code deviceId} 绑定到握手令牌的 userId）。
      */
     public RiderUav bindDrone(long userId, String djiId) {
-        riderUavService.bindDrone(userId, djiId);
+        return bindDrone(userId, djiId, defaultAircraftModelId());
+    }
+
+    /**
+     * 用 userId 绑定指定 DJI ID 并映射指定机型（{@code aircraftModelId} 为 {@code null}
+     * 时造出与注册旧路径一致的未映射设备）：仍走生产绑定路径
+     * {@link RiderUavService#bindDrone(Long, String, Long)}。
+     */
+    public RiderUav bindDrone(long userId, String djiId, Long aircraftModelId) {
+        riderUavService.bindDrone(userId, djiId, aircraftModelId);
         return riderUavRepository.findByUserId(userId).stream()
                 .filter(binding -> djiId.equals(binding.getDjiId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "绑定后未查到 rider_uav 记录: userId=" + userId + ", djiId=" + djiId));
+    }
+
+    /** 默认可吊运机型 ID（V2 迁移种子 {@code FC30}）；种子缺失时快速失败。 */
+    public long defaultAircraftModelId() {
+        return aircraftModelRepository.findByModelCode("FC30")
+                .orElseThrow(() -> new IllegalStateException(
+                        "缺少机型种子 FC30（V2__aircraft_model.sql 未执行？"))
+                .getId();
     }
 
     /** 读取飞手当前绑定的第一个 DJI ID；未绑定时快速失败。 */

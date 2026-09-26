@@ -292,6 +292,37 @@
         },
         "type" : "object"
       },
+      "AircraftModelVO" : {
+        "description" : "平台机型目录项",
+        "properties" : {
+          "coefficient" : {
+            "description" : "机型系数：ADR-0003 报价公式乘子",
+            "type" : "number"
+          },
+          "displayName" : {
+            "description" : "显示名（如 DJI FlyCart 30）",
+            "type" : "string"
+          },
+          "id" : {
+            "description" : "机型ID：绑机与吊运应征提交的 aircraftModelId",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "maxPayloadKg" : {
+            "description" : "最大载重（kg）",
+            "type" : "number"
+          },
+          "modelCode" : {
+            "description" : "型号编码（如 FC30、M350RTK）",
+            "type" : "string"
+          },
+          "transportEnabled" : {
+            "description" : "是否可承接吊运",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "AmapConfigVO" : {
         "properties" : {
           "key" : {
@@ -938,6 +969,36 @@
           "data" : {
             "$ref" : "#/components/schemas/GpsPointVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListAircraftModelVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/AircraftModelVO"
+            },
+            "type" : "array"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -1927,6 +1988,11 @@
       "RiderRegisterDto" : {
         "description" : "飞手注册参数",
         "properties" : {
+          "aircraftModelId" : {
+            "description" : "机型ID（/api/aircraft-models 返回）：提供 djiId 时可同时映射机型；不传则绑定为未映射设备，吊运应征将被 AIRCRAFT_MODEL_REQUIRED 拒绝",
+            "format" : "int64",
+            "type" : "integer"
+          },
           "djiId" : {
             "description" : "无人机DJI ID",
             "type" : "string"
@@ -1968,6 +2034,10 @@
       },
       "RiderUav" : {
         "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "createTime" : {
             "format" : "date-time",
             "type" : "string"
@@ -3221,6 +3291,26 @@
         "tags" : [ "UAV Management API" ]
       }
     },
+    "/api/aircraft-models" : {
+      "get" : {
+        "description" : "平台机型目录（仅启用机型）：型号、显示名、最大载重、机型系数、是否可吊运",
+        "operationId" : "listAircraftModels",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "机型目录",
+        "tags" : [ "Aircraft Model API" ]
+      }
+    },
     "/api/ws/request" : {
       "post" : {
         "description" : "设备申请建立WebSocket连接",
@@ -4374,9 +4464,17 @@
     },
     "/rider/drone/bind" : {
       "post" : {
-        "description" : "飞手绑定新的无人机",
+        "description" : "飞手绑定新的无人机并映射机型（机型取自 /api/aircraft-models）",
         "operationId" : "bindDrone",
         "parameters" : [ {
+          "in" : "query",
+          "name" : "aircraftModelId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
           "in" : "query",
           "name" : "djiId",
           "required" : true,
@@ -4422,9 +4520,17 @@
     },
     "/rider/drone/unbind" : {
       "delete" : {
-        "description" : "飞手解绑已绑定的无人机",
+        "description" : "飞手解绑已绑定的无人机；提交的机型须与绑定记录一致（未映射的存量绑定可不传机型）",
         "operationId" : "unbindDrone",
         "parameters" : [ {
+          "in" : "query",
+          "name" : "aircraftModelId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
           "in" : "query",
           "name" : "djiId",
           "required" : true,
@@ -5530,6 +5636,9 @@
   }, {
     "description" : "会话相关接口",
     "name" : "chat session API"
+  }, {
+    "description" : "平台机型目录接口",
+    "name" : "Aircraft Model API"
   }, {
     "description" : "微信支付结果回调（服务端到服务端，非消费端接口）",
     "name" : "Pay Notify API"

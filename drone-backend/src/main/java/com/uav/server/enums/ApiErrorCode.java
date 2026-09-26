@@ -37,7 +37,11 @@ public enum ApiErrorCode {
     FILE_MERGE_FAILED("FILE_MERGE_FAILED", "文件合并失败"),
     FILE_BIND_FAILED("FILE_BIND_FAILED", "文件与订单绑定失败"),
     FILE_UPLOAD_NOT_COMPLETE("FILE_UPLOAD_NOT_COMPLETE", "上传未完成，缺少分片"),
-    FILE_ACCESS_DENIED("FILE_ACCESS_DENIED", "无权访问此文件");
+    FILE_ACCESS_DENIED("FILE_ACCESS_DENIED", "无权访问此文件"),
+    AIRCRAFT_MODEL_REQUIRED("AIRCRAFT_MODEL_REQUIRED", "未指定机型，不能用于吊运应征"),
+    AIRCRAFT_MODEL_NOT_FOUND("AIRCRAFT_MODEL_NOT_FOUND", "机型不存在或已停用"),
+    AIRCRAFT_MODEL_NOT_TRANSPORTABLE("AIRCRAFT_MODEL_NOT_TRANSPORTABLE", "该机型不可承接吊运"),
+    AIRCRAFT_MODEL_MISMATCH("AIRCRAFT_MODEL_MISMATCH", "绑定设备与提交的机型不一致");
 
     private final String code;
     private final String defaultMessage;

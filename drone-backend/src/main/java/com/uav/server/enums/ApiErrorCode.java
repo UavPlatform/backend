@@ -20,6 +20,7 @@ public enum ApiErrorCode {
     RATE_LIMITED("RATE_LIMITED", "请求过于频繁，请稍后重试"),
     ORDER_ALREADY_EXISTS("ORDER_ALREADY_EXISTS", "您已有待支付的订单，请先完成支付"),
     ORDER_NOT_FOUND("ORDER_NOT_FOUND", "订单不存在"),
+    USER_NOT_FOUND("USER_NOT_FOUND", "用户不存在"),
     ORDER_STATUS_INVALID("ORDER_STATUS_INVALID", "当前订单状态不允许此操作"),
     ROUTE_NOT_FOUND("ROUTE_NOT_FOUND", "未查询到航线信息，请先创建航线"),
     INTERNAL_ERROR("INTERNAL_ERROR", "系统内部错误"),

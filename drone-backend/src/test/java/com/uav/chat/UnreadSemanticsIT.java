@@ -1,56 +1,43 @@
 package com.uav.chat;
 
-import com.uav.chat.mapper.ChatMessageMapper;
-import com.uav.chat.mapper.ChatSessionMapper;
-import com.uav.chat.mapper.ChatUserSessionMapper;
 import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
+import com.uav.chat.repository.ChatMessageRepository;
+import com.uav.chat.repository.ChatSessionRepository;
+import com.uav.chat.repository.ChatUserSessionRepository;
 import com.uav.chat.service.MessageService;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.util.UserContext;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * 契约测试（t49 / BE P3-37 语义修复）：
- * ① WS 上线补推（getUnreadMessages）只拉不推 lastReadTime——补推消息保留未读语义；
- * ② 补推不计入未读重复累加（未读数以 lastReadTime 单源计算，幂等）；
- * ③ 显式 markSessionRead 推进已读，仅会话成员可调用。MockMvc 集成测试（R9/O4）。
- *
- * <p>R2/R4：继承 {@link IntegrationTestBase}（MOCK + {@code @AutoConfigureMockMvc}），
- * 删除无真实端口依据的 {@code RANDOM_PORT}；R3：成员身份由 {@link TestAccounts}
- * 真实注册取得，不再自签 token；R5：{@code System.nanoTime()} 唯一名改为 {@code UniqueNames}，
- * 隔离靠事务回滚。
- */
 class UnreadSemanticsIT extends IntegrationTestBase {
 
     @Autowired
-    private ChatUserSessionMapper chatUserSessionMapper;
+    private ChatUserSessionRepository chatUserSessionRepository;
 
     @Autowired
-    private ChatSessionMapper chatSessionMapper;
+    private ChatSessionRepository chatSessionRepository;
 
     @Autowired
-    private ChatMessageMapper chatMessageMapper;
+    private ChatMessageRepository chatMessageRepository;
 
     @Autowired
     private MessageService messageService;
 
-    /** 建一个双成员会话；成员 lastReadTime=0（历史未读全量）。返回 sessionId。 */
     private Long seedSessionWithMembers(TestAccounts.Account a, TestAccounts.Account b) {
         long now = System.currentTimeMillis();
         ChatSession session = ChatSession.builder()
@@ -60,9 +47,9 @@ class UnreadSemanticsIT extends IntegrationTestBase {
                 .userIds(List.of(a.id(), b.id()))
                 .createTime(now)
                 .build();
-        chatSessionMapper.insert(session);
+        chatSessionRepository.save(session);
         for (TestAccounts.Account u : List.of(a, b)) {
-            chatUserSessionMapper.insert(ChatUserSession.builder()
+            chatUserSessionRepository.save(ChatUserSession.builder()
                     .sessionId(session.getId())
                     .userId(u.id())
                     .joinTime(now)
@@ -73,7 +60,7 @@ class UnreadSemanticsIT extends IntegrationTestBase {
     }
 
     private void insertMessage(Long sessionId, Long fromUserId, String content, long createTime) {
-        chatMessageMapper.insert(ChatMessage.builder()
+        chatMessageRepository.save(ChatMessage.builder()
                 .msgId(UniqueNames.unique("msg"))
                 .fromUserId(fromUserId)
                 .sessionId(sessionId)
@@ -96,21 +83,15 @@ class UnreadSemanticsIT extends IntegrationTestBase {
         Long sessionId = seedSessionWithMembers(a, b);
         insertMessage(sessionId, b.id(), "离线消息 1", System.currentTimeMillis() - 5_000);
 
-        // WS 上线补推 = getUnreadMessages：拉到消息
         var pulled = messageService.getUnreadMessages(a.id());
         assertThat(pulled).hasSize(1);
 
-        // 但 lastReadTime 未被推进（成员行不变，仍为 0）
-        ChatUserSession link = chatUserSessionMapper.selectOne(
-                Wrappers.<ChatUserSession>lambdaQuery()
-                        .eq(ChatUserSession::getSessionId, sessionId)
-                        .eq(ChatUserSession::getUserId, a.id()));
+        ChatUserSession link = chatUserSessionRepository.findBySessionIdAndUserId(sessionId, a.id())
+                .orElseThrow();
         assertThat(link.getLastReadTime()).isEqualTo(0L);
 
-        // 未读语义保留：计数仍为 1
         assertThat(unreadCount(a.id(), sessionId)).isEqualTo(1);
 
-        // 重复补拉（连接重试/再次 sync）：同一消息再拉一次，未读数不重复累加
         var pulledAgain = messageService.getUnreadMessages(a.id());
         assertThat(pulledAgain).hasSize(1);
         assertThat(unreadCount(a.id(), sessionId)).isEqualTo(1);
@@ -129,11 +110,8 @@ class UnreadSemanticsIT extends IntegrationTestBase {
         messageService.markSessionRead(a.id(), sessionId);
 
         assertThat(unreadCount(a.id(), sessionId)).isZero();
-
-        // 显式已读后，sync 补拉不再返回旧消息
         assertThat(messageService.getUnreadMessages(a.id())).isEmpty();
 
-        // 新消息到达 → 重新计入未读
         insertMessage(sessionId, b.id(), "msg-2", System.currentTimeMillis());
         assertThat(unreadCount(a.id(), sessionId)).isEqualTo(1);
     }
@@ -144,7 +122,7 @@ class UnreadSemanticsIT extends IntegrationTestBase {
         TestAccounts.Account member = accounts().registerUser();
         TestAccounts.Account b = accounts().registerUser();
         Long sessionId = seedSessionWithMembers(member, b);
-        TestAccounts.Account outsider = accounts().registerUser(); // 不在会话内
+        TestAccounts.Account outsider = accounts().registerUser();
         insertMessage(sessionId, member.id(), "hello", System.currentTimeMillis());
 
         UserContext.setUser(outsider.id(), outsider.userName(), outsider.role());
@@ -160,7 +138,7 @@ class UnreadSemanticsIT extends IntegrationTestBase {
         TestAccounts.Account member = accounts().registerUser();
         TestAccounts.Account b = accounts().registerUser();
         Long sessionId = seedSessionWithMembers(member, b);
-        TestAccounts.Account outsider = accounts().registerUser(); // 不在会话内
+        TestAccounts.Account outsider = accounts().registerUser();
         insertMessage(sessionId, member.id(), "hello", System.currentTimeMillis());
 
         mockMvc.perform(post("/chat/Message/read")

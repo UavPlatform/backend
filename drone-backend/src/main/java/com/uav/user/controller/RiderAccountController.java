@@ -51,20 +51,21 @@ public class RiderAccountController {
     }
 
     @OperationLog("绑定无人机")
-    @Operation(summary = "绑定无人机", description = "飞手绑定新的无人机")
+    @Operation(summary = "绑定无人机", description = "飞手绑定新的无人机并映射机型（机型取自 /api/aircraft-models）")
     @PostMapping("/drone/bind")
-    public Result<Void> bindDrone(@RequestParam String djiId) {
+    public Result<Void> bindDrone(@RequestParam String djiId, @RequestParam Long aircraftModelId) {
         Long userId = UserContext.getUserId();
-        riderUavService.bindDrone(userId, djiId);
+        riderUavService.bindDrone(userId, djiId, aircraftModelId);
         return Result.success("无人机绑定成功");
     }
 
     @OperationLog("解绑无人机")
-    @Operation(summary = "解绑无人机", description = "飞手解绑已绑定的无人机")
+    @Operation(summary = "解绑无人机", description = "飞手解绑已绑定的无人机；提交的机型须与绑定记录一致（未映射的存量绑定可不传机型）")
     @DeleteMapping("/drone/unbind")
-    public Result<Void> unbindDrone(@RequestParam String djiId) {
+    public Result<Void> unbindDrone(@RequestParam String djiId,
+                                    @RequestParam(required = false) Long aircraftModelId) {
         Long userId = UserContext.getUserId();
-        riderUavService.unbindDrone(userId, djiId);
+        riderUavService.unbindDrone(userId, djiId, aircraftModelId);
         return Result.success("无人机解绑成功");
     }
 

@@ -2,7 +2,11 @@ package com.uav.admin.controller;
 
 import com.uav.admin.pojo.vo.AdminOrderVo;
 import com.uav.admin.pojo.vo.AdminPageVo;
+import com.uav.admin.pojo.vo.AdminPilotDetailVo;
+import com.uav.admin.pojo.vo.AdminPilotVo;
 import com.uav.admin.pojo.vo.AdminTaskVo;
+import com.uav.admin.pojo.vo.AdminUserDetailVo;
+import com.uav.admin.pojo.vo.AdminUserVo;
 import com.uav.admin.service.AdminQueryService;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.result.Result;
@@ -81,5 +85,56 @@ public class AdminQueryController {
     @GetMapping("/tasks/{taskNum}")
     public Result<AdminTaskVo> taskDetail(@PathVariable String taskNum) {
         return Result.success(adminQueryService.getTaskDetail(taskNum));
+    }
+
+    // ---------- 注册主体（TASK-BACKEND-006 / REQ-FRONTEND-001 / ADR-0004）----------
+
+    @Operation(summary = "注册用户分页列表",
+            description = "注册普通用户（role=0，飞手见 /admin/pilots）；含名下订单数；page 从 0 起",
+            parameters = {
+                    @Parameter(name = "page", description = "页码（从 0 起）"),
+                    @Parameter(name = "size", description = "每页条数（默认 20，上限 100）"),
+                    @Parameter(name = "keyword", description = "用户名关键字（模糊匹配，忽略大小写）"),
+                    @Parameter(name = "status", description = "账号状态筛选（1 正常 / 0 停用）")
+            })
+    @GetMapping("/users")
+    public Result<AdminPageVo<AdminUserVo>> listUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(adminQueryService.listUsers(page, size, keyword, status));
+    }
+
+    @Operation(summary = "用户详情",
+            description = "基本信息 + 关联订单摘要（orderNum、任务、状态、金额）；飞手请用 /admin/pilots/{userId}",
+            parameters = {@Parameter(name = "userId", description = "用户ID", required = true)})
+    @GetMapping("/users/{userId}")
+    public Result<AdminUserDetailVo> userDetail(@PathVariable Long userId) {
+        return Result.success(adminQueryService.getUserDetail(userId));
+    }
+
+    @Operation(summary = "注册飞手分页列表",
+            description = "注册飞手（role=1）；含绑定无人机数、在线无人机数与累计完成单；page 从 0 起",
+            parameters = {
+                    @Parameter(name = "page", description = "页码（从 0 起）"),
+                    @Parameter(name = "size", description = "每页条数（默认 20，上限 100）"),
+                    @Parameter(name = "keyword", description = "用户名关键字（模糊匹配，忽略大小写）")
+            })
+    @GetMapping("/pilots")
+    public Result<AdminPageVo<AdminPilotVo>> listPilots(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword) {
+        return Result.success(adminQueryService.listPilots(page, size, keyword));
+    }
+
+    @Operation(summary = "飞手详情",
+            description = "基本信息 + 绑定无人机表（djiId、机型名、在线、可用）+ 关联订单；"
+                    + "无人机启用/禁用复用 POST /admin/uav/available（按 deviceId=djiId 启停）",
+            parameters = {@Parameter(name = "userId", description = "飞手ID", required = true)})
+    @GetMapping("/pilots/{userId}")
+    public Result<AdminPilotDetailVo> pilotDetail(@PathVariable Long userId) {
+        return Result.success(adminQueryService.getPilotDetail(userId));
     }
 }

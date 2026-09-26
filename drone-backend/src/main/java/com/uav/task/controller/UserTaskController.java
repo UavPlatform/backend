@@ -5,17 +5,15 @@ import com.uav.billing.service.BillConfigService;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.enums.Role;
 import com.uav.task.pojo.dto.PriceEstimateDto;
+import com.uav.task.pojo.dto.SelectRiderDto;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.server.result.Result;
-import com.uav.order.mapper.OrderRepository;
-import com.uav.order.pojo.entity.MissionOrder;
-import com.uav.task.mapper.TaskAssignmentRepository;
-import com.uav.task.pojo.entity.TaskAssignment;
+import com.uav.task.pojo.vo.TaskApplicationVO;
+import com.uav.task.service.TaskApplicationService;
 import com.uav.task.pojo.vo.AmapConfigVO;
 import com.uav.task.pojo.vo.PriceDetailVO;
 import com.uav.task.pojo.vo.PublishConfigVO;
-import com.uav.task.pojo.vo.TaskActionHints;
 import com.uav.task.pojo.vo.TaskPageVO;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.annotation.OperationLog;
@@ -23,7 +21,7 @@ import com.uav.server.annotation.RateLimiter;
 import com.uav.server.config.AmapConfig;
 import com.uav.server.util.UserContext;
 import com.uav.task.service.TaskService;
-import com.uav.user.mapper.UserRepository;
+import com.uav.task.service.TaskVoAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -53,16 +51,10 @@ public class UserTaskController {
     private BillConfigService billConfigService;
 
     @Autowired
-    private TaskAssignmentRepository taskAssignmentRepository;
+    private TaskApplicationService taskApplicationService;
 
     @Autowired
-    private OrderRepository orderRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
+    private TaskVoAssembler taskVoAssembler;
 
     @Operation(summary = "获取地图配置", description = "返回高德地图 JS API 所需的 key 与安全密钥")
     @GetMapping("/init")
@@ -72,11 +64,13 @@ public class UserTaskController {
 
     @OperationLog("创建任务")
     @RateLimiter(limit = 10, windowSeconds = 60)
-    @Operation(summary = "创建任务", description = "创建新任务，包含任务类型、航点信息等")
+    @Operation(summary = "创建任务",
+            description = "创建新任务（含任务类型、航点、货物字段），同时生成待撮合草稿订单（MATCHING），"
+                    + "不强制立即支付（ADR-0003 决定 3）；金额在选定应征时锁定")
     @PostMapping("/create")
     public Result<TaskVo> createTask(@RequestBody TaskDto dto) {
         Task saved = taskService.createTask(dto);
-        return Result.success("任务创建成功", toTaskVo(saved));
+        return Result.success("任务创建成功", taskVoAssembler.assemble(saved));
     }
 
     @OperationLog("参考价预估")
@@ -107,7 +101,7 @@ public class UserTaskController {
         Page<Task> taskPage = taskService.getTasksByUser(userId, page, size);
 
         List<TaskVo> tasks = taskPage.getContent().stream()
-                .map(this::toTaskVo)
+                .map(taskVoAssembler::assemble)
                 .toList();
 
         TaskPageVO vo = new TaskPageVO();
@@ -119,42 +113,50 @@ public class UserTaskController {
     }
 
     @OperationLog("查询任务详情")
-    @Operation(summary = "获取任务详情", description = "根据任务编号获取详细信息，包含航点列表",
+    @Operation(summary = "获取任务详情",
+            description = "根据任务编号获取详细信息，含航点、货物字段、撮合状态 matchStatus、"
+                    + "约定时间/双方确认时间与选定应征报价（quotedAmount）/机型",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @GetMapping("/detail")
     public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {
         Long userId = UserContext.getUserId();
         Task task = taskService.getTaskByTaskNum(taskNum, userId);
-        return Result.success("获取成功", toTaskVo(task));
+        return Result.success("获取成功", taskVoAssembler.assemble(task));
     }
 
-    private TaskVo toTaskVo(Task task) {
-        TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElse(null);
-        TaskVo vo = TaskVo.from(task, assignment);
-        if (assignment != null) {
-            userRepository.findById(assignment.getRiderId())
-                .ifPresent(user -> vo.setRiderName(user.getUserName()));
-        }
-        MissionOrder order = orderRepository.findByTaskId(task.getId()).orElse(null);
-        if (order != null) {
-            vo.setOrderNum(order.getOrderNum());
-            vo.setTotalAmount(order.getTotalAmount());
-            vo.setTotalDistance(order.getTotalDistance());
-            vo.setOrderStatus(order.getOrderStatus().name());
-        }
-        // 1B-9a 状态矩阵：任务状态×订单状态 → 操作提示
-        vo.setActionHint(TaskActionHints.hint(task.getTaskStatus(),
-                order != null ? order.getOrderStatus() : null));
-        // 1B-4b：任务→设备映射（deviceId/liveState），用户端据此点亮「观看直播」入口
-        var liveDevice = liveDeviceResolver.resolveForTask(task.getId());
-        vo.setDeviceId(liveDevice.deviceId());
-        vo.setLiveState(liveDevice.liveState());
-        return vo;
+    @OperationLog("查询应征列表")
+    @Operation(summary = "应征列表",
+            description = "任务属主、应征飞手与管理员（role=2，监管端只读）按任务编号查询飞手应征列表："
+                    + "飞手、机型、载重、系统报价 quotedAmount、应征时间、状态"
+                    + "（非属主非应征的普通用户 403）",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @RequireRole({0, 1, 2})
+    @GetMapping("/{taskNum}/applications")
+    public Result<List<TaskApplicationVO>> listApplications(@PathVariable String taskNum) {
+        Long userId = UserContext.getUserId();
+        return Result.success("获取成功", taskApplicationService.listByTask(taskNum, userId, UserContext.getRole()));
+    }
+
+    @OperationLog("选定应征下单")
+    @Operation(summary = "用户选定应征并下单",
+            description = "ADR-0003 决定 3：选定一条应征（其余自动 CLOSED）+ 提交约定作业时间 scheduledTime，"
+                    + "服务端锁定订单 totalAmount = 该应征 quotedAmount（严格相等，不允许改价）并转待支付（PENDING）；"
+                    + "随后走既有 POST /pay/{orderNum} 支付。撮合状态 → AWAITING_PAYMENT，"
+                    + "非法迁移返回 MATCH_STATUS_INVALID；已有待支付订单返回 ORDER_ALREADY_EXISTS",
+            parameters = {
+                    @Parameter(name = "taskNum", description = "任务编号", required = true)
+            })
+    @PostMapping("/{taskNum}/select-rider")
+    public Result<TaskVo> selectRider(@PathVariable String taskNum,
+                                      @RequestBody SelectRiderDto dto) {
+        Long userId = UserContext.getUserId();
+        Task task = taskService.selectRider(taskNum, userId, dto.getApplicationId(), dto.getScheduledTime());
+        return Result.success("下单成功，待支付", taskVoAssembler.assemble(task));
     }
 
     @OperationLog("删除任务")
     @RateLimiter(limit = 5, windowSeconds = 60)
-    @Operation(summary = "删除任务", description = "删除指定ID的任务，只能删除自己创建的任务",
+    @Operation(summary = "删除任务", description = "删除指定ID的任务，只能删除自己创建的任务；已支付/已完成订单的任务禁止删除",
             parameters = {@Parameter(name = "id", description = "任务数据库ID", required = true)})
     @DeleteMapping("/delete")
     public Result<Void> deleteTask(@RequestParam Long id) {
@@ -164,7 +166,9 @@ public class UserTaskController {
     }
 
     @OperationLog("确认收货")
-    @Operation(summary = "确认收货", description = "骑手完成任务后用户确认收货，订单完结",
+    @Operation(summary = "确认收货",
+            description = "飞手上传履约证据并交付后用户确认收货：须已存在 attachment 证据（否则 "
+                    + "DELIVERY_EVIDENCE_REQUIRED），确认后订单 COMPLETED、撮合状态 CLOSED",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @PostMapping("/confirm")
     public Result<Void> confirmTask(@RequestParam String taskNum) {

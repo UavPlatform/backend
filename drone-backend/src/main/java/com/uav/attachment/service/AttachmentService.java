@@ -22,8 +22,8 @@ import java.util.UUID;
 /**
  * 交付物附件业务（1B-9b）：授权、类型/大小限制、presigned URL、附件列表。
  *
- * <p>授权口径（裁决 Q8=B）：上传=任务的接单飞手（task_assignment.rider_id）；
- * 查看/下载=任务所有者与接单飞手。objectKey 全局唯一（task-attachments/{taskNum}/{uuid}）。
+ * <p>授权口径（裁决 Q8=B，TASK-BACKEND-007 只读放行）：上传=任务的接单飞手或任务所有者（写路径不变）；
+ * 查看/下载=任务所有者、接单飞手与管理员（role=2，监管端只读）。objectKey 全局唯一（task-attachments/{taskNum}/{uuid}）。
  */
 @Slf4j
 @Service
@@ -44,14 +44,18 @@ public class AttachmentService {
 
     private final MinioStorageService minioStorageService;
 
+    private final com.uav.task.service.TaskReadAccess taskReadAccess;
+
     public AttachmentService(TaskRepository taskRepository,
                              TaskAttachmentRepository taskAttachmentRepository,
                              com.uav.task.mapper.TaskAssignmentRepository taskAssignmentRepository,
-                             MinioStorageService minioStorageService) {
+                             MinioStorageService minioStorageService,
+                             com.uav.task.service.TaskReadAccess taskReadAccess) {
         this.taskRepository = taskRepository;
         this.taskAttachmentRepository = taskAttachmentRepository;
         this.taskAssignmentRepository = taskAssignmentRepository;
         this.minioStorageService = minioStorageService;
+        this.taskReadAccess = taskReadAccess;
     }
 
     /**
@@ -91,13 +95,13 @@ public class AttachmentService {
     }
 
     /**
-     * 附件列表（任务所有者与接单飞手可看），逐条附 presigned 下载 URL。
+     * 附件列表（任务所有者、接单飞手与管理员只读），逐条附 presigned 下载 URL。
      */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> listAttachments(Long callerId, String taskNum) {
+    public List<Map<String, Object>> listAttachments(Long callerId, Integer role, String taskNum) {
         requireConfigured();
         Task task = requireTask(taskNum);
-        requireOwnerOrRider(task, callerId);
+        requireReadAccess(task, callerId, role);
 
         return taskAttachmentRepository.findByTaskNumOrderByCreateTimeAsc(taskNum).stream()
                 .map(a -> {
@@ -116,13 +120,13 @@ public class AttachmentService {
     }
 
     /**
-     * 单个附件的下载凭证（所有者或飞手）。
+     * 单个附件的下载凭证（任务所有者、接单飞手与管理员只读）。
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> downloadUrl(Long callerId, String taskNum, String objectKey) {
+    public Map<String, Object> downloadUrl(Long callerId, Integer role, String taskNum, String objectKey) {
         requireConfigured();
         Task task = requireTask(taskNum);
-        requireOwnerOrRider(task, callerId);
+        requireReadAccess(task, callerId, role);
         TaskAttachment attachment = taskAttachmentRepository
                 .findByTaskNumAndObjectKey(taskNum, objectKey)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM,
@@ -159,6 +163,16 @@ public class AttachmentService {
                 .map(a -> a.getRiderId().equals(callerId))
                 .orElse(false);
         if (!isOwner && !isRider) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "无权查看该任务交付物");
+        }
+    }
+
+    /**
+     * 只读放行（TASK-BACKEND-007）：任务属主 / 应征飞手 / 管理员（role=2），
+     * 其余 → 403（错误码与文案沿用既有口径）。写路径不走此方法。
+     */
+    private void requireReadAccess(Task task, Long callerId, Integer role) {
+        if (!taskReadAccess.canRead(task, callerId, role)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "无权查看该任务交付物");
         }
     }

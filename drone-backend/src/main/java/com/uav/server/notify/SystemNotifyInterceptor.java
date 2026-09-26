@@ -3,6 +3,7 @@ package com.uav.server.notify;
 import com.uav.chat.notify.SystemNotificationService;
 import com.uav.chat.pojo.enums.MsgType;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.util.UserContext;
@@ -32,6 +33,9 @@ import java.util.Map;
  *   <li>Task IN_PROGRESS→COMPLETED —— 完成（通知任务发布者）</li>
  *   <li>MissionOrder →WAITING_CONFIRM —— 待验收（通知任务发布者）</li>
  *   <li>MissionOrder WAITING_CONFIRM→COMPLETED —— 确认完成（通知接单飞手）</li>
+ *   <li>Task.matchStatus → AWAITING_PAYMENT —— 用户选定应征（通知被选定飞手，ORDER_SELECTED）</li>
+ *   <li>Task.matchStatus → AWAITING_RIDER_CONFIRM —— 支付成功待飞手确认（通知被选定飞手）</li>
+ *   <li>Task.matchStatus → CONFIRMED —— 双确认完成（通知被选定飞手；用户侧由 TASK_ACCEPTED 覆盖）</li>
  * </ol>
  *
  * <p>派发时机：捕获到首个迁移时向当前 Spring 事务注册 {@link TransactionSynchronization}，
@@ -76,7 +80,7 @@ public class SystemNotifyInterceptor implements Interceptor {
                 }
                 if (before == OrderStatus.PENDING && after == OrderStatus.PAID) {
                     add(NotificationDraft.of(order.getUserId(), MsgType.ORDER, "ORDER_PAID",
-                            orderData(order), "任务支付成功，已进入接单大厅"));
+                            orderData(order), "任务支付成功，等待飞手确认约定时间"));
                 } else if (after == OrderStatus.WAITING_CONFIRM) {
                     add(NotificationDraft.of(order.getUserId(), MsgType.ORDER, "ORDER_WAITING_CONFIRM",
                             orderData(order), "飞手已完成任务，请前往验收确认"));
@@ -92,21 +96,44 @@ public class SystemNotifyInterceptor implements Interceptor {
             } else if (entity instanceof Task task) {
                 TaskStatus before = (TaskStatus) stateAt(previousState, propertyNames, "taskStatus");
                 TaskStatus after = (TaskStatus) stateAt(currentState, propertyNames, "taskStatus");
-                if (before == after || after == null) {
+                MatchStatus matchBefore = (MatchStatus) stateAt(previousState, propertyNames, "matchStatus");
+                MatchStatus matchAfter = (MatchStatus) stateAt(currentState, propertyNames, "matchStatus");
+                if (before == after && matchBefore == matchAfter) {
                     return false;
                 }
                 Long actorId = UserContext.getUserId();
-                if (before == TaskStatus.IDLE && after == TaskStatus.IN_PROGRESS) {
-                    Map<String, Object> data = baseData(task);
-                    data.put("riderId", actorId);
-                    add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_ACCEPTED", data,
-                            "您的任务已被飞手接单"));
-                } else if (before == TaskStatus.IN_PROGRESS && after == TaskStatus.IDLE) {
-                    add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_CANCELLED", baseData(task),
-                            "飞手已取消接单，任务重新进入接单大厅"));
-                } else if (before == TaskStatus.IN_PROGRESS && after == TaskStatus.COMPLETED) {
-                    add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_COMPLETED", baseData(task),
-                            "飞手已完成任务，请前往验收确认"));
+                if (before != after && after != null) {
+                    if (before == TaskStatus.IDLE && after == TaskStatus.IN_PROGRESS) {
+                        Map<String, Object> data = baseData(task);
+                        data.put("riderId", actorId);
+                        add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_ACCEPTED", data,
+                                "双方已确认，任务开始执行"));
+                    } else if (before == TaskStatus.IN_PROGRESS && after == TaskStatus.IDLE) {
+                        add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_CANCELLED", baseData(task),
+                                "飞手已取消接单，任务重新开放撮合"));
+                    } else if (before == TaskStatus.IN_PROGRESS && after == TaskStatus.COMPLETED) {
+                        add(NotificationDraft.of(task.getUserId(), MsgType.NOTICE, "TASK_COMPLETED", baseData(task),
+                                "飞手已完成任务，请前往验收确认"));
+                    }
+                }
+                // 撮合状态事件（TASK-BACKEND-004 冲突点 4）：选定 / 待飞手确认 / 双确认完成
+                if (matchBefore != matchAfter && matchAfter != null) {
+                    if (matchAfter == MatchStatus.AWAITING_PAYMENT) {
+                        // 被选定的飞手（派发阶段按任务的 SELECTED 应征解析收件人）
+                        Map<String, Object> data = baseData(task);
+                        data.put("ownerId", actorId);
+                        add(NotificationDraft.forTask(task.getUserId(), MsgType.NOTICE, "ORDER_SELECTED",
+                                data, "用户已选定您，请等待支付后确认约定时间", task.getId()));
+                    } else if (matchAfter == MatchStatus.AWAITING_RIDER_CONFIRM) {
+                        // 支付成功 → 待飞手确认（收件人同上按 SELECTED 应征解析）
+                        add(NotificationDraft.forTask(task.getUserId(), MsgType.ORDER, "ORDER_WAIT_RIDER_CONFIRM",
+                                orderDataFromTask(task), "用户已支付，请确认约定时间并接单", task.getId()));
+                    } else if (matchAfter == MatchStatus.CONFIRMED) {
+                        // 双确认完成 → 通知被选定飞手（用户侧由 TASK_ACCEPTED 覆盖）
+                        Map<String, Object> data = baseData(task);
+                        add(NotificationDraft.forTask(task.getUserId(), MsgType.NOTICE, "MATCH_CONFIRMED",
+                                data, "双方已确认，请按约定时间执行任务", task.getId()));
+                    }
                 }
             }
             registerCommitDispatchIfNeeded();
@@ -185,6 +212,14 @@ public class SystemNotifyInterceptor implements Interceptor {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("orderNum", order.getOrderNum());
         data.put("taskId", order.getTask() != null ? order.getTask().getId() : null);
+        return data;
+    }
+
+    private Map<String, Object> orderDataFromTask(Task task) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("taskNum", task.getTaskNum());
+        data.put("taskName", task.getTaskName());
+        data.put("taskId", task.getId());
         return data;
     }
 }

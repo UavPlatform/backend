@@ -1,6 +1,8 @@
 package com.uav.task.pojo.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.uav.server.enums.CargoCategory;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import jakarta.persistence.*;
@@ -19,6 +21,9 @@ public class Task {
     protected void onCreate() {
         this.createTime = LocalDateTime.now();
         this.updateTime = this.createTime;
+        if (this.matchStatus == null) {
+            this.matchStatus = MatchStatus.SEEKING_RIDER;
+        }
     }
 
     @PreUpdate
@@ -47,6 +52,15 @@ public class Task {
     @Column(name = "task_status")
     private TaskStatus taskStatus;
 
+    /**
+     * 撮合子状态（V5__match_status.sql / ADR-0003 决定 6）：承载「发单 → 应征 → 选定 → 支付 →
+     * 双确认 → 验收 → 结案」的匹配阶段；{@link TaskStatus} 保持三态不扩。
+     * 未显式赋值时按 {@link MatchStatus#SEEKING_RIDER} 落库（存量行由 V5 迁移回填）。
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "match_status", length = 32)
+    private MatchStatus matchStatus;
+
     @Column(name = "default_speed")
     private Double defaultSpeed;
 
@@ -64,12 +78,28 @@ public class Task {
     @Column(name = "task_time")
     private LocalDateTime taskTime;
 
+    /**
+     * 吊运货物重量（kg）（V3__transport_application.sql）。ADR-0003 报价公式因子
+     * {@code weightCharge = 重量 × transport.pricing.price-per-kg}。
+     * 可空：存量任务与非吊运任务不填；吊运应征时缺重量会被拒绝计价。
+     */
+    @Column(name = "cargo_weight_kg", precision = 8, scale = 2)
+    private BigDecimal cargoWeightKg;
+
+    /**
+     * 吊运货物类别（V3__transport_application.sql），与 {@code transport.pricing.category-surcharge}
+     * 配置表对齐；可空 = 未知类别（按 unknown-category-surcharge 计费）。
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cargo_category", length = 32)
+    private CargoCategory cargoCategory;
+
+    /**
+     * 用户意向价（元）。供飞手参考与后续筛选，<b>不参与计费</b>——
+     * 成交价由 ADR-0003 报价公式给出，并在用户选定应征时锁定到订单。
+     */
     @Column(name = "reward")
     private Double reward;
-
-    /** 货物重量（kg），空 = 未填写 */
-    @Column(name = "weight")
-    private Double weight;
 
     /** 平台参考价（元，2 位小数） */
     @Column(name = "reference_price", precision = 10, scale = 2)

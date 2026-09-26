@@ -1,20 +1,25 @@
 package com.uav.chat.notify;
 
 import com.alibaba.fastjson.JSON;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.uav.chat.mapper.ChatMessageMapper;
-import com.uav.chat.mapper.ChatSessionMapper;
-import com.uav.chat.mapper.ChatUserSessionMapper;
 import com.uav.chat.pojo.entity.ChatEnvelope;
 import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
+import com.uav.chat.repository.ChatMessageRepository;
+import com.uav.chat.repository.ChatSessionRepository;
+import com.uav.chat.repository.ChatUserSessionRepository;
 import com.uav.chat.websocket.ChatWebSocketHandler;
 import com.uav.server.notify.NotificationDraft;
+import com.uav.server.enums.ApplicationStatus;
+import com.uav.task.mapper.TaskApplicationRepository;
 import com.uav.task.mapper.TaskAssignmentRepository;
+import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.task.pojo.entity.TaskAssignment;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,10 +29,6 @@ import java.util.UUID;
 
 /**
  * 系统通知派发（1B-3，裁决 Q9=A）。
- *
- * <p>职责：为接收方维护一个「系统通知」会话（chat_session.type=2，与普通聊天会话隔离），
- * 将状态变更通知以 ChatMessage（msg_type=1 NOTICE / 2 ORDER，content 为结构化 JSON）落库，
- * 并在接收方在线时经聊天 WS 实时推送；离线由既有 /chat/Message/sync 补偿（getUnreadMessages）。
  */
 @Slf4j
 @Service
@@ -36,43 +37,47 @@ public class SystemNotificationService {
     /** 系统通知会话类型标记（0=一对一，1=群组，2=系统通知） */
     public static final int SESSION_TYPE_SYSTEM = 2;
 
-    private final ChatSessionMapper chatSessionMapper;
-
-    private final ChatUserSessionMapper chatUserSessionMapper;
-
-    private final ChatMessageMapper chatMessageMapper;
-
+    private final ChatSessionRepository chatSessionRepository;
+    private final ChatUserSessionRepository chatUserSessionRepository;
+    private final ChatMessageRepository chatMessageRepository;
     private final ChatWebSocketHandler chatWebSocketHandler;
-
     private final TaskAssignmentRepository taskAssignmentRepository;
+    private final TaskApplicationRepository taskApplicationRepository;
+    private final ObjectProvider<SystemNotificationService> self;
 
-    public SystemNotificationService(ChatSessionMapper chatSessionMapper,
-                                     ChatUserSessionMapper chatUserSessionMapper,
-                                     ChatMessageMapper chatMessageMapper,
+    public SystemNotificationService(ChatSessionRepository chatSessionRepository,
+                                     ChatUserSessionRepository chatUserSessionRepository,
+                                     ChatMessageRepository chatMessageRepository,
                                      ChatWebSocketHandler chatWebSocketHandler,
-                                     TaskAssignmentRepository taskAssignmentRepository) {
-        this.chatSessionMapper = chatSessionMapper;
-        this.chatUserSessionMapper = chatUserSessionMapper;
-        this.chatMessageMapper = chatMessageMapper;
+                                     TaskAssignmentRepository taskAssignmentRepository,
+                                     TaskApplicationRepository taskApplicationRepository,
+                                     ObjectProvider<SystemNotificationService> self) {
+        this.chatSessionRepository = chatSessionRepository;
+        this.chatUserSessionRepository = chatUserSessionRepository;
+        this.chatMessageRepository = chatMessageRepository;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.taskAssignmentRepository = taskAssignmentRepository;
+        this.taskApplicationRepository = taskApplicationRepository;
+        this.self = self;
     }
 
-    /**
-     * 派发一批通知（事务已提交后调用；单条失败不影响其余通知）。
-     */
     public void dispatch(List<NotificationDraft> drafts) {
         for (NotificationDraft draft : drafts) {
             if (draft == null || draft.recipientId() == null) {
                 continue;
             }
             try {
-                insertNotification(draft);
+                self.getObject().insertNotificationInNewTx(draft);
             } catch (Exception e) {
                 log.error("系统通知落库/推送失败, recipient={}, name={}: {}",
                         draft.recipientId(), draft.name(), e.getMessage(), e);
             }
         }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void insertNotificationInNewTx(NotificationDraft draft) {
+        insertNotification(draft);
     }
 
     private void insertNotification(NotificationDraft draft) {
@@ -88,7 +93,7 @@ public class SystemNotificationService {
 
         ChatMessage message = ChatMessage.builder()
                 .msgId(UUID.randomUUID().toString())
-                .fromUserId(0L) // 0 = 系统
+                .fromUserId(0L)
                 .sessionId(sessionId)
                 .content(JSON.toJSONString(payload))
                 .status(0)
@@ -96,9 +101,9 @@ public class SystemNotificationService {
                 .msgType(draft.msgType().getCode())
                 .deletedByUserIds(new ArrayList<>())
                 .build();
-        chatMessageMapper.insert(message);
+        chatMessageRepository.save(message);
 
-        com.uav.chat.pojo.entity.ChatEnvelope envelope = com.uav.chat.pojo.entity.ChatEnvelope.builder()
+        ChatEnvelope envelope = ChatEnvelope.builder()
                 .msgId(message.getMsgId())
                 .sessionId(sessionId)
                 .msgType(draft.msgType())
@@ -114,29 +119,36 @@ public class SystemNotificationService {
                 draft.name(), pushed ? "WS" : "未（离线，走 sync 补偿）", recipientId, sessionId);
     }
 
-    /**
-     * 接收方解析：确认完成（ORDER_CONFIRMED）的对方是接单飞手（按 taskId 查接单记录），
-     * 其余通知的接收方即草稿携带的用户（通常是任务/订单所有者本人或 actor 的对端）。
-     */
     private Long resolveRecipient(NotificationDraft draft) {
-        if ("ORDER_CONFIRMED".equals(draft.name()) && draft.taskId() != null) {
-            return taskAssignmentRepository.findByTaskId(draft.taskId())
-                    .map(TaskAssignment::getRiderId)
-                    .orElse(draft.recipientId());
+        if (draft.taskId() != null) {
+            if ("ORDER_CONFIRMED".equals(draft.name())) {
+                return taskAssignmentRepository.findByTaskId(draft.taskId())
+                        .map(TaskAssignment::getRiderId)
+                        .orElse(draft.recipientId());
+            }
+            // 撮合事件收件人 = 被选定的飞手（TASK-BACKEND-004）：
+            // 选定时点 assignment 尚不存在 → 按 SELECTED 应征解析；确认后两者皆可
+            if ("ORDER_SELECTED".equals(draft.name())
+                    || "ORDER_WAIT_RIDER_CONFIRM".equals(draft.name())
+                    || "MATCH_CONFIRMED".equals(draft.name())) {
+                Long selectedRider = taskApplicationRepository
+                        .findByTaskIdAndStatus(draft.taskId(), ApplicationStatus.SELECTED)
+                        .map(TaskApplication::getRiderId)
+                        .orElse(null);
+                if (selectedRider != null) {
+                    return selectedRider;
+                }
+                return taskAssignmentRepository.findByTaskId(draft.taskId())
+                        .map(TaskAssignment::getRiderId)
+                        .orElse(draft.recipientId());
+            }
         }
         return draft.recipientId();
     }
 
-    /**
-     * 懒创建/复用接收方的「系统通知」会话；成员 lastReadTime=0，保证历史通知可被 sync 拉全。
-     */
     private Long ensureSystemSession(Long userId) {
-        List<ChatSession> found = chatSessionMapper.selectList(
-                Wrappers.<ChatSession>lambdaQuery()
-                        .eq(ChatSession::getType, SESSION_TYPE_SYSTEM)
-                        .eq(ChatSession::getOwnerId, userId)
-                        .orderByAsc(ChatSession::getId)
-                        .last("LIMIT 1"));
+        List<ChatSession> found = chatSessionRepository.findByTypeAndOwnerIdOrderByIdAsc(
+                SESSION_TYPE_SYSTEM, userId);
         if (found != null && !found.isEmpty()) {
             return found.get(0).getId();
         }
@@ -148,8 +160,8 @@ public class SystemNotificationService {
                 .userIds(List.of(userId))
                 .createTime(now)
                 .build();
-        chatSessionMapper.insert(session);
-        chatUserSessionMapper.insert(ChatUserSession.builder()
+        chatSessionRepository.saveAndFlush(session);
+        chatUserSessionRepository.save(ChatUserSession.builder()
                 .sessionId(session.getId())
                 .userId(userId)
                 .joinTime(now)

@@ -10,9 +10,13 @@ import com.uav.pay.pojo.vo.PayResultVO;
 import com.uav.pay.service.WeChatPayService;
 import com.uav.pay.util.WeChatPayUtil;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.exception.PayNotifyException;
+import com.uav.task.mapper.TaskApplicationRepository;
+import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskApplication;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,6 +37,9 @@ public class WeChatPayServiceImpl implements WeChatPayService {
 
     @Autowired
     private PayRecordRepository payRecordRepository;
+
+    @Autowired
+    private TaskApplicationRepository taskApplicationRepository;
 
     @Autowired
     private WeChatPayConfig weChatPayConfig;
@@ -56,6 +63,8 @@ public class WeChatPayServiceImpl implements WeChatPayService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_STATUS_INVALID,
                     "当前订单状态不允许支付");
         }
+        // ADR-0003 决定 2「不允许改价」：支付前硬校验 totalAmount == 选定应征的 quotedAmount
+        requireLockedQuote(order);
 
         PayRecord existing = payRecordRepository.findByOrderNum(orderNum).orElse(null);
         if (existing != null && existing.getPrepayId() != null
@@ -145,6 +154,17 @@ public class WeChatPayServiceImpl implements WeChatPayService {
             throw new PayNotifyException("支付回调金额与订单金额不一致");
         }
 
+        // ADR-0003「不允许改价」：回调入账前同样硬校验 totalAmount == 选定应征 quotedAmount
+        // （防订单金额在支付窗口被篡改；不一致拒绝入账并审计留痕）
+        try {
+            requireLockedQuote(order);
+        } catch (BusinessException e) {
+            log.error("[资损防护] 支付回调触发报价一致性校验失败，拒绝入账。orderNum={}, err={}",
+                    orderNum, e.getMessage());
+            payRecordAuditService.writeRecordError(record.getId(), e.getMessage());
+            throw new PayNotifyException(e.getMessage());
+        }
+
         record.setTransactionId(transactionId);
         record.setStatus(OrderStatus.PAID);
         record.setPayTime(LocalDateTime.now());
@@ -153,7 +173,39 @@ public class WeChatPayServiceImpl implements WeChatPayService {
         order.setOrderStatus(OrderStatus.PAID);
         orderRepository.save(order);
 
+        // ADR-0003 决定 3：支付成功 → 待飞手确认（撮合状态机推进 + 拦截器向飞手发通知）
+        Task task = order.getTask();
+        if (task != null) {
+            if (task.getMatchStatus() == MatchStatus.AWAITING_PAYMENT) {
+                task.setMatchStatus(MatchStatus.AWAITING_RIDER_CONFIRM);
+            } else if (task.getMatchStatus() != MatchStatus.AWAITING_RIDER_CONFIRM) {
+                // 订单已支付但撮合状态不符：金额安全优先（不回滚入账），留错误日志供排查
+                log.error("[撮合状态异常] 支付成功但任务 {} 撮合状态为 {}（期望 AWAITING_PAYMENT）",
+                        task.getTaskNum(), task.getMatchStatus());
+            }
+        }
+
         log.info("支付回调成功, 订单号: {}, 微信流水号: {}, 金额: {}分", orderNum, transactionId, callbackAmountCents);
+    }
+
+    /**
+     * 支付硬校验（ADR-0003 决定 2「不允许改价」）：订单必须经过「用户选定应征」锁定金额，
+     * 且 {@code totalAmount} 严格等于该应征的 {@code quotedAmount}，否则
+     * {@link ApiErrorCode#AMOUNT_MISMATCH} 拒绝支付。
+     */
+    private void requireLockedQuote(MissionOrder order) {
+        if (order.getSelectedApplicationId() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.AMOUNT_MISMATCH,
+                    "订单未锁定系统报价（未经过选定应征流程），拒绝支付");
+        }
+        TaskApplication application = taskApplicationRepository.findById(order.getSelectedApplicationId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.AMOUNT_MISMATCH,
+                        "订单锁定的应征记录不存在，拒绝支付"));
+        if (order.getTotalAmount() == null
+                || order.getTotalAmount().compareTo(application.getQuotedAmount()) != 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.AMOUNT_MISMATCH,
+                    "订单金额与系统报价不一致（成交价必须等于 quotedAmount），拒绝支付");
+        }
     }
 
     private Integer toCents(BigDecimal amountYuan) {

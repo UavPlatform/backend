@@ -21,6 +21,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.Connection;
+import java.util.Base64;
 
 import javax.sql.DataSource;
 import java.time.Duration;
@@ -44,14 +45,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>无静默降级</b>：T4_DB_* 任一缺失时本类被 JUnit 显式禁用（skip），绝不回退 H2。</li>
  * </ul>
  *
- * <p>覆盖链路：建单（POST /task/create 生成 MissionOrder=PENDING）→ 支付（POST /pay/{orderNum}）
- * → 接单（POST /rider/accept，需飞手已绑定无人机）→ 交付（POST /rider/complete）。
+ * <p>覆盖链路（TASK-BACKEND-004 / ADR-0003）：发布（POST /task/create → MATCHING 草稿订单，
+ * 不强制支付）→ 飞手应征（POST /rider/apply，服务端计价）→ 用户选定+约定时间
+ * （POST /task/{taskNum}/select-rider，锁定 totalAmount=quotedAmount）→ 支付（POST /pay/{orderNum}）
+ * → 飞手双确认（POST /rider/confirm-order → IN_PROGRESS）→ 交付（POST /rider/complete，
+ * 须履约证据）→ 验收（POST /task/confirm → 订单 COMPLETED / 撮合 CLOSED）。
  *
- * <p>schema 来源（**限定本 E2E profile**）：本 profile 显式关闭 Flyway（`spring.flyway.enabled=false`；主配置 `application.yml` 为 `true`），
- * schema 100% 由 Hibernate `ddl-auto=create-drop` 建立；Flyway 迁移链断裂由**独立干净库探针**证明（QA-B16），**不在本 profile 内复现**。
- *
- * <p><b>强制表述：本 harness 的结构保真未验证</b>（QA-B16）。schema 由本 profile 的 Hibernate `create-drop` 决定，
- * <b>不得</b>由此推出「迁移链健康」；要证明迁移链是坏的须走**独立探针**（独立类、独立命名，红才是预期）。
+ * <p>schema 来源（**限定本 E2E profile**）：Flyway {@code db/migration/V1__baseline.sql}
+ * 为唯一 DDL 来源，JPA {@code ddl-auto=validate} 仅校验映射一致性（ADR-0001）。
  *
  * <p>为何 profile 用 test 而非专用 e2e：com.uav.pay.MockPayGuard 把 mock 支付白名单硬编码为 [dev, test]
  * （src/main，测试不可改），非白名单 profile 会拒绝启用 mock 支付。故复用 test profile 满足门禁，
@@ -86,21 +87,12 @@ import static org.assertj.core.api.Assertions.assertThat;
                         + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai",
                 "spring.datasource.username=${T4_DB_USER}",
                 "spring.datasource.password=${T4_DB_PASSWORD}",
-                // ── harness 语义：create-drop（已实测不受跨 schema 误判影响），脚本初始化显式关闭 ──
-                "spring.jpa.hibernate.ddl-auto=create-drop",
+                // ── schema：Flyway baseline + JPA validate（ADR-0001）──
+                "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.show-sql=false",
-                // 不钉死方言：主路径是 mysql:8.4（与生产同镜像），Hibernate 自动识别正确。
-                // 仅当退回 MariaDB 12.3.3（最后手段）时才需外部追加：
-                //   -Dspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MariaDBDialect
-                // ── schema 来源：**只有 Hibernate create-drop** ──
-                // 契约 §5-2 明令禁止同时开 `flyway.enabled` 与 `ddl-auto=create-drop`：那会让 V2 报
-                // `success=1` 却从不落地声明的外键（QA-B16 假阳性）。实测见报告 §14。
-                // 因此改为：Flyway 关闭；chat 三表（非 ORM 管理）直接执行**迁移文件本身**
-                // （MySQL 方言，含 IF NOT EXISTS），而不是复制 H2 的 schema.sql（t2 建议）。
-                "spring.flyway.enabled=false",
-                "spring.sql.init.mode=always",
-                "spring.jpa.defer-datasource-initialization=true",
-                "spring.sql.init.schema-locations=classpath:db/migration/chat/V1__init_chat_tables.sql",
+                "spring.flyway.enabled=true",
+                "spring.flyway.locations=classpath:db/migration",
+                "spring.sql.init.mode=never",
                 // ── 应用自身的 mock 支付开关（非测试替身）──
                 "wechat.pay.mock-enabled=true",
                 // ── 主 application.yml 必填占位符 ──
@@ -137,6 +129,9 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
 
     @Autowired
     PayRecordRepository payRecords;
+
+    @Autowired
+    com.uav.task.mapper.TaskRepository tasks;
 
     /** 安全红线专用：生效数据源。用于断言「真实建立的那条连接的 JDBC URL」，而不是只看环境变量。 */
     @Autowired
@@ -190,28 +185,16 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("QA-B16 特征化：V2 迁移声明的 fk_rider_uav_user 当前【不存在】（修链后本测试失败即为预期信号）")
-    void qaB16DeclaredForeignKeyIsStillMissing() throws Exception {
-        // 把 QA-B16 从「文档结论」变成「可回归的门禁」：实测锁定现状 —— 迁移脚本声明了
-        // `CONSTRAINT fk_rider_uav_user FOREIGN KEY (user_id) REFERENCES user(id)`，但在本 harness 下
-        // 该外键**从未落地**（全库外键数 0），因为建表实际由 Hibernate 完成。
-        //
-        // ⚠️ 预期信号：一旦 QA-B16 修复（需授权改 src/main），本断言会【失败】——那是好事。
-        //    届时把 isZero() 翻转为 isEqualTo(1)，本测试即成为「迁移链已修复」的正向门禁。
+    @DisplayName("ADR-0001：Flyway baseline 声明的 fk_rider_uav_user 已落地")
+    void flywayBaselineForeignKeyIsPresent() throws Exception {
         try (Connection c = dataSource.getConnection()) {
             int declaredFk = scalarInt(c,
                     "select count(*) from information_schema.table_constraints"
                             + " where table_schema = database()"
                             + " and constraint_name = 'fk_rider_uav_user'");
-            int allFks = scalarInt(c,
-                    "select count(*) from information_schema.table_constraints"
-                            + " where table_schema = database() and constraint_type = 'FOREIGN KEY'");
             assertThat(declaredFk)
-                    .as("fk_rider_uav_user 存在性：0 = QA-B16 未修复（修复后请翻转本断言）")
-                    .isZero();
-            assertThat(allFks)
-                    .as("全库外键数：0 印证迁移声明的约束从未落地")
-                    .isZero();
+                    .as("fk_rider_uav_user 应由 Flyway baseline 创建")
+                    .isEqualTo(1);
         }
     }
 
@@ -244,7 +227,7 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("真实 HTTP + 真实库 + 真实账号：建单 → 支付 → 接单 → 交付 全链路")
+    @DisplayName("真实 HTTP + 真实库 + 真实账号：发布 → 应征 → 选定 → 支付 → 双确认 → 交付 → 验收 全链路（ADR-0003）")
     void fullOrderLifecycleOverRealHttpAndRealDatabase() throws Exception {
         // ── 1. 真实注册 + 真实登录，JWT 只来自 HTTP 响应体 ──
         String userName = "e2e_u_" + RUN_ID;
@@ -257,9 +240,10 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         String userToken = login.path("data").path("token").asText();
         assertThat(userToken).as("login resp=%s", login).isNotBlank();
 
-        // ── 2. 建单：POST /task/create 同时生成 task 与 MissionOrder(PENDING) ──
-        String taskBody = "{\"taskName\":\"e2e-task-" + RUN_ID + "\",\"type\":\"SURVEY\","
-                + "\"description\":\"t4 e2e\",\"reward\":100.0,\"waypoints\":["
+        // ── 2. 发布吊运需求：POST /task/create 生成 task + 待撮合草稿订单（MATCHING，不强制支付） ──
+        String taskBody = "{\"taskName\":\"e2e-task-" + RUN_ID + "\",\"type\":\"TRANSPORT\","
+                + "\"description\":\"t4 e2e\",\"reward\":100.0,\"cargoWeightKg\":20.0,"
+                + "\"cargoCategory\":\"CONSTRUCTION\",\"waypoints\":["
                 + "{\"orderIndex\":0,\"longitude\":121.0,\"latitude\":31.0,\"altitude\":100.0},"
                 + "{\"orderIndex\":1,\"longitude\":121.01,\"latitude\":31.0,\"altitude\":100.0}]}";
         JsonNode created = post("/task/create", userToken, taskBody);
@@ -268,42 +252,130 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         String orderNum = created.path("data").path("orderNum").asText();
         assertThat(taskNum).as("taskNum from resp=%s", created).isNotBlank();
         assertThat(orderNum).as("orderNum from resp=%s", created).isNotBlank();
+        assertThat(created.path("data").path("matchStatus").asText())
+                .as("发单即进入招募阶段, resp=%s", created).isEqualTo("SEEKING_RIDER");
 
         MissionOrder order = orders.findByOrderNum(orderNum)
                 .orElseThrow(() -> new AssertionError("DB 内无该订单: " + orderNum));
-        assertThat(order.getOrderStatus().name()).isEqualTo("PENDING");
-        assertThat(order.getUserId()).isNotNull();
+        assertThat(order.getOrderStatus().name())
+                .as("发单创建待撮合草稿订单，不强制支付").isEqualTo("MATCHING");
+        assertThat(order.getTotalAmount().signum())
+                .as("金额未锁定（选定应征时才 = quotedAmount）").isZero();
 
-        // ── 3. 支付（应用自带 mock 支付开关 wechat.pay.mock-enabled=true，非测试替身） ──
+        // 冲突点 1：同一用户可并行发布多个需求（MATCHING 不占用 pending_key 单例约束）
+        JsonNode created2 = post("/task/create", userToken,
+                taskBody.replace("e2e-task-" + RUN_ID, "e2e-task2-" + RUN_ID));
+        assertThat(created2.path("success").asBoolean())
+                .as("多需求并行发布应成功, resp=%s", created2).isTrue();
+
+        // ── 3. 两名飞手注册（生产绑机路径映射机型 FC30） ──
+        String riderAToken = registerRiderWithModel("e2e_ra_" + RUN_ID, "E2E-DJI-A-" + RUN_ID);
+        long riderAId = userIdFromToken(riderAToken);
+        String riderBToken = registerRiderWithModel("e2e_rb_" + RUN_ID, "E2E-DJI-B-" + RUN_ID);
+        long riderBId = userIdFromToken(riderBToken);
+        long fc30Id = modelIdByCode(riderAToken, "FC30");
+
+        // ── 4. 飞手应征（服务端计价，客户端金额字段被忽略） ──
+        JsonNode applyA = post("/rider/apply", riderAToken,
+                "{\"taskNum\":\"" + taskNum + "\",\"aircraftModelId\":" + fc30Id
+                        + ",\"price\":0.01}");
+        assertThat(applyA.path("success").asBoolean()).as("applyA resp=%s", applyA).isTrue();
+        long applicationIdA = applyA.path("data").path("applicationId").asLong();
+        String quotedA = applyA.path("data").path("quotedAmount").asText();
+        assertThat(new java.math.BigDecimal(quotedA)).as("系统报价应为正数").isPositive();
+
+        JsonNode applyB = post("/rider/apply", riderBToken,
+                "{\"taskNum\":\"" + taskNum + "\",\"aircraftModelId\":" + fc30Id + "}");
+        assertThat(applyB.path("success").asBoolean()).as("applyB resp=%s", applyB).isTrue();
+        long applicationIdB = applyB.path("data").path("applicationId").asLong();
+
+        // 属主应征列表：2 条，含飞手/机型/报价（验收 3）
+        JsonNode apps = get("/task/" + taskNum + "/applications", userToken);
+        assertThat(apps.path("data").size()).as("应征列表, resp=%s", apps).isEqualTo(2);
+
+        // ── 5. 双确认门禁前置：未支付时飞手确认被拒（任务不得 IN_PROGRESS，验收 4） ──
+        JsonNode earlyConfirm = sendExpecting(postReq("/rider/confirm-order?taskNum=" + taskNum,
+                riderAToken, null), 400);
+        assertThat(earlyConfirm.path("errorCode").asText()).isEqualTo("MATCH_STATUS_INVALID");
+
+        // ── 6. 用户选定应征 + 约定时间：订单锁定 totalAmount = quotedAmount（不允许改价，验收 2） ──
+        JsonNode selected = post("/task/" + taskNum + "/select-rider", userToken,
+                "{\"applicationId\":" + applicationIdA
+                        + ",\"scheduledTime\":\"2030-10-01 10:00:00\"}");
+        assertThat(selected.path("success").asBoolean()).as("select resp=%s", selected).isTrue();
+        assertThat(selected.path("data").path("matchStatus").asText())
+                .as("选定后撮合状态, resp=%s", selected).isEqualTo("AWAITING_PAYMENT");
+
+        MissionOrder locked = orders.findByOrderNum(orderNum).orElseThrow();
+        assertThat(locked.getOrderStatus().name()).isEqualTo("PENDING");
+        assertThat(locked.getTotalAmount())
+                .as("成交价必须严格等于系统报价（禁止改价）")
+                .isEqualByComparingTo(new java.math.BigDecimal(quotedA));
+        assertThat(locked.getSelectedApplicationId()).isEqualTo(applicationIdA);
+        assertThat(locked.getScheduledTime()).isNotNull();
+        assertThat(locked.getUserConfirmedAt()).isNotNull();
+
+        // 其余应征自动关闭（ADR-0003 决定 1）
+        JsonNode appsAfterSelect = get("/task/" + taskNum + "/applications", userToken);
+        for (JsonNode item : appsAfterSelect.path("data")) {
+            if (item.path("applicationId").asLong() == applicationIdA) {
+                assertThat(item.path("status").asText()).isEqualTo("SELECTED");
+            } else {
+                assertThat(item.path("status").asText()).isEqualTo("CLOSED");
+            }
+        }
+
+        // ── 7. 支付（应用自带 mock 支付开关 wechat.pay.mock-enabled=true，非测试替身） ──
         JsonNode paid = post("/pay/" + orderNum, userToken, null);
         assertThat(paid.path("success").asBoolean()).as("pay resp=%s", paid).isTrue();
         assertThat(orders.findByOrderNum(orderNum).orElseThrow().getOrderStatus().name())
-                .as("支付后订单状态应为 PAID")
-                .isEqualTo("PAID");
+                .as("支付后订单状态应为 PAID").isEqualTo("PAID");
         assertThat(payRecords.findByOrderNum(orderNum)).as("支付流水应真实落库").isPresent();
+        assertThat(tasks.findByTaskNum(taskNum).orElseThrow().getMatchStatus().name())
+                .as("支付成功 → 待飞手确认").isEqualTo("AWAITING_RIDER_CONFIRM");
 
-        // ── 4. 飞手真实注册（含绑定无人机）+ 真实登录 → 接单 ──
-        String riderName = "e2e_r_" + RUN_ID;
-        JsonNode riderReg = post("/rider/register", null,
-                "{\"userName\":\"" + riderName + "\",\"password\":\"" + PASSWORD + "\","
-                + "\"djiId\":\"E2E-DJI-" + RUN_ID + "\"}");
-        String riderToken = riderReg.path("data").path("token").asText();
-        assertThat(riderToken).as("rider register resp=%s", riderReg).isNotBlank();
+        // ── 8. 非选定飞手确认被拒（NO_PERMISSION）；选定飞手确认 → 双确认门禁放行 IN_PROGRESS ──
+        sendExpecting(postReq("/rider/confirm-order?taskNum=" + taskNum, riderBToken, null), 403);
 
-        JsonNode accepted = post("/rider/accept?taskNum=" + taskNum, riderToken, null);
-        assertThat(accepted.path("success").asBoolean()).as("accept resp=%s", accepted).isTrue();
+        JsonNode confirmed = post("/rider/confirm-order?taskNum=" + taskNum, riderAToken, null);
+        assertThat(confirmed.path("success").asBoolean()).as("confirm resp=%s", confirmed).isTrue();
+        MissionOrder confirmedOrder = orders.findByOrderNum(orderNum).orElseThrow();
+        assertThat(confirmedOrder.getRiderConfirmedAt()).as("飞手确认时间").isNotNull();
+        var confirmedTask = tasks.findByTaskNum(taskNum).orElseThrow();
+        assertThat(confirmedTask.getTaskStatus().name())
+                .as("双确认后才允许 IN_PROGRESS（验收 4）").isEqualTo("IN_PROGRESS");
+        assertThat(confirmedTask.getMatchStatus().name()).isEqualTo("CONFIRMED");
 
-        // ── 5. 交付 ──
+        // ── 9. 交付门禁：无履约证据 → 拒绝（验收 5）；插入证据后方可交付 ──
+        JsonNode noEvidence = sendExpecting(postReq(
+                "/rider/complete?taskNum=" + taskNum + "&note=no-evidence", riderAToken, null), 400);
+        assertThat(noEvidence.path("errorCode").asText()).isEqualTo("DELIVERY_EVIDENCE_REQUIRED");
+
+        insertEvidence(taskNum, riderAId);
+
         JsonNode done = post("/rider/complete?taskNum=" + taskNum + "&note=t4-e2e-delivered",
-                riderToken, null);
+                riderAToken, null);
         assertThat(done.path("success").asBoolean()).as("complete resp=%s", done).isTrue();
 
-        // ── 6. 终态校验：HTTP 层与数据库层必须一致 ──
+        // ── 10. 用户验收：无证据拒绝由上一步覆盖；确认后订单与撮合状态双终态 ──
+        JsonNode waiting = get("/task/detail?taskNum=" + taskNum, userToken);
+        assertThat(waiting.path("data").path("taskStatus").asText()).isEqualTo("COMPLETED");
+        assertThat(waiting.path("data").path("orderStatus").asText()).isEqualTo("WAITING_CONFIRM");
+        assertThat(waiting.path("data").path("matchStatus").asText())
+                .as("交付后进入待验收").isEqualTo("PENDING_ACCEPTANCE");
+        assertThat(waiting.path("data").path("actionHint").asText()).contains("验收");
+
+        JsonNode confirmedByUser = post("/task/confirm?taskNum=" + taskNum, userToken, null);
+        assertThat(confirmedByUser.path("success").asBoolean())
+                .as("confirm resp=%s", confirmedByUser).isTrue();
+
+        // ── 11. 终态校验：HTTP 层与数据库层必须一致 ──
         JsonNode detail = get("/task/detail?taskNum=" + taskNum, userToken);
         assertThat(detail.path("success").asBoolean()).as("detail resp=%s", detail).isTrue();
         assertThat(detail.path("data").path("taskStatus").asText())
-                .as("交付后任务状态, detail=%s", detail)
-                .isEqualTo("COMPLETED");
+                .as("验收后任务状态, detail=%s", detail).isEqualTo("COMPLETED");
+        assertThat(detail.path("data").path("matchStatus").asText())
+                .as("验收后撮合终态").isEqualTo("CLOSED");
 
         String dbOrderStatus = orders.findByOrderNum(orderNum).orElseThrow()
                 .getOrderStatus().name();
@@ -311,13 +383,14 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         assertThat(httpOrderStatus)
                 .as("HTTP 报的订单状态必须与真实数据库一致 (db=%s)", dbOrderStatus)
                 .isEqualTo(dbOrderStatus);
-        assertThat(dbOrderStatus).as("交付后订单不应仍为 PENDING/PAID").isNotIn("PENDING", "PAID");
-        // 终态字面量断言：交付完成后「任务 = COMPLETED、订单 = WAITING_CONFIRM（待确认完成）」
-        // （订单终态由 TaskServiceImpl 的完成动作置为 WAITING_CONFIRM，随后由验收/超时自动确认转 COMPLETED）
-        assertThat(detail.path("data").path("taskStatus").asText())
-                .as("交付后任务终态").isEqualTo("COMPLETED");
-        assertThat(httpOrderStatus).as("交付后订单终态（HTTP 层）").isEqualTo("WAITING_CONFIRM");
-        assertThat(dbOrderStatus).as("交付后订单终态（数据库层）").isEqualTo("WAITING_CONFIRM");
+        assertThat(dbOrderStatus).as("验收后订单终态（数据库层）").isEqualTo("COMPLETED");
+        assertThat(httpOrderStatus).as("验收后订单终态（HTTP 层）").isEqualTo("COMPLETED");
+        assertThat(detail.path("data").path("quotedAmount").asText())
+                .as("详情回显成交价 = 系统报价")
+                .isEqualTo(quotedA);
+        assertThat(detail.path("data").path("aircraftModelName").asText()).isNotBlank();
+        assertThat(detail.path("data").path("cargoWeightKg").decimalValue())
+                .isEqualByComparingTo("20.00");
     }
 
     @Test
@@ -337,7 +410,9 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         assertThat(liveOps).contains(
                 "POST /user/register", "POST /user/login", "POST /task/create",
                 "POST /pay/{orderNum}", "POST /rider/register",
-                "POST /rider/accept", "POST /rider/complete", "GET /task/detail");
+                "POST /rider/apply", "POST /task/{taskNum}/select-rider",
+                "POST /rider/confirm-order", "POST /rider/complete",
+                "GET /task/detail");
 
         Set<String> taskFields = declaredProperties(live, "/task/create", "post");
         assertThat(taskFields).as("E2E 发送的建单字段未被规格声明")
@@ -385,7 +460,7 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
 
     // ─────────── 真实 HTTP 工具（无 MockMvc） ───────────
 
-    private JsonNode post(String path, String token, String body) throws Exception {
+    private HttpRequest postReq(String path, String token, String body) {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base + path))
                 .timeout(Duration.ofSeconds(60))
                 .header("Content-Type", "application/json");
@@ -394,7 +469,11 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         }
         b.POST(body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(body));
-        return send(b.build());
+        return b.build();
+    }
+
+    private JsonNode post(String path, String token, String body) throws Exception {
+        return send(postReq(path, token, body));
     }
 
     private JsonNode get(String path, String token) throws Exception {
@@ -414,5 +493,61 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
                         req.method(), req.uri().getPath(), resp.statusCode(), resp.body())
                 .isEqualTo(200);
         return json.readTree(resp.body());
+    }
+
+    /** 发起请求并断言非 200 状态（错误路径门禁用例：400/403 + errorCode）。 */
+    private JsonNode sendExpecting(HttpRequest req, int expectedStatus) throws Exception {
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        assertThat(resp.statusCode())
+                .as("HTTP %s %s 期望 %s，实际 %s，body=%s",
+                        req.method(), req.uri().getPath(), expectedStatus, resp.statusCode(), resp.body())
+                .isEqualTo(expectedStatus);
+        return json.readTree(resp.body());
+    }
+
+    // ─────────── ADR-0003 撮合链路辅助 ───────────
+
+    /** 注册飞手（不带设备）并走生产绑定路径映射到 FC30 机型，返回其真实 token。 */
+    private String registerRiderWithModel(String riderName, String djiId) throws Exception {
+        JsonNode riderReg = post("/rider/register", null,
+                "{\"userName\":\"" + riderName + "\",\"password\":\"" + PASSWORD + "\"}");
+        assertThat(riderReg.path("success").asBoolean()).as("rider register resp=%s", riderReg).isTrue();
+        String token = riderReg.path("data").path("token").asText();
+        assertThat(token).as("rider register token, resp=%s", riderReg).isNotBlank();
+        JsonNode bound = post("/rider/drone/bind?djiId=" + djiId
+                + "&aircraftModelId=" + modelIdByCode(token, "FC30"), token, null);
+        assertThat(bound.path("success").asBoolean()).as("bind resp=%s", bound).isTrue();
+        return token;
+    }
+
+    /** 从平台机型目录取指定型号的 ID（应征接口需要数值机型 ID）。 */
+    private long modelIdByCode(String token, String modelCode) throws Exception {
+        JsonNode models = get("/api/aircraft-models", token);
+        for (JsonNode model : models.path("data")) {
+            if (modelCode.equals(model.path("modelCode").asText())) {
+                return model.path("id").asLong();
+            }
+        }
+        throw new AssertionError("机型目录缺少 " + modelCode + ", resp=" + models);
+    }
+
+    /** 从真实签发的 JWT payload 取 userId（仅取声明，不自签令牌，R3 不受影响）。 */
+    private static long userIdFromToken(String token) throws Exception {
+        byte[] payload = Base64.getUrlDecoder().decode(token.split("\\.")[1]);
+        return new ObjectMapper().readTree(payload).path("userId").asLong();
+    }
+
+    /**
+     * 直插一条履约证据（task_attachment）。交付门禁只认证据行是否存在，
+     * presigned 上传依赖 MinIO（E2E 环境不保证），故用 SQL 造证据行，同样经真实库。
+     */
+    private void insertEvidence(String taskNum, long uploaderId) throws Exception {
+        try (Connection c = dataSource.getConnection();
+             java.sql.Statement st = c.createStatement()) {
+            st.executeUpdate("INSERT INTO task_attachment (task_num, uploader_id, object_key,"
+                    + " file_name, content_type, size_bytes, create_time) VALUES ('" + taskNum + "', "
+                    + uploaderId + ", 'task-attachments/" + taskNum + "/e2e-evidence', 'evidence.jpg',"
+                    + " 'image/jpeg', 1024, NOW())");
+        }
     }
 }

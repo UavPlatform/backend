@@ -69,7 +69,7 @@ public class PriceCalculator {
     // 参考价
     // -----------------------------------------------------------------------
 
-    public PriceDetailVO calculate(TaskType type, BigDecimal distanceMeters, Double weightKg, LocalDateTime taskTime) {
+    public PriceDetailVO calculate(TaskType type, BigDecimal distanceMeters, BigDecimal weightKg, LocalDateTime taskTime) {
         BigDecimal baseFee = big("baseFee", new BigDecimal("30"));
         BigDecimal baseDistanceKm = big("baseDistanceKm", new BigDecimal("3"));
 
@@ -88,12 +88,12 @@ public class PriceCalculator {
         // 重量阶梯费：仅 WEIGHT_TYPES 中的类型参与；超档 → 按最高档计费 + 需人工报价
         BigDecimal weightFee = BigDecimal.ZERO;
         boolean needManualQuote = false;
-        if (isWeightType(type) && weightKg != null && weightKg > 0) {
+        if (isWeightType(type) && weightKg != null && weightKg.signum() > 0) {
             List<WeightStep> steps = billConfigService.getJson("weightSteps",
                     new TypeReference<List<WeightStep>>() {}, DEFAULT_WEIGHT_STEPS);
             boolean matched = false;
             for (WeightStep step : steps) {
-                if (BigDecimal.valueOf(weightKg).compareTo(step.getMaxKg()) <= 0) {
+                if (weightKg.compareTo(step.getMaxKg()) <= 0) {
                     weightFee = step.getFee().setScale(2, RoundingMode.HALF_UP);
                     matched = true;
                     break;

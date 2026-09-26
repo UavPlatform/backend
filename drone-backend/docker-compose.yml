@@ -32,12 +32,24 @@ services:
         condition: service_healthy
     environment:
       TZ: ${TZ:-Asia/Shanghai}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-drone_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-drone}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-change_me}
-      JWT_SECRET: ${JWT_SECRET:-replace-with-a-strong-secret-at-least-32-chars}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
-      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      DRONE_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      DRONE_DATASOURCE_HOST: mysql
+      DRONE_DATASOURCE_PORT: "3306"
+      DRONE_DATASOURCE_DATABASE: ${MYSQL_DATABASE:-drone_db}
+      DRONE_DATASOURCE_USERNAME: ${MYSQL_USER:-drone}
+      DRONE_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-change_me}
+      DRONE_JWT_SECRET: ${JWT_SECRET:-replace-with-a-strong-secret-at-least-32-chars}
+      DRONE_JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      DRONE_JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      DRONE_TRTC_SDK_APP_ID: ${TRTC_SDK_APP_ID:-1400000001}
+      DRONE_TRTC_SECRET_KEY: ${TRTC_SECRET_KEY:-docker-placeholder-trtc-secret-key}
+      DRONE_TRTC_ROOM_EXPIRE: ${TRTC_ROOM_EXPIRE:-3600}
+      DRONE_AMAP_KEY: ${AMAP_KEY:-docker-placeholder-amap-key}
+      DRONE_AMAP_SECURITY_KEY: ${AMAP_SECURITY_KEY:-docker-placeholder-amap-security-key}
       JAVA_TOOL_OPTIONS: "${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}"
     ports:
       - "${APP_PORT:-8081}:8081"

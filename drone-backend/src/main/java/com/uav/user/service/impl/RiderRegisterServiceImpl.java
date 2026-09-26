@@ -37,8 +37,13 @@ public class RiderRegisterServiceImpl implements RiderRegisterService {
         user.setRole(Role.RIDER);
         user = userRepository.save(user);
 
+        if (dto.getAircraftModelId() != null
+                && (dto.getDjiId() == null || dto.getDjiId().isBlank())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "未提供 djiId 时不能指定机型");
+        }
         if (dto.getDjiId() != null && !dto.getDjiId().isBlank()) {
-            riderUavService.bindDrone(user.getId(), dto.getDjiId());
+            riderUavService.bindDrone(user.getId(), dto.getDjiId(), dto.getAircraftModelId());
         }
 
         return user;

@@ -1,12 +1,11 @@
 package com.uav.security;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.uav.chat.mapper.ChatMessageMapper;
-import com.uav.chat.mapper.ChatSessionMapper;
-import com.uav.chat.mapper.ChatUserSessionMapper;
 import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
+import com.uav.chat.repository.ChatMessageRepository;
+import com.uav.chat.repository.ChatSessionRepository;
+import com.uav.chat.repository.ChatUserSessionRepository;
 import com.uav.live.service.AppWebSocketService;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
@@ -56,13 +55,13 @@ class HttpAccessControlIT extends IntegrationTestBase {
     UserRecordRepository userRecordRepository;
 
     @Autowired
-    ChatSessionMapper chatSessionMapper;
+    ChatSessionRepository chatSessionRepository;
 
     @Autowired
-    ChatUserSessionMapper chatUserSessionMapper;
+    ChatUserSessionRepository chatUserSessionRepository;
 
     @Autowired
-    ChatMessageMapper chatMessageMapper;
+    ChatMessageRepository chatMessageRepository;
 
     @Autowired
     AppWebSocketService appWebSocketService;
@@ -205,15 +204,15 @@ class HttpAccessControlIT extends IntegrationTestBase {
                 .userIds(List.of(member.id()))
                 .createTime(now)
                 .build();
-        chatSessionMapper.insert(session);
-        chatUserSessionMapper.insert(ChatUserSession.builder()
+        chatSessionRepository.save(session);
+        chatUserSessionRepository.save(ChatUserSession.builder()
                 .sessionId(session.getId())
                 .userId(member.id())
                 .joinTime(now)
                 .lastReadTime(0L)
                 .build());
         String msgId = UniqueNames.unique("msg");
-        chatMessageMapper.insert(ChatMessage.builder()
+        chatMessageRepository.save(ChatMessage.builder()
                 .msgId(msgId)
                 .fromUserId(member.id())
                 .sessionId(session.getId())
@@ -250,8 +249,8 @@ class HttpAccessControlIT extends IntegrationTestBase {
                         .header("Authorization", fixture.outsider().authorization()))
                 .andExpect(status().isForbidden());
 
-        Integer statusAfterOutsider = chatMessageMapper
-                .selectOne(Wrappers.<ChatMessage>lambdaQuery().eq(ChatMessage::getMsgId, fixture.msgId()))
+        Integer statusAfterOutsider = chatMessageRepository.findByMsgId(fixture.msgId())
+                .orElseThrow()
                 .getStatus();
         assertThat(statusAfterOutsider).isEqualTo(0);
 
@@ -259,8 +258,8 @@ class HttpAccessControlIT extends IntegrationTestBase {
                         .header("Authorization", fixture.member().authorization()))
                 .andExpect(status().isOk());
 
-        Integer statusAfterSender = chatMessageMapper
-                .selectOne(Wrappers.<ChatMessage>lambdaQuery().eq(ChatMessage::getMsgId, fixture.msgId()))
+        Integer statusAfterSender = chatMessageRepository.findByMsgId(fixture.msgId())
+                .orElseThrow()
                 .getStatus();
         assertThat(statusAfterSender).isEqualTo(2);
     }

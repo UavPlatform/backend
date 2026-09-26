@@ -1,5 +1,9 @@
 package com.uav.admin;
 
+import com.uav.live.service.AppWebSocketService;
+import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.pay.mapper.PayRecordRepository;
+import com.uav.pay.pojo.entity.PayRecord;
 import com.uav.server.util.UserContext;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
@@ -10,6 +14,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.format.DateTimeFormatter;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,7 +23,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 管理端分页查询集成测试：管理员分页查询全平台任务/订单；普通用户/飞手 403；
- * 订单状态码契约（0-5 含 4/5）与 actionHint 可供 OrderView 状态矩阵渲染。
+ * 订单状态码契约（0-7，含 4/5 与新增 7=待撮合 MATCHING）与 actionHint 可供 OrderView 状态矩阵渲染。
+ *
+ * <p>TASK-BACKEND-007 增补监管上下文断言：任务/订单 VO 的 deviceId（在线设备映射正/空两态）与
+ * userConfirmedAt / riderConfirmedAt / paidAt（PayRecord 支付时间与订单状态迁移回退两口径）。
  *
  * <p>层次与驱动（O6/R2/R4）：进程内 MockMvc 集成测试，继承 {@link IntegrationTestBase}
  * （MOCK + {@code @AutoConfigureMockMvc} + {@code @Transactional}），不自称端到端。
@@ -28,11 +37,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class AdminQueryApiIT extends IntegrationTestBase {
 
+    /** VO @JsonFormat 口径（yyyy-MM-dd HH:mm:ss），用于 paidAt 精确回显断言。 */
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     @Autowired
     TaskService taskService;
 
+    @Autowired
+    AppWebSocketService appWebSocketService;
+
+    @Autowired
+    PayRecordRepository payRecordRepository;
+
     @Test
-    @DisplayName("管理员分页查询全平台订单：状态码契约含 4/5，字段齐全")
+    @DisplayName("管理员分页查询全平台订单：状态码契约含 4/5/7，字段齐全")
     void adminListOrdersWithStatusContract() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         UserContext.setUser(owner.id(), owner.userName(), 0);
@@ -51,7 +69,7 @@ class AdminQueryApiIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + paidTask.getTaskNum() + "')].orderStatusCode")
                         .value(org.hamcrest.Matchers.hasItem(1)))
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + pendingTask.getTaskNum() + "')].orderStatusCode")
-                        .value(org.hamcrest.Matchers.hasItem(0)))
+                        .value(org.hamcrest.Matchers.hasItem(7)))
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + pendingTask.getTaskNum() + "')].ownerName")
                         .value(org.hamcrest.Matchers.hasItem(owner.userName())));
     }
@@ -138,5 +156,85 @@ class AdminQueryApiIT extends IntegrationTestBase {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/admin/orders/ANY").header("Authorization", rider.authorization()))
                 .andExpect(status().isForbidden());
+    }
+
+    // ---------- 监管上下文（TASK-BACKEND-007 / REQ-FRONTEND-001 验收 4）----------
+
+    @Test
+    @DisplayName("任务/订单 VO 暴露 deviceId：已接单且设备在线 → 非空；未接单 → null")
+    void adminCarriesDeviceMapping() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
+        UserContext.setUser(owner.id(), owner.userName(), owner.role());
+        Task task = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("adm-dev")));
+        Task unassigned = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("adm-none")));
+
+        UserContext.setUser(rider.id(), rider.userName(), rider.role());
+        MissionOrder order = fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
+        appWebSocketService.requestConnection(rider.djiId());
+        appWebSocketService.markAsConnected(rider.djiId());
+
+        UserContext.clear();
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+
+        // 正态：task → task_assignment → rider_uav → 在线设备；
+        // 同一响应断言双确认时间与 paidAt（无支付流水 → 订单状态迁移时间回退口径）非空
+        mockMvc.perform(get("/admin/tasks/" + task.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceId").value(rider.djiId()))
+                .andExpect(jsonPath("$.data.userConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.riderConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.paidAt").isNotEmpty());
+
+        mockMvc.perform(get("/admin/orders/" + order.getOrderNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceId").value(rider.djiId()));
+
+        // 空态：任务未接单 → deviceId 为 null（schema 已文档化）
+        mockMvc.perform(get("/admin/tasks/" + unassigned.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deviceId")
+                        .value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("任务/订单 VO 回显双确认与支付完成时间：paidAt = PayRecord.payTime")
+    void adminCarriesConfirmAndPayTimestamps() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
+        UserContext.setUser(owner.id(), owner.userName(), owner.role());
+        Task task = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("adm-ts")));
+
+        MissionOrder locked = fixtures.selectAndLock(task, rider.id());
+        fixtures.payLockedOrder(task); // 生产支付状态机：PENDING→PAID，PayRecord.payTime 落库
+
+        UserContext.setUser(rider.id(), rider.userName(), rider.role());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
+
+        PayRecord pay = payRecordRepository.findByOrderNum(locked.getOrderNum())
+                .orElseThrow(() -> new AssertionError("缺少支付流水: " + locked.getOrderNum()));
+        assertThat(pay.getPayTime()).as("支付成功时间应落库").isNotNull();
+        String expectedPaidAt = pay.getPayTime().format(FMT);
+
+        UserContext.clear();
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+
+        mockMvc.perform(get("/admin/tasks/" + task.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.riderConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.paidAt").value(expectedPaidAt));
+
+        mockMvc.perform(get("/admin/orders/" + locked.getOrderNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.riderConfirmedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.paidAt").value(expectedPaidAt));
     }
 }

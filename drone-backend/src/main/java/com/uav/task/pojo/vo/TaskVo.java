@@ -3,6 +3,7 @@ package com.uav.task.pojo.vo;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import lombok.Data;
@@ -27,16 +28,50 @@ public class TaskVo {
     private BigDecimal totalAmount;
     private BigDecimal totalDistance;
     private String orderStatus;
-    /** 货物重量（kg，计费输入） */
-    private Double weight;
-    /** 平台参考价（起步价 + 里程费 + 重量阶梯费 + 夜间附加费） */
+    /** 平台参考价（元，2 位小数）：发布时按报价公式算出的基准价，供客户端展示与飞手报价参考 */
     private BigDecimal referencePrice;
-    /** 计费明细 JSON（PriceDetailVO 序列化） */
+    /** 参考价逐项明细 JSON（PriceDetailVO 序列化），供客户端展示费用构成 */
     private String priceDetail;
-    /** 超重等场景：需平台人工报价 */
+    /** 超重等场景：true = 需平台人工报价 */
     private Boolean needManualQuote;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    /**
+     * 撮合子状态（TASK-BACKEND-004 / ADR-0003 决定 6）：SEEKING_RIDER → NEGOTIATING →
+     * AWAITING_PAYMENT → AWAITING_RIDER_CONFIRM → CONFIRMED → PENDING_ACCEPTANCE → CLOSED。
+     */
+    private MatchStatus matchStatus;
+
+    /** 选定应征的系统报价（= 成交价 totalAmount，严格相等；未选定时为 null） */
+    private BigDecimal quotedAmount;
+
+    /** 选定应征的机型（用户下单后可见成交机型；未选定时为 null） */
+    private Long aircraftModelId;
+
+    /** 机型显示名（如 DJI FlyCart 30） */
+    private String aircraftModelName;
+
+    /** 机型型号编码（如 FC30、M350RTK） */
+    private String modelCode;
+
+    /** 约定作业时间（ADR-0003 决定 4，下单时由用户提交） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime scheduledTime;
+
+    /** 用户下单确认时刻（ADR-0003 决定 4） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime userConfirmedAt;
+
+    /** 飞手确认接单与约定时间的时刻（ADR-0003 决定 4） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime riderConfirmedAt;
+
+    /** 吊运货物重量 kg（TASK-BACKEND-003 采集，TASK-BACKEND-004 回显给发单/详情页） */
+    private BigDecimal cargoWeightKg;
+
+    /** 吊运货物类别（CONSTRUCTION/EQUIPMENT/AGRICULTURAL） */
+    private com.uav.server.enums.CargoCategory cargoCategory;
 
     /** 任务期望执行时间（1A-7a）：与发布侧一致的 "yyyy-MM-dd HH:mm:ss" 格式 */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -45,7 +80,7 @@ public class TaskVo {
     /** 飞手完成说明（1B-9a，来自 task_assignment.complete_note，可空） */
     private String completeNote;
 
-    /** 操作提示（1B-9a 状态矩阵）：按 任务状态×订单状态 计算的人类可读提示，客户端可直接渲染 */
+    /** 操作提示（1B-9a 状态矩阵）：按 任务状态×订单状态×撮合状态 计算的人类可读提示，客户端可直接渲染 */
     private String actionHint;
 
     /** 任务关联的作业设备（1B-4b 微任务）：接单飞手绑定且在线的设备；无在线设备为 null */
@@ -68,14 +103,16 @@ public class TaskVo {
         vo.setUserId(task.getUserId());
         vo.setTaskType(task.getTaskType());
         vo.setTaskStatus(task.getTaskStatus());
+        vo.setMatchStatus(task.getMatchStatus());
         vo.setDescription(task.getDescription());
-        // 计费字段（账户计费模块）
-        vo.setWeight(task.getWeight());
+        // 参考价与费用构成（发布时按报价公式算出，供发布页/详情页展示）
         vo.setReferencePrice(task.getReferencePrice());
         vo.setPriceDetail(task.getPriceDetail());
         vo.setNeedManualQuote(task.getNeedManualQuote());
         // 任务期望执行时间（1A-7a 契约，替代早期的 plannedTime）
         vo.setTaskTime(task.getTaskTime());
+        vo.setCargoWeightKg(task.getCargoWeightKg());
+        vo.setCargoCategory(task.getCargoCategory());
         vo.setCreateTime(task.getCreateTime());
         vo.setUpdateTime(task.getUpdateTime());
         if (assignment != null) {

@@ -20,19 +20,18 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     open-in-view: false
-    defer-datasource-initialization: true
   sql:
     init:
-      mode: always
+      mode: never
 
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: 0
-    locations: classpath:db/migration/chat,classpath:db/migration/task,classpath:db/migration/user
+    baseline-version: 1
+    locations: classpath:db/migration
 
   servlet:
     multipart:
@@ -69,6 +68,18 @@ trtc:
 
 order:
   price-per-meter: 0.05
+
+# 吊运平台计价（REQ-BACKEND-001 / ADR-0003）：
+# quotedAmount = (距离费 + 重量费 + 类别费) × 机型系数；距离费单价沿用 order.price-per-meter。
+# ADR-0003「不允许改价」：本节只放平台规则单价，禁止按订单 override；调价须改配置并留痕。
+transport:
+  pricing:
+    price-per-kg: 2.00                 # 重量单价（元/kg）
+    unknown-category-surcharge: 0.00   # 未知类别附加费（元）：类别不在下表时按此值计费，行为确定
+    category-surcharge:                # 货物类别附加费表（元），键为类别码，查找大小写不敏感
+      CONSTRUCTION: 50.00              # 建材
+      EQUIPMENT: 80.00                 # 设备
+      AGRICULTURAL: 30.00              # 农产品
 
 # 1B-9b 交付物存储（MinIO S3 兼容）。生产经环境变量注入；为空=未配置，交付物接口返回 503。
 minio:

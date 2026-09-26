@@ -6,17 +6,12 @@ import org.springframework.data.domain.Page;
 public interface OrderService {
 
     /**
-     * 创建 PENDING 订单并绑定服务端计价金额。
-     *
-     * <p>金额一律<b>服务端</b>计算，客户端传入的 reward 不作为金额依据：
-     * 由 TaskServiceImpl 计价块按 bill_config（起步价 + 里程费 + 重量阶梯费 + 夜间附加费）
-     * 算出参考价，再取「协商价 ?: 参考价」为挂牌价，并校验协商价不低于
-     * 参考价 × MIN_NEGOTIATED_RATE。本方法只负责透传与校验，不再自行计价。
-     *
-     * @param listedPrice 挂牌价（元）= 协商价 ?: 参考价，等价于 Task.reward 与
-     *                    MissionOrder.totalAmount。必须 &gt; 0。
+     * 发单时创建「待撮合」草稿订单（ADR-0003 决定 3）：状态 MATCHING，totalAmount=0（未锁定），
+     * 不强制支付、不占用 pending_key 单例约束。金额锁定发生在用户选定应征（selectRider），
+     * 锁定值 = 该应征的 {@code quotedAmount}（缺省为系统基准价，飞手可在区间内报价），
+     * 支付前由 pay/handleNotify 硬校验 totalAmount == quotedAmount。
      */
-    MissionOrder createOrder(Long userId, String taskNum, Double listedPrice);
+    MissionOrder createOrder(Long userId, String taskNum);
 
     Page<MissionOrder> listOrders(Long userId, int page, int size);
 

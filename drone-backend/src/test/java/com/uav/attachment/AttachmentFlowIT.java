@@ -99,7 +99,7 @@ class AttachmentFlowIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("越权：无关第三方用户查看附件列表 → 403")
+    @DisplayName("越权：无关第三方用户查看附件列表与下载凭证 → 403")
     void unrelatedUserCannotList() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("att-rider"), null);
@@ -108,6 +108,51 @@ class AttachmentFlowIT extends IntegrationTestBase {
 
         mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments")
                         .header("Authorization", stranger.authorization()))
+                .andExpect(status().isForbidden());
+
+        // 下载凭证同属只读路径：先过读权限，非属主非应征 → 403（不是 404）
+        mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments/download-url")
+                        .param("objectKey", "foreign-key")
+                        .header("Authorization", stranger.authorization()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("监管只读放行（TASK-BACKEND-007）：管理员 list/download-url 200，上传仍 403")
+    void adminCanReadButNotUpload() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("att-rider"), null);
+        Task currentTask = seedTaskAndAssignment(owner, rider);
+
+        mockMvc.perform(post("/tasks/" + currentTask.getTaskNum() + "/attachments/upload-url")
+                        .param("fileName", "ortho.jpg")
+                        .param("contentType", "image/jpeg")
+                        .param("sizeBytes", "1024")
+                        .header("Authorization", rider.authorization()))
+                .andExpect(status().isOk());
+        String objectKey = taskAttachmentRepository
+                .findByTaskNumOrderByCreateTimeAsc(currentTask.getTaskNum()).get(0).getObjectKey();
+
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+
+        mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments")
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].fileName").value("ortho.jpg"))
+                .andExpect(jsonPath("$.data[0].downloadUrl").isNotEmpty());
+
+        mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments/download-url")
+                        .param("objectKey", objectKey)
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.downloadUrl").isNotEmpty());
+
+        // 写路径权限不动：管理员既非属主也非接单飞手 → 上传凭证 403
+        mockMvc.perform(post("/tasks/" + currentTask.getTaskNum() + "/attachments/upload-url")
+                        .param("fileName", "admin-note.jpg")
+                        .param("contentType", "image/jpeg")
+                        .param("sizeBytes", "1024")
+                        .header("Authorization", admin.authorization()))
                 .andExpect(status().isForbidden());
     }
 

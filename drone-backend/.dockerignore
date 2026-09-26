@@ -1,6 +1,7 @@
 .git
 .gitignore
 .idea
+.localdb
 .mvn
 mvnw
 mvnw.cmd

@@ -40,9 +40,6 @@ RUN set -eux; \
     && find target -maxdepth 1 -type f -name "*.jar" ! -name "original-*.jar" \
        -exec cp {} target/app.jar \;
 
-# ③ 提取 Spring Boot 分层（dependencies → loader → snapshots → application）
-RUN java -Djarmode=layertools -jar target/app.jar extract --destination target/extracted
-
 # ============================================================
 # Stage 2: Runtime
 # ============================================================
@@ -53,11 +50,7 @@ WORKDIR /app
 RUN addgroup -S spring && adduser -S spring -G spring \
     && mkdir -p /app/logs && chown spring:spring /app/logs
 
-# 按 Spring Boot 分层顺序 COPY（依赖层在下、应用层在上，最大化 Docker 缓存命中）
-COPY --from=builder /build/target/extracted/dependencies/        ./
-COPY --from=builder /build/target/extracted/spring-boot-loader/   ./
-COPY --from=builder /build/target/extracted/snapshot-dependencies/ ./
-COPY --from=builder /build/target/extracted/application/           ./
+COPY --from=builder /build/target/app.jar ./app.jar
 
 ENV TZ=Asia/Shanghai
 ENV JAVA_TOOL_OPTIONS=""
@@ -66,4 +59,4 @@ EXPOSE 8081
 
 USER spring
 
-ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

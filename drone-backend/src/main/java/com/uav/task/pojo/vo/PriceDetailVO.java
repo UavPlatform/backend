@@ -13,7 +13,8 @@ public class PriceDetailVO {
     private BigDecimal total;
     private List<PriceItem> items;
     private BigDecimal distanceKm;
-    private Double weightKg;
+    /** 计费所用货物重量（kg），与 {@code Task.cargoWeightKg} 同源 */
+    private BigDecimal weightKg;
     private Boolean isNight;
     /** true = 重量超出阶梯上限，平台将人工协商报价/调配机型 */
     private Boolean needManualQuote;

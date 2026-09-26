@@ -8,6 +8,7 @@ import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.calculator.RoutePriceCalculator;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.OrderIdGenerator;
 import com.uav.order.service.OrderService;
@@ -21,7 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,7 +37,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public MissionOrder createOrder(Long userId, String taskNum, Double listedPrice) {
+    public MissionOrder createOrder(Long userId, String taskNum) {
         Optional<Task> taskOpt = taskRepository.findByTaskNum(taskNum);
         if (taskOpt.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ROUTE_NOT_FOUND);
@@ -48,27 +48,11 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权使用此任务");
         }
 
-        Optional<MissionOrder> unpaid = orderRepository.findByUserIdAndOrderStatusForUpdate(userId, OrderStatus.PENDING);
-        if (unpaid.isPresent()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
-        }
-        // 挂牌价已在 TaskServiceImpl 计价块算好（bill_config 参考价 → 协商价校验下限），
-        // 这里仅透传，不再自行计价
+        // TASK-BACKEND-004 / ADR-0003 决定 3：发单创建「待撮合」草稿订单（MATCHING），不强制支付。
+        // 金额未锁定（totalAmount=0，选定应征时由 selectRider 写死 = quotedAmount）；
+        // MATCHING 不占用 pending_key 单例约束，同一用户可并行发布多个需求（冲突点 1 解除）。
         List<TaskWaypoint> waypoints = task.getWaypoints();
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
-
-        // 校验（保留 1A P0-2 安全止血的语义）：金额必须是服务端算出的正值。
-        // listedPrice 为 null 属服务端计价链路异常；为 0 属航点不足/距离过近。
-        if (listedPrice == null) {
-            log.error("订单挂牌价缺失（TaskServiceImpl 计价块未传值），拒绝创建订单");
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
-                    "订单计价缺失，已拒绝创建订单");
-        }
-        BigDecimal totalAmount = BigDecimal.valueOf(listedPrice).setScale(2, RoundingMode.HALF_UP);
-        if (totalAmount.signum() <= 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
-                    "订单金额计算为 0（航点不足或距离过近），已拒绝创建订单");
-        }
 
         String orderNum = OrderIdGenerator.generate(userId);
 
@@ -76,23 +60,19 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderNum(orderNum);
         order.setUserId(userId);
         order.setTask(task);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(BigDecimal.ZERO);
         order.setTotalDistance(distance);
-        order.setOrderStatus(OrderStatus.PENDING);
+        order.setOrderStatus(OrderStatus.MATCHING);
 
         try {
             orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
-            log.warn("并发冲突，用户ID {} 已有待支付订单，唯一约束拦截", userId);
+            log.warn("并发冲突，用户ID {} 订单唯一约束拦截", userId);
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
 
-        log.info("订单创建成功，订单号: {}, 用户ID: {}, 金额: {}元, 距离: {}m",
-                orderNum, userId, order.getTotalAmount(), distance);
-
-        if (order.getTask() != null) {
-            order.getTask().getTaskName();
-        }
+        log.info("待撮合订单创建成功，订单号: {}, 用户ID: {}, 距离: {}m（金额待选定应征时锁定）",
+                orderNum, userId, distance);
 
         return order;
     }
@@ -133,6 +113,14 @@ public class OrderServiceImpl implements OrderService {
 
         order.setOrderStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+
+        // TASK-BACKEND-004：取消支付后重新开放撮合（AWAITING_PAYMENT → NEGOTIATING），
+        // 用户可重新选定应征并再次下单（select-rider 允许 CANCELLED 订单重新激活为 PENDING）。
+        Task task = order.getTask();
+        if (task != null && task.getMatchStatus() == MatchStatus.AWAITING_PAYMENT) {
+            task.setMatchStatus(MatchStatus.NEGOTIATING);
+            taskRepository.save(task);
+        }
         log.info("订单取消成功，订单号: {}, 用户ID: {}", orderNum, userId);
     }
 

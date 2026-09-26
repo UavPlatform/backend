@@ -1,5 +1,6 @@
 package com.uav.server.calculator;
 
+import com.uav.server.config.TransportPricingConfig;
 import com.uav.task.pojo.entity.TaskWaypoint;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,14 +26,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TransportPriceCalculatorTest {
 
     private static final BigDecimal PRICE_PER_METER = new BigDecimal("0.05");
-    private static final BigDecimal PRICE_PER_KG = new BigDecimal("2.00");
+    private static final List<TransportPricingConfig.WeightStep> WEIGHT_STEPS =
+            List.of(weightStep("10", "0.00"), weightStep("25", "30.00"), weightStep("50", "80.00"));
     private static final BigDecimal UNKNOWN_SURCHARGE = new BigDecimal("0.00");
     private static final Map<String, BigDecimal> CATEGORY_SURCHARGE = Map.of(
             "CONSTRUCTION", new BigDecimal("50.00"),
             "EQUIPMENT", new BigDecimal("80.00"));
 
     private static TransportPriceCalculator calculator() {
-        return new TransportPriceCalculator(PRICE_PER_METER, PRICE_PER_KG, CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE);
+        return new TransportPriceCalculator(PRICE_PER_METER, WEIGHT_STEPS, CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE);
+    }
+
+    /** 构造一档重量阶梯（测试造数） */
+    private static TransportPricingConfig.WeightStep weightStep(String maxKg, String fee) {
+        TransportPricingConfig.WeightStep step = new TransportPricingConfig.WeightStep();
+        step.setMaxKg(new BigDecimal(maxKg));
+        step.setFee(new BigDecimal(fee));
+        return step;
     }
 
     private static TransportPriceResult.Quote quoteOf(TransportPriceResult result) {
@@ -53,7 +63,7 @@ class TransportPriceCalculatorTest {
                 new BigDecimal("1.000"), new BigDecimal("30")));
 
         assertThat(quote.distanceCharge()).isEqualTo(new BigDecimal("61.73"));   // 1234.56 × 0.05 = 61.728 → 61.73
-        assertThat(quote.weightCharge()).isEqualTo(new BigDecimal("30.00"));     // 15 × 2.00
+        assertThat(quote.weightCharge()).isEqualTo(new BigDecimal("30.00"));     // 15kg 落 25kg 档
         assertThat(quote.categoryCharge()).isEqualTo(new BigDecimal("50.00"));
         assertThat(quote.aircraftModelCoefficient()).isEqualByComparingTo("1.000");
         assertThat(quote.quotedAmount())
@@ -100,9 +110,9 @@ class TransportPriceCalculatorTest {
                 new BigDecimal("1.000"), new BigDecimal("30")));
 
         assertThat(quote.distanceCharge()).isEqualTo(new BigDecimal("0.00"));
-        assertThat(quote.weightCharge()).isEqualTo(new BigDecimal("20.00"));
+        assertThat(quote.weightCharge()).isEqualTo(new BigDecimal("0.00"));      // 10kg 落 10kg 档（免费）
         assertThat(quote.categoryCharge()).isEqualTo(new BigDecimal("0.00"));
-        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("20.00"));
+        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("0.00"));
     }
 
     @Test
@@ -112,7 +122,7 @@ class TransportPriceCalculatorTest {
                 BigDecimal.ZERO, new BigDecimal("30"), null,
                 new BigDecimal("1.000"), new BigDecimal("30")));
 
-        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("60.00"));
+        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("80.00"));  // 30kg 落 50kg 档
     }
 
     @Test
@@ -134,7 +144,7 @@ class TransportPriceCalculatorTest {
                 new BigDecimal("1.000"), new BigDecimal("30")));
 
         assertThat(quote.categoryCharge()).isEqualTo(new BigDecimal("50.00"));
-        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("52.00"));
+        assertThat(quote.quotedAmount()).isEqualTo(new BigDecimal("50.00"));
     }
 
     @Test
@@ -173,13 +183,16 @@ class TransportPriceCalculatorTest {
     @DisplayName("非法计价配置在构造期拒绝（宁可启动失败也不产出错误价格）")
     void invalidPricingConfigRejectedAtConstruction() {
         assertThatThrownBy(() -> new TransportPriceCalculator(
-                null, PRICE_PER_KG, CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE))
+                null, WEIGHT_STEPS, CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TransportPriceCalculator(
-                PRICE_PER_METER, new BigDecimal("-0.01"), CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE))
+                PRICE_PER_METER, List.of(weightStep("10", "-1.00")), CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new TransportPriceCalculator(
-                PRICE_PER_METER, PRICE_PER_KG, Map.of("CONSTRUCTION", new BigDecimal("-1")), UNKNOWN_SURCHARGE))
+                PRICE_PER_METER, List.of(), CATEGORY_SURCHARGE, UNKNOWN_SURCHARGE))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new TransportPriceCalculator(
+                PRICE_PER_METER, WEIGHT_STEPS, Map.of("CONSTRUCTION", new BigDecimal("-1")), UNKNOWN_SURCHARGE))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

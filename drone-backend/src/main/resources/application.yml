@@ -74,7 +74,13 @@ order:
 # ADR-0003「不允许改价」：本节只放平台规则单价，禁止按订单 override；调价须改配置并留痕。
 transport:
   pricing:
-    price-per-kg: 2.00                 # 重量单价（元/kg）
+    weight-steps:                      # 重量阶梯（元）：按货物重量所在档计费，档位对应所需机型等级
+      - max-kg: 10                     #  <=10kg   普通机型
+        fee: 0.00
+      - max-kg: 25                     #  10~25kg  中型机型
+        fee: 30.00
+      - max-kg: 50                     #  >25kg    重型机型（超此档按本档计）
+        fee: 80.00
     unknown-category-surcharge: 0.00   # 未知类别附加费（元）：类别不在下表时按此值计费，行为确定
     category-surcharge:                # 货物类别附加费表（元），键为类别码，查找大小写不敏感
       CONSTRUCTION: 50.00              # 建材

@@ -49,7 +49,6 @@ class TaskApplicationIT extends IntegrationTestBase {
 
     /** application.yml 计价配置（平台 SSOT，测试以常量独立复核公式）。 */
     private static final BigDecimal PRICE_PER_METER = new BigDecimal("0.05");
-    private static final BigDecimal PRICE_PER_KG = new BigDecimal("2.00");
     private static final BigDecimal CONSTRUCTION_SURCHARGE = new BigDecimal("50.00");
 
     @Autowired
@@ -144,13 +143,20 @@ class TaskApplicationIT extends IntegrationTestBase {
      * 独立复核 ADR-0003 首版公式（只与实现共享 haversine 距离助手，不共享计价器）：
      * {@code quotedAmount = (distance×0.05 + weight×2.00 + 类别附加费) × 机型系数}，2 位 HALF_UP。
      */
+    /** 重量阶梯费，与 application.yml 的 transport.pricing.weight-steps 对齐：<=10kg 免费 / <=25kg 30 / <=50kg 80 */
+    private static BigDecimal weightTierCharge(String weightKg) {
+        BigDecimal w = new BigDecimal(weightKg);
+        if (w.compareTo(new BigDecimal("10")) <= 0) return new BigDecimal("0.00");
+        if (w.compareTo(new BigDecimal("25")) <= 0) return new BigDecimal("30.00");
+        return new BigDecimal("80.00");
+    }
+
     private BigDecimal expectedQuote(String taskNum, String weight, String coefficient) {
         Task task = taskRepository.findByTaskNum(taskNum)
                 .orElseThrow(() -> new AssertionError("任务不存在: " + taskNum));
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(task.getWaypoints());
         BigDecimal distanceCharge = RoutePriceCalculator.calculatePrice(distance, PRICE_PER_METER);
-        BigDecimal weightCharge = PRICE_PER_KG.multiply(new BigDecimal(weight))
-                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal weightCharge = weightTierCharge(weight);
         return distanceCharge.add(weightCharge).add(CONSTRUCTION_SURCHARGE)
                 .multiply(new BigDecimal(coefficient)).setScale(2, RoundingMode.HALF_UP);
     }

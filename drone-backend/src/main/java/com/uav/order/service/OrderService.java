@@ -6,8 +6,9 @@ import org.springframework.data.domain.Page;
 public interface OrderService {
 
     /**
-     * 按任务航点由服务端计价创建 PENDING 订单（P0-2：金额一律服务端计算，
-     * 客户端传入的 reward 不再作为金额依据）。
+     * 发单时创建「待撮合」草稿订单（ADR-0003 决定 3）：状态 MATCHING，totalAmount=0（未锁定），
+     * 不强制支付、不占用 pending_key 单例约束。金额锁定发生在用户选定应征（selectRider），
+     * 支付前由 pay/handleNotify 硬校验 totalAmount == quotedAmount（不允许改价）。
      */
     MissionOrder createOrder(Long userId, String taskNum);
 

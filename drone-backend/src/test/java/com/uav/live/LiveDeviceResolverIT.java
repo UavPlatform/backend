@@ -54,8 +54,8 @@ class LiveDeviceResolverIT extends IntegrationTestBase {
         var task = taskService.createTask(fixtures.twoWaypointTask());
         String deviceId = rider.djiId();
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
         appWebSocketService.requestConnection(deviceId);
         appWebSocketService.markAsConnected(deviceId);
 
@@ -74,8 +74,8 @@ class LiveDeviceResolverIT extends IntegrationTestBase {
         var task = taskService.createTask(fixtures.twoWaypointTask());
         String deviceId = rider.djiId();
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
         appWebSocketService.requestConnection(deviceId);
         appWebSocketService.markAsConnected(deviceId);
         liveSessionService.markRunning(deviceId, "drone_" + deviceId, UniqueNames.unique("req"));
@@ -94,8 +94,8 @@ class LiveDeviceResolverIT extends IntegrationTestBase {
         UserContext.setUser(owner.id(), owner.userName(), owner.role());
         var task = taskService.createTask(fixtures.twoWaypointTask());
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
         // 设备不连接（不 requestConnection/markAsConnected）
 
         TaskLiveDevice resolved = liveDeviceResolver.resolveForTask(task.getId());
@@ -126,8 +126,8 @@ class LiveDeviceResolverIT extends IntegrationTestBase {
         var task = taskService.createTask(fixtures.twoWaypointTask());
         String deviceId = rider.djiId();
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
         appWebSocketService.requestConnection(deviceId);
         appWebSocketService.markAsConnected(deviceId);
 

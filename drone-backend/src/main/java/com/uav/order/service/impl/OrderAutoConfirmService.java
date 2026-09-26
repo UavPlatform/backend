@@ -2,6 +2,7 @@ package com.uav.order.service.impl;
 
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.OrderStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,8 +23,9 @@ import java.util.List;
  *   <li>{@code order.auto-confirm-hours} —— WAITING_CONFIRM 超过该小时数后自动确认，默认 72；</li>
  *   <li>{@code order.auto-confirm-interval-ms} —— 调度间隔，默认 600000（10 分钟）。</li>
  * </ul>
- * <p>开启后：将超时的 WAITING_CONFIRM 订单置为 COMPLETED，executeResult=AUTO_CONFIRM 留痕。
- * 注意：本骨架只落订单终态，不做结算/通知联动（1B 后续任务扩展点）。
+ * <p>开启后：将超时的 WAITING_CONFIRM 订单置为 COMPLETED，executeResult=AUTO_CONFIRM 留痕，
+ * 并把任务撮合状态从 PENDING_ACCEPTANCE 结案为 CLOSED（ADR-0003 决定 5，与用户手动确认一致）。
+ * 注意：本骨架只落订单/撮合终态，不做结算联动（1B 后续任务扩展点）。
  */
 @Slf4j
 @Service
@@ -31,14 +33,18 @@ public class OrderAutoConfirmService {
 
     private final OrderRepository orderRepository;
 
+    private final com.uav.task.mapper.TaskRepository taskRepository;
+
     @Value("${order.auto-confirm-enabled:false}")
     private boolean enabled;
 
     @Value("${order.auto-confirm-hours:72}")
     private int autoConfirmHours;
 
-    public OrderAutoConfirmService(OrderRepository orderRepository) {
+    public OrderAutoConfirmService(OrderRepository orderRepository,
+                                   com.uav.task.mapper.TaskRepository taskRepository) {
         this.orderRepository = orderRepository;
+        this.taskRepository = taskRepository;
     }
 
     @Scheduled(fixedDelayString = "${order.auto-confirm-interval-ms:600000}",
@@ -77,6 +83,12 @@ public class OrderAutoConfirmService {
             order.setExecutedAt(LocalDateTime.now());
             order.setExecuteResult("AUTO_CONFIRM");
             orderRepository.save(order);
+            // TASK-BACKEND-004 / ADR-0003 决定 5：超时自动确认同样结案撮合状态（PENDING_ACCEPTANCE → CLOSED）
+            var task = order.getTask();
+            if (task != null && task.getMatchStatus() == MatchStatus.PENDING_ACCEPTANCE) {
+                task.setMatchStatus(MatchStatus.CLOSED);
+                taskRepository.save(task);
+            }
         }
         if (!expired.isEmpty()) {
             log.info("[AUTO CONFIRM] 验收超时自动确认 {} 笔订单（阈值 {} 小时）", expired.size(), hours);

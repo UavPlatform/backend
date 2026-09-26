@@ -75,9 +75,10 @@ class AccountAuthIT extends IntegrationTestBase {
         assertThat(rider.role()).isEqualTo(1);
         assertThat(rider.djiId()).isNotBlank();
 
-        // /rider/accept 标注 @RequireDrone：未绑定 → 403，未认证 → 401，角色不符 → 403；
+        // /rider/complete 标注 @RequireDrone：未绑定 → 403，未认证 → 401，角色不符 → 403；
         // 返回 404（任务不存在）唯一地证明身份、角色与无人机绑定三道门槛全部通过。
-        mockMvc.perform(post("/rider/accept")
+        // （旧 /rider/accept 已随 ADR-0003 移除，@RequireDrone 门槛改由 /rider/complete 承载）
+        mockMvc.perform(post("/rider/complete")
                         .param("taskNum", UniqueNames.unique("TN"))
                         .header("Authorization", rider.authorization()))
                 .andExpect(status().isNotFound());
@@ -88,7 +89,7 @@ class AccountAuthIT extends IntegrationTestBase {
     void riderWithoutDroneIsRejectedByRequireDroneGate() throws Exception {
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), null);
 
-        mockMvc.perform(post("/rider/accept")
+        mockMvc.perform(post("/rider/complete")
                         .param("taskNum", UniqueNames.unique("TN"))
                         .header("Authorization", rider.authorization()))
                 .andExpect(status().isForbidden())

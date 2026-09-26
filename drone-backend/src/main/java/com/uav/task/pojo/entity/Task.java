@@ -2,6 +2,7 @@ package com.uav.task.pojo.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.uav.server.enums.CargoCategory;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import jakarta.persistence.*;
@@ -20,6 +21,9 @@ public class Task {
     protected void onCreate() {
         this.createTime = LocalDateTime.now();
         this.updateTime = this.createTime;
+        if (this.matchStatus == null) {
+            this.matchStatus = MatchStatus.SEEKING_RIDER;
+        }
     }
 
     @PreUpdate
@@ -47,6 +51,15 @@ public class Task {
     @Enumerated(EnumType.STRING)
     @Column(name = "task_status")
     private TaskStatus taskStatus;
+
+    /**
+     * 撮合子状态（V5__match_status.sql / ADR-0003 决定 6）：承载「发单 → 应征 → 选定 → 支付 →
+     * 双确认 → 验收 → 结案」的匹配阶段；{@link TaskStatus} 保持三态不扩。
+     * 未显式赋值时按 {@link MatchStatus#SEEKING_RIDER} 落库（存量行由 V5 迁移回填）。
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "match_status", length = 32)
+    private MatchStatus matchStatus;
 
     @Column(name = "default_speed")
     private Double defaultSpeed;

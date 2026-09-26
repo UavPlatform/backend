@@ -26,7 +26,6 @@ public enum ApiErrorCode {
     MESSAGE_NOT_FOUND("MESSAGE_NOT_FOUND", "消息不存在"),
     SESSION_NOT_FOUND("SESSION_NOT_FOUND", "会话不存在"),
     NO_PERMISSION("NO_PERMISSION", "无权执行此操作"),
-    TASK_NOT_PAID("TASK_NOT_PAID", "任务尚未支付，支付后将进入接单大厅"),
     REFUND_FAILED("REFUND_FAILED", "退款失败"),
     PAY_RECORD_NOT_FOUND("PAY_RECORD_NOT_FOUND", "支付记录不存在"),
     FILE_NOT_FOUND("FILE_NOT_FOUND", "文件不存在"),
@@ -42,7 +41,11 @@ public enum ApiErrorCode {
     AIRCRAFT_MODEL_NOT_FOUND("AIRCRAFT_MODEL_NOT_FOUND", "机型不存在或已停用"),
     AIRCRAFT_MODEL_NOT_TRANSPORTABLE("AIRCRAFT_MODEL_NOT_TRANSPORTABLE", "该机型不可承接吊运"),
     AIRCRAFT_MODEL_MISMATCH("AIRCRAFT_MODEL_MISMATCH", "绑定设备与提交的机型不一致"),
-    EXCEEDS_PAYLOAD("EXCEEDS_PAYLOAD", "货物重量超过所选机型最大载重，不能应征");
+    EXCEEDS_PAYLOAD("EXCEEDS_PAYLOAD", "货物重量超过所选机型最大载重，不能应征"),
+    MATCH_STATUS_INVALID("MATCH_STATUS_INVALID", "当前撮合状态不允许此操作"),
+    DOUBLE_CONFIRM_REQUIRED("DOUBLE_CONFIRM_REQUIRED", "双方尚未确认，任务不能开始执行"),
+    DELIVERY_EVIDENCE_REQUIRED("DELIVERY_EVIDENCE_REQUIRED", "请先上传履约证据"),
+    AMOUNT_MISMATCH("AMOUNT_MISMATCH", "订单金额与系统报价不一致，已拒绝支付");
 
     private final String code;
     private final String defaultMessage;

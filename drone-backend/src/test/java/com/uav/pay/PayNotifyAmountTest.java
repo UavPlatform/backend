@@ -8,6 +8,8 @@ import com.uav.pay.service.impl.PayRecordAuditService;
 import com.uav.pay.service.impl.WeChatPayServiceImpl;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.exception.PayNotifyException;
+import com.uav.task.mapper.TaskApplicationRepository;
+import com.uav.task.pojo.entity.TaskApplication;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * P0-3 防护测试：支付回调金额必须与订单应支付金额一致，不符拒绝入账并留痕。
+ * ADR-0003「不允许改价」：入账前硬校验订单 totalAmount == 选定应征 quotedAmount，不一致拒绝入账并留痕。
  * 留痕经 PayRecordAuditService 以 REQUIRES_NEW 独立事务写入（主事务回滚后审计仍存活）。
  * 纯 Mockito 单元测试，不起 Spring 上下文。
  */
@@ -45,6 +48,9 @@ class PayNotifyAmountTest {
 
     @Mock
     PayRecordAuditService payRecordAuditService;
+
+    @Mock
+    TaskApplicationRepository taskApplicationRepository;
 
     @InjectMocks
     WeChatPayServiceImpl service;
@@ -68,13 +74,23 @@ class PayNotifyAmountTest {
         return order;
     }
 
+    /** 构造被订单锁定的应征记录（selectedApplicationId 固定为 7L）。 */
+    private TaskApplication quotedApplication(BigDecimal quotedAmount) {
+        TaskApplication application = new TaskApplication();
+        application.setQuotedAmount(quotedAmount);
+        return application;
+    }
+
     @Test
     @DisplayName("回调金额与订单一致 → 订单与支付记录标记 PAID")
     void matchingAmountMarksPaid() {
         PayRecord record = pendingRecord();
         MissionOrder order = orderOf(new BigDecimal("10.00"));
+        order.setSelectedApplicationId(7L);
         when(payRecordRepository.findByOrderNum(ORDER_NUM)).thenReturn(Optional.of(record));
         when(orderRepository.findByOrderNum(ORDER_NUM)).thenReturn(Optional.of(order));
+        when(taskApplicationRepository.findById(7L))
+                .thenReturn(Optional.of(quotedApplication(new BigDecimal("10.00"))));
 
         service.handleNotify("tx-1", ORDER_NUM, "SUCCESS", 1000); // 10.00 元 = 1000 分
 
@@ -100,6 +116,28 @@ class PayNotifyAmountTest {
 
         assertThat(record.getStatus()).isNotEqualTo(OrderStatus.PAID);
         verify(payRecordAuditService).writeRecordError(eq(RECORD_ID), contains("金额不符"));
+        verify(orderRepository, never()).save(any(MissionOrder.class));
+    }
+
+    @Test
+    @DisplayName("订单金额与系统报价不一致 → 拒绝入账并留痕（ADR-0003 不允许改价）")
+    void mismatchedQuoteRejected() {
+        PayRecord record = pendingRecord();
+        MissionOrder order = orderOf(new BigDecimal("10.00"));
+        order.setSelectedApplicationId(7L);
+        when(payRecordRepository.findByOrderNum(ORDER_NUM)).thenReturn(Optional.of(record));
+        when(orderRepository.findByOrderNum(ORDER_NUM)).thenReturn(Optional.of(order));
+        when(taskApplicationRepository.findById(7L))
+                .thenReturn(Optional.of(quotedApplication(new BigDecimal("99.99"))));
+
+        // 回调金额 1000 分与订单 10.00 元一致（通过回调金额比对），但订单金额 ≠ 系统报价 99.99
+        assertThatThrownBy(() -> service.handleNotify("tx-5", ORDER_NUM, "SUCCESS", 1000))
+                .isInstanceOf(PayNotifyException.class)
+                .hasMessageContaining("报价");
+
+        assertThat(record.getStatus()).isNotEqualTo(OrderStatus.PAID);
+        assertThat(order.getOrderStatus()).isNotEqualTo(OrderStatus.PAID);
+        verify(payRecordAuditService).writeRecordError(eq(RECORD_ID), contains("报价"));
         verify(orderRepository, never()).save(any(MissionOrder.class));
     }
 

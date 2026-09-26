@@ -10,7 +10,10 @@ import com.uav.chat.repository.ChatSessionRepository;
 import com.uav.chat.repository.ChatUserSessionRepository;
 import com.uav.chat.websocket.ChatWebSocketHandler;
 import com.uav.server.notify.NotificationDraft;
+import com.uav.server.enums.ApplicationStatus;
+import com.uav.task.mapper.TaskApplicationRepository;
 import com.uav.task.mapper.TaskAssignmentRepository;
+import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.task.pojo.entity.TaskAssignment;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -39,6 +42,7 @@ public class SystemNotificationService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatWebSocketHandler chatWebSocketHandler;
     private final TaskAssignmentRepository taskAssignmentRepository;
+    private final TaskApplicationRepository taskApplicationRepository;
     private final ObjectProvider<SystemNotificationService> self;
 
     public SystemNotificationService(ChatSessionRepository chatSessionRepository,
@@ -46,12 +50,14 @@ public class SystemNotificationService {
                                      ChatMessageRepository chatMessageRepository,
                                      ChatWebSocketHandler chatWebSocketHandler,
                                      TaskAssignmentRepository taskAssignmentRepository,
+                                     TaskApplicationRepository taskApplicationRepository,
                                      ObjectProvider<SystemNotificationService> self) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatUserSessionRepository = chatUserSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.taskAssignmentRepository = taskAssignmentRepository;
+        this.taskApplicationRepository = taskApplicationRepository;
         this.self = self;
     }
 
@@ -114,10 +120,28 @@ public class SystemNotificationService {
     }
 
     private Long resolveRecipient(NotificationDraft draft) {
-        if ("ORDER_CONFIRMED".equals(draft.name()) && draft.taskId() != null) {
-            return taskAssignmentRepository.findByTaskId(draft.taskId())
-                    .map(TaskAssignment::getRiderId)
-                    .orElse(draft.recipientId());
+        if (draft.taskId() != null) {
+            if ("ORDER_CONFIRMED".equals(draft.name())) {
+                return taskAssignmentRepository.findByTaskId(draft.taskId())
+                        .map(TaskAssignment::getRiderId)
+                        .orElse(draft.recipientId());
+            }
+            // 撮合事件收件人 = 被选定的飞手（TASK-BACKEND-004）：
+            // 选定时点 assignment 尚不存在 → 按 SELECTED 应征解析；确认后两者皆可
+            if ("ORDER_SELECTED".equals(draft.name())
+                    || "ORDER_WAIT_RIDER_CONFIRM".equals(draft.name())
+                    || "MATCH_CONFIRMED".equals(draft.name())) {
+                Long selectedRider = taskApplicationRepository
+                        .findByTaskIdAndStatus(draft.taskId(), ApplicationStatus.SELECTED)
+                        .map(TaskApplication::getRiderId)
+                        .orElse(null);
+                if (selectedRider != null) {
+                    return selectedRider;
+                }
+                return taskAssignmentRepository.findByTaskId(draft.taskId())
+                        .map(TaskAssignment::getRiderId)
+                        .orElse(draft.recipientId());
+            }
         }
         return draft.recipientId();
     }

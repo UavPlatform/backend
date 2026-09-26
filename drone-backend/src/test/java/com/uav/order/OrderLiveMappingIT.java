@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 令牌由服务端签发，不再自签 JWT 绕过认证链路（R3）。
  *
  * <p>隔离与造数（R5/R7/R8）：事务回滚隔离；任务 DTO 与订单状态迁移走共享工厂
- * （{@code fixtures.twoWaypointTask()}、{@code fixtures.markOrderPaid(task)}）；
+ * （{@code fixtures.twoWaypointTask()}、{@code fixtures.awaitingRiderConfirm(task, rider.id())}）；
  * ThreadLocal 由基类 {@code @AfterEach} 统一清理，本类不再手工 {@code UserContext.clear()}。
  */
 class OrderLiveMappingIT extends IntegrationTestBase {
@@ -55,8 +55,8 @@ class OrderLiveMappingIT extends IntegrationTestBase {
         Task task = taskService.createTask(fixtures.twoWaypointTask());
 
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
         appWebSocketService.requestConnection(deviceId);
         appWebSocketService.markAsConnected(deviceId);
 
@@ -81,8 +81,8 @@ class OrderLiveMappingIT extends IntegrationTestBase {
         Task task = taskService.createTask(fixtures.twoWaypointTask());
 
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
-        fixtures.markOrderPaid(task);
-        taskService.acceptTask(task.getTaskNum(), rider.id());
+        fixtures.awaitingRiderConfirm(task, rider.id());
+        taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
 
         String orderNum = orderRepository.findByTaskId(task.getId()).orElseThrow().getOrderNum();
         mockMvc.perform(get("/order/detail")

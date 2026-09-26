@@ -2155,6 +2155,23 @@
         },
         "type" : "object"
       },
+      "SelectRiderDto" : {
+        "description" : "用户选定应征并下单（金额由服务端锁定为系统报价，不接受客户端金额字段）",
+        "properties" : {
+          "applicationId" : {
+            "description" : "用户选定的应征记录 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "scheduledTime" : {
+            "description" : "约定作业时间（yyyy-MM-dd HH:mm:ss），下单即视为用户确认该时间",
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "applicationId", "scheduledTime" ],
+        "type" : "object"
+      },
       "SessionDTO" : {
         "properties" : {
           "applicationId" : {
@@ -2278,6 +2295,11 @@
           "appliedAt" : {
             "description" : "应征时间（首次应征时间）",
             "format" : "date-time",
+            "type" : "string"
+          },
+          "matchStatus" : {
+            "description" : "任务撮合子状态（SEEKING_RIDER/NEGOTIATING/AWAITING_PAYMENT/AWAITING_RIDER_CONFIRM/CONFIRMED/PENDING_ACCEPTANCE/CLOSED），供端上判断当前阶段",
+            "enum" : [ "AWAITING_PAYMENT", "AWAITING_RIDER_CONFIRM", "CLOSED", "CONFIRMED", "NEGOTIATING", "PENDING_ACCEPTANCE", "SEEKING_RIDER" ],
             "type" : "string"
           },
           "maxPayloadKg" : {
@@ -2437,6 +2459,20 @@
           "actionHint" : {
             "type" : "string"
           },
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "aircraftModelName" : {
+            "type" : "string"
+          },
+          "cargoCategory" : {
+            "enum" : [ "AGRICULTURAL", "CONSTRUCTION", "EQUIPMENT" ],
+            "type" : "string"
+          },
+          "cargoWeightKg" : {
+            "type" : "number"
+          },
           "completeNote" : {
             "type" : "string"
           },
@@ -2457,10 +2493,24 @@
           "liveState" : {
             "type" : "string"
           },
+          "matchStatus" : {
+            "enum" : [ "AWAITING_PAYMENT", "AWAITING_RIDER_CONFIRM", "CLOSED", "CONFIRMED", "NEGOTIATING", "PENDING_ACCEPTANCE", "SEEKING_RIDER" ],
+            "type" : "string"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
           "orderNum" : {
             "type" : "string"
           },
           "orderStatus" : {
+            "type" : "string"
+          },
+          "quotedAmount" : {
+            "type" : "number"
+          },
+          "riderConfirmedAt" : {
+            "format" : "date-time",
             "type" : "string"
           },
           "riderId" : {
@@ -2468,6 +2518,10 @@
             "type" : "integer"
           },
           "riderName" : {
+            "type" : "string"
+          },
+          "scheduledTime" : {
+            "format" : "date-time",
             "type" : "string"
           },
           "taskName" : {
@@ -2495,6 +2549,10 @@
             "type" : "number"
           },
           "updateTime" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userConfirmedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
@@ -4598,38 +4656,9 @@
         "tags" : [ "Review API" ]
       }
     },
-    "/rider/accept" : {
-      "post" : {
-        "description" : "骑手接受指定任务",
-        "operationId" : "acceptTask",
-        "parameters" : [ {
-          "description" : "任务编号",
-          "in" : "query",
-          "name" : "taskNum",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "接受任务",
-        "tags" : [ "Rider API" ]
-      }
-    },
     "/rider/apply" : {
       "post" : {
-        "description" : "提交 taskNum + aircraftModelId，服务端按 ADR-0003 平台计价公式（航点距离 + 货物重量/类别 + 机型系数）计算并持久化系统报价 quotedAmount；不接受客户端金额字段——请求携带 price 等字段一律忽略（不允许改价）。设备/机型门禁：UAV_NOT_FOUND / AIRCRAFT_MODEL_REQUIRED / AIRCRAFT_MODEL_NOT_FOUND / AIRCRAFT_MODEL_NOT_TRANSPORTABLE / AIRCRAFT_MODEL_MISMATCH；超重拒绝：EXCEEDS_PAYLOAD",
+        "description" : "提交 taskNum + aircraftModelId，服务端按 ADR-0003 平台计价公式（航点距离 + 货物重量/类别 + 机型系数）计算并持久化系统报价 quotedAmount；不接受客户端金额字段——请求携带 price 等字段一律忽略（不允许改价）。设备/机型门禁：UAV_NOT_FOUND / AIRCRAFT_MODEL_REQUIRED / AIRCRAFT_MODEL_NOT_FOUND / AIRCRAFT_MODEL_NOT_TRANSPORTABLE / AIRCRAFT_MODEL_MISMATCH；超重拒绝：EXCEEDS_PAYLOAD；撮合状态门禁：任务进入选定/支付/确认/验收阶段后拒绝新应征（MATCH_STATUS_INVALID）",
         "operationId" : "apply",
         "parameters" : [ {
           "description" : "任务编号",
@@ -4670,7 +4699,7 @@
     },
     "/rider/cancel" : {
       "post" : {
-        "description" : "骑手取消已接受的任务，任务回到空闲状态",
+        "description" : "骑手取消执行中的任务，任务回到待撮合（重新开放撮合）",
         "operationId" : "cancelTask",
         "parameters" : [ {
           "description" : "任务编号",
@@ -4699,7 +4728,7 @@
     },
     "/rider/complete" : {
       "post" : {
-        "description" : "骑手完成已接受的任务；note 为可选完成说明（≤500 字）",
+        "description" : "骑手交付任务；必须先上传履约证据（attachment），否则 DELIVERY_EVIDENCE_REQUIRED；交付后进入待验收（PENDING_ACCEPTANCE / 订单 WAITING_CONFIRM）。note 为可选完成说明（≤500 字）",
         "operationId" : "completeTask",
         "parameters" : [ {
           "description" : "任务编号",
@@ -4731,6 +4760,35 @@
           }
         },
         "summary" : "完成任务",
+        "tags" : [ "Rider API" ]
+      }
+    },
+    "/rider/confirm-order" : {
+      "post" : {
+        "description" : "ADR-0003 决定 4：被选定的飞手确认接单与约定作业时间（记 riderConfirmedAt），撮合状态 → CONFIRMED；双确认齐备后任务经门禁推进 IN_PROGRESS（可执飞）。未到待确认阶段返回 MATCH_STATUS_INVALID/ORDER_STATUS_INVALID；非选定飞手返回 NO_PERMISSION；门禁不满足返回 DOUBLE_CONFIRM_REQUIRED",
+        "operationId" : "confirmOrder",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手确认订单",
         "tags" : [ "Rider API" ]
       }
     },
@@ -4918,7 +4976,7 @@
     },
     "/rider/square" : {
       "get" : {
-        "description" : "骑手查看所有可接的任务",
+        "description" : "骑手浏览待撮合的吊运任务（招募中/洽谈中，含货物重量/类别等 cargo 字段），不要求订单已支付——支付发生在用户选定应征之后（ADR-0003）",
         "operationId" : "listAvailableTasks",
         "responses" : {
           "200" : {
@@ -4958,7 +5016,7 @@
     },
     "/rider/task/detail" : {
       "get" : {
-        "description" : "飞手查看任意任务的详细信息（无需任务归属）",
+        "description" : "飞手查看任意任务的详细信息（无需任务归属），含撮合状态、货物字段与订单/报价回显",
         "operationId" : "getTaskDetail_1",
         "parameters" : [ {
           "description" : "任务编号",
@@ -4987,7 +5045,7 @@
     },
     "/task/confirm" : {
       "post" : {
-        "description" : "骑手完成任务后用户确认收货，订单完结",
+        "description" : "飞手上传履约证据并交付后用户确认收货：须已存在 attachment 证据（否则 DELIVERY_EVIDENCE_REQUIRED），确认后订单 COMPLETED、撮合状态 CLOSED",
         "operationId" : "confirmTask",
         "parameters" : [ {
           "description" : "任务编号",
@@ -5016,7 +5074,7 @@
     },
     "/task/create" : {
       "post" : {
-        "description" : "创建新任务，包含任务类型、航点信息等",
+        "description" : "创建新任务（含任务类型、航点、货物字段），同时生成待撮合草稿订单（MATCHING），不强制立即支付（ADR-0003 决定 3）；金额在选定应征时锁定",
         "operationId" : "createTask",
         "requestBody" : {
           "content" : {
@@ -5046,7 +5104,7 @@
     },
     "/task/delete" : {
       "delete" : {
-        "description" : "删除指定ID的任务，只能删除自己创建的任务",
+        "description" : "删除指定ID的任务，只能删除自己创建的任务；已支付/已完成订单的任务禁止删除",
         "operationId" : "deleteTask",
         "parameters" : [ {
           "description" : "任务数据库ID",
@@ -5076,7 +5134,7 @@
     },
     "/task/detail" : {
       "get" : {
-        "description" : "根据任务编号获取详细信息，包含航点列表",
+        "description" : "根据任务编号获取详细信息，含航点、货物字段、撮合状态 matchStatus、约定时间/双方确认时间与选定应征报价（quotedAmount）/机型",
         "operationId" : "getTaskDetail",
         "parameters" : [ {
           "description" : "任务编号",
@@ -5217,6 +5275,45 @@
         },
         "summary" : "按任务编号查询任务会话",
         "tags" : [ "chat session API" ]
+      }
+    },
+    "/task/{taskNum}/select-rider" : {
+      "post" : {
+        "description" : "ADR-0003 决定 3：选定一条应征（其余自动 CLOSED）+ 提交约定作业时间 scheduledTime，服务端锁定订单 totalAmount = 该应征 quotedAmount（严格相等，不允许改价）并转待支付（PENDING）；随后走既有 POST /pay/{orderNum} 支付。撮合状态 → AWAITING_PAYMENT，非法迁移返回 MATCH_STATUS_INVALID；已有待支付订单返回 ORDER_ALREADY_EXISTS",
+        "operationId" : "selectRider",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SelectRiderDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskVo"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "用户选定应征并下单",
+        "tags" : [ "Task API" ]
       }
     },
     "/tasks/{taskNum}/attachments" : {

@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * 管理端分页查询集成测试：管理员分页查询全平台任务/订单；普通用户/飞手 403；
- * 订单状态码契约（0-5 含 4/5）与 actionHint 可供 OrderView 状态矩阵渲染。
+ * 订单状态码契约（0-7，含 4/5 与新增 7=待撮合 MATCHING）与 actionHint 可供 OrderView 状态矩阵渲染。
  *
  * <p>层次与驱动（O6/R2/R4）：进程内 MockMvc 集成测试，继承 {@link IntegrationTestBase}
  * （MOCK + {@code @AutoConfigureMockMvc} + {@code @Transactional}），不自称端到端。
@@ -32,7 +32,7 @@ class AdminQueryApiIT extends IntegrationTestBase {
     TaskService taskService;
 
     @Test
-    @DisplayName("管理员分页查询全平台订单：状态码契约含 4/5，字段齐全")
+    @DisplayName("管理员分页查询全平台订单：状态码契约含 4/5/7，字段齐全")
     void adminListOrdersWithStatusContract() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         UserContext.setUser(owner.id(), owner.userName(), 0);
@@ -51,7 +51,7 @@ class AdminQueryApiIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + paidTask.getTaskNum() + "')].orderStatusCode")
                         .value(org.hamcrest.Matchers.hasItem(1)))
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + pendingTask.getTaskNum() + "')].orderStatusCode")
-                        .value(org.hamcrest.Matchers.hasItem(0)))
+                        .value(org.hamcrest.Matchers.hasItem(7)))
                 .andExpect(jsonPath("$.data.content[?(@.taskNum == '" + pendingTask.getTaskNum() + "')].ownerName")
                         .value(org.hamcrest.Matchers.hasItem(owner.userName())));
     }

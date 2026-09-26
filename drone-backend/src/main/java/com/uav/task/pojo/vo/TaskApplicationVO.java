@@ -2,6 +2,7 @@ package com.uav.task.pojo.vo;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.uav.server.enums.ApplicationStatus;
+import com.uav.server.enums.MatchStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -49,6 +50,10 @@ public class TaskApplicationVO {
 
     @Schema(description = "应征状态（ACTIVE=应征中；SELECTED/CLOSED 为用户选定阶段语义）")
     private ApplicationStatus status;
+
+    @Schema(description = "任务撮合子状态（SEEKING_RIDER/NEGOTIATING/AWAITING_PAYMENT/"
+            + "AWAITING_RIDER_CONFIRM/CONFIRMED/PENDING_ACCEPTANCE/CLOSED），供端上判断当前阶段")
+    private MatchStatus matchStatus;
 
     @Schema(description = "应征时间（首次应征时间）")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

@@ -1,7 +1,7 @@
 package com.uav.task.mapper;
 
 import com.uav.task.pojo.entity.Task;
-import com.uav.server.enums.OrderStatus;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -36,14 +36,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByTaskStatusOrderByCreateTimeDesc(TaskStatus taskStatus);
 
     /**
-     * 接单大厅可见任务（1B-2a，裁决 Q1=A 托管式支付）：仅返回「空闲 且 关联订单已支付」的任务。
-     * 未支付任务对飞手不可见。
+     * 任务广场可见任务（TASK-BACKEND-004 / ADR-0003 闲鱼式撮合）：返回「空闲 且 撮合开放」的任务
+     * （SEEKING_RIDER 招募中 / NEGOTIATING 洽谈中）。不再要求订单已支付——支付发生在用户选定应征之后。
      */
     @EntityGraph(attributePaths = "waypoints")
-    @Query("SELECT t FROM Task t WHERE t.taskStatus = :idle AND EXISTS "
-            + "(SELECT o FROM MissionOrder o WHERE o.task = t AND o.orderStatus = :paid) "
+    @Query("SELECT t FROM Task t WHERE t.taskStatus = :idle AND t.matchStatus IN :matching "
             + "ORDER BY t.createTime DESC")
-    List<Task> findPaidIdleTasks(@Param("idle") TaskStatus idle, @Param("paid") OrderStatus paid);
+    List<Task> findMatchingTasks(@Param("idle") TaskStatus idle,
+                                  @Param("matching") List<MatchStatus> matching);
 
     @EntityGraph(attributePaths = "waypoints")
     @Lock(LockModeType.PESSIMISTIC_WRITE)

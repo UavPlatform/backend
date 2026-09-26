@@ -5,11 +5,15 @@ import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.exception.BusinessException;
+import com.uav.server.util.UserContext;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
+import com.uav.task.mapper.TaskApplicationRepository;
 import com.uav.task.mapper.TaskRepository;
 import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.task.service.TaskService;
+import com.uav.user.pojo.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +22,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 防护测试（P0-8）：任务存在已支付/已完成订单时禁止删除，防止财务记录被物理删除。
- * MockMvc 集成测试（R9/O4）：删除守卫走 Service→Repository 链路，必须启动 Spring。
+ * 防护测试（P0-8 / ADR-0003 更新）：任务存在<b>财务订单</b>时禁止删除，防止财务记录被物理删除。
+ * 禁删状态：PAID / WAITING_CONFIRM / COMPLETED / REFUNDED / <b>DISPUTED</b>（争议处理中，同属财务记录）；
+ * 非财务状态 MATCHING（草稿待撮合）/ PENDING（选定未支付）/ CANCELLED 允许删除——删除时订单行连带清理，
+ * 且先清理 task_application（V3 的 fk_task_application_task FK 不再挡删除）。删除时任务执行中（IN_PROGRESS）
+ * 亦拒绝。MockMvc 集成测试（R9/O4）：删除守卫走 Service→Repository 链路，必须启动 Spring。
  *
  * <p>R2：继承 {@link IntegrationTestBase}（MOCK + {@code @Transactional} 回滚隔离）；
  * R3：用户身份由 {@link TestAccounts} 真实注册取得（本用例只需合法 userId）；
@@ -34,6 +41,9 @@ class TaskDeleteGuardIT extends IntegrationTestBase {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private TaskApplicationRepository taskApplicationRepository;
 
     @Autowired
     private TaskService taskService;
@@ -92,5 +102,26 @@ class TaskDeleteGuardIT extends IntegrationTestBase {
         assertThatThrownBy(() -> taskService.deleteTask(task.getId(), attacker.id()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("无权");
+    }
+
+    @Test
+    @DisplayName("含草稿订单（MATCHING）与应征记录的任务可删除：应征/订单连带清理，FK 不再挡删除")
+    void deleteTaskWithDraftOrderAndApplicationAllowed() {
+        User owner = fixtures.user(0);
+        UserContext.setUser(owner.getId(), owner.getUserName(), 0);
+
+        // 发单走生产链路：任务 + MATCHING 草稿订单（非财务，允许删除）
+        Task task = taskService.createTask(fixtures.twoWaypointTask());
+        MissionOrder order = orderRepository.findByTaskId(task.getId()).orElseThrow();
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.MATCHING);
+
+        // 再落一条飞手应征（task_application 带 fk_task_application_task，删除任务前必须先清理）
+        TaskApplication application = fixtures.taskApplication(task, fixtures.rider().getId());
+
+        taskService.deleteTask(task.getId(), owner.getId());
+
+        assertThat(taskRepository.findById(task.getId())).isEmpty();
+        assertThat(orderRepository.findById(order.getId())).isEmpty();
+        assertThat(taskApplicationRepository.findById(application.getId())).isEmpty();
     }
 }

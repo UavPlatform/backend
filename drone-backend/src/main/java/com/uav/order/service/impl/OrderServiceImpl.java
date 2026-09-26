@@ -7,8 +7,8 @@ import com.uav.server.enums.OrderStatus;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskWaypoint;
 import com.uav.server.calculator.RoutePriceCalculator;
-import com.uav.server.config.OrderConfig;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.util.OrderIdGenerator;
 import com.uav.order.service.OrderService;
@@ -35,9 +35,6 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private OrderRepository orderRepository;
 
-    @Autowired
-    private OrderConfig orderConfig;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MissionOrder createOrder(Long userId, String taskNum) {
@@ -51,25 +48,11 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权使用此任务");
         }
 
-        Optional<MissionOrder> unpaid = orderRepository.findByUserIdAndOrderStatusForUpdate(userId, OrderStatus.PENDING);
-        if (unpaid.isPresent()) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
-        }
-
-        // P0-2：金额一律由服务端按航点距离计算，客户端传入的 reward 不作为金额依据
+        // TASK-BACKEND-004 / ADR-0003 决定 3：发单创建「待撮合」草稿订单（MATCHING），不强制支付。
+        // 金额未锁定（totalAmount=0，选定应征时由 selectRider 写死 = quotedAmount）；
+        // MATCHING 不占用 pending_key 单例约束，同一用户可并行发布多个需求（冲突点 1 解除）。
         List<TaskWaypoint> waypoints = task.getWaypoints();
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(waypoints);
-        BigDecimal pricePerMeter = orderConfig.getPricePerMeter();
-        if (pricePerMeter == null || pricePerMeter.signum() <= 0) {
-            log.error("订单计价配置非法（order.price-per-meter={}），拒绝创建订单", pricePerMeter);
-            throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
-                    "订单计价配置缺失，已拒绝创建订单");
-        }
-        BigDecimal totalAmount = RoutePriceCalculator.calculatePrice(distance, pricePerMeter);
-        if (totalAmount == null || totalAmount.signum() <= 0) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
-                    "订单金额计算为 0（航点不足或距离过近），已拒绝创建订单");
-        }
 
         String orderNum = OrderIdGenerator.generate(userId);
 
@@ -77,23 +60,19 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderNum(orderNum);
         order.setUserId(userId);
         order.setTask(task);
-        order.setTotalAmount(totalAmount);
+        order.setTotalAmount(BigDecimal.ZERO);
         order.setTotalDistance(distance);
-        order.setOrderStatus(OrderStatus.PENDING);
+        order.setOrderStatus(OrderStatus.MATCHING);
 
         try {
             orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
-            log.warn("并发冲突，用户ID {} 已有待支付订单，唯一约束拦截", userId);
+            log.warn("并发冲突，用户ID {} 订单唯一约束拦截", userId);
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_ALREADY_EXISTS);
         }
 
-        log.info("订单创建成功，订单号: {}, 用户ID: {}, 金额: {}元, 距离: {}m",
-                orderNum, userId, order.getTotalAmount(), distance);
-
-        if (order.getTask() != null) {
-            order.getTask().getTaskName();
-        }
+        log.info("待撮合订单创建成功，订单号: {}, 用户ID: {}, 距离: {}m（金额待选定应征时锁定）",
+                orderNum, userId, distance);
 
         return order;
     }
@@ -134,6 +113,14 @@ public class OrderServiceImpl implements OrderService {
 
         order.setOrderStatus(OrderStatus.CANCELLED);
         orderRepository.save(order);
+
+        // TASK-BACKEND-004：取消支付后重新开放撮合（AWAITING_PAYMENT → NEGOTIATING），
+        // 用户可重新选定应征并再次下单（select-rider 允许 CANCELLED 订单重新激活为 PENDING）。
+        Task task = order.getTask();
+        if (task != null && task.getMatchStatus() == MatchStatus.AWAITING_PAYMENT) {
+            task.setMatchStatus(MatchStatus.NEGOTIATING);
+            taskRepository.save(task);
+        }
         log.info("订单取消成功，订单号: {}, 用户ID: {}", orderNum, userId);
     }
 

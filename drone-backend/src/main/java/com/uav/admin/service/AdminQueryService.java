@@ -162,7 +162,8 @@ public class AdminQueryService {
             }
         }
         String actionHint = com.uav.task.pojo.vo.TaskActionHints.hint(task.getTaskStatus(),
-                order != null ? order.getOrderStatus() : null);
+                order != null ? order.getOrderStatus() : null,
+                task.getMatchStatus());
 
         return AdminTaskVo.of(task, ownerName,
                 order != null ? order.getOrderNum() : null,

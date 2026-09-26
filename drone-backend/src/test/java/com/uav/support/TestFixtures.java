@@ -3,16 +3,22 @@ package com.uav.support;
 import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.pay.mapper.PayRecordRepository;
+import com.uav.pay.pojo.entity.PayRecord;
+import com.uav.pay.service.WeChatPayService;
 import com.uav.server.enums.ApplicationStatus;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import com.uav.task.mapper.TaskApplicationRepository;
+import com.uav.task.mapper.TaskAttachmentRepository;
 import com.uav.task.mapper.TaskRepository;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.dto.WaypointDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskApplication;
+import com.uav.task.pojo.entity.TaskAttachment;
 import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.RiderUav;
@@ -22,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -63,6 +70,15 @@ public class TestFixtures {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private PayRecordRepository payRecordRepository;
+
+    @Autowired
+    private WeChatPayService weChatPayService;
+
+    @Autowired
+    private TaskAttachmentRepository taskAttachmentRepository;
 
     // ---------- 用户 / 飞手 ----------
 
@@ -265,6 +281,105 @@ public class TestFixtures {
                 .orElseThrow(() -> new IllegalStateException("任务无对应订单: " + task.getId()));
         order.setOrderStatus(OrderStatus.PAID);
         return orderRepository.save(order);
+    }
+
+    // ---------- 撮合状态机造数（TASK-BACKEND-004 / ADR-0003）----------
+    // 以下均为「直连仓储」造数：把任务推进到某一撮合阶段，供非撮合主题的测试跨过长链路；
+    // 撮合链路本身的正确性由 MatchFlowIT / TaskApplicationIT 走生产 Service/HTTP 覆盖。
+
+    /**
+     * 造「已选定未支付」：SELECTED 应征（其余 CLOSED）+ 订单锁定金额（= quotedAmount）
+     * 转 PENDING + matchStatus=AWAITING_PAYMENT（userConfirmedAt/scheduledTime 已就位）。
+     */
+    public MissionOrder selectAndLock(Task task, long riderId) {
+        TaskApplication application = selectedApplication(task, riderId);
+        MissionOrder order = missionOrderOf(task);
+        order.setSelectedApplicationId(application.getId());
+        order.setTotalAmount(application.getQuotedAmount());
+        order.setScheduledTime(LocalDateTime.now().plusDays(1));
+        order.setUserConfirmedAt(LocalDateTime.now());
+        order.setRiderConfirmedAt(null);
+        order.setOrderStatus(OrderStatus.PENDING);
+        order = orderRepository.save(order);
+        task.setMatchStatus(MatchStatus.AWAITING_PAYMENT);
+        taskRepository.save(task);
+        return order;
+    }
+
+    /**
+     * 造「已选定已支付、待飞手确认」：在 {@link #selectAndLock} 基础上订单 PAID、
+     * matchStatus=AWAITING_RIDER_CONFIRM——飞手下一步走生产 {@code riderConfirmOrder}。
+     */
+    public MissionOrder awaitingRiderConfirm(Task task, long riderId) {
+        MissionOrder order = selectAndLock(task, riderId);
+        order.setOrderStatus(OrderStatus.PAID);
+        order = orderRepository.save(order);
+        task.setMatchStatus(MatchStatus.AWAITING_RIDER_CONFIRM);
+        taskRepository.save(task);
+        return order;
+    }
+
+    /**
+     * 走生产支付状态机 {@code WeChatPayService.handleNotify} 完成支付（需订单已 selectAndLock）：
+     * PENDING→PAID + 撮合状态 →AWAITING_RIDER_CONFIRM + ORDER_PAID/ORDER_WAIT_RIDER_CONFIRM 通知。
+     */
+    public MissionOrder payLockedOrder(Task task) {
+        MissionOrder order = orderRepository.findByTaskId(task.getId())
+                .orElseThrow(() -> new IllegalStateException("任务无对应订单: " + task.getId()));
+        if (order.getOrderStatus() != OrderStatus.PENDING) {
+            throw new IllegalStateException("订单未处于待支付状态: " + order.getOrderStatus());
+        }
+        PayRecord record = new PayRecord();
+        record.setOrderNum(order.getOrderNum());
+        record.setUserId(order.getUserId());
+        record.setAmount(order.getTotalAmount());
+        record.setPayChannel("WECHAT");
+        record.setStatus(OrderStatus.PENDING);
+        payRecordRepository.save(record);
+        int cents = order.getTotalAmount().multiply(BigDecimal.valueOf(100)).intValueExact();
+        weChatPayService.handleNotify(UniqueNames.unique("tx"), order.getOrderNum(), "SUCCESS", cents);
+        return orderRepository.findById(order.getId()).orElseThrow();
+    }
+
+    /** 插入一条履约证据（task_attachment），供「无证据拒绝确认」与完成链路测试造数。 */
+    public TaskAttachment evidence(String taskNum, long uploaderId) {
+        TaskAttachment attachment = new TaskAttachment();
+        attachment.setTaskNum(taskNum);
+        attachment.setUploaderId(uploaderId);
+        attachment.setObjectKey("task-attachments/" + taskNum + "/" + UniqueNames.unique("ev"));
+        attachment.setFileName("evidence.jpg");
+        attachment.setContentType("image/jpeg");
+        attachment.setSizeBytes(1024L);
+        return taskAttachmentRepository.save(attachment);
+    }
+
+    /** 选定应征（无则建）并置 SELECTED；同任务其余应征置 CLOSED。 */
+    private TaskApplication selectedApplication(Task task, long riderId) {
+        TaskApplication application = taskApplicationRepository
+                .findByTaskIdAndRiderId(task.getId(), riderId)
+                .orElseGet(() -> {
+                    TaskApplication created = new TaskApplication();
+                    created.setTaskId(task.getId());
+                    created.setRiderId(riderId);
+                    created.setAircraftModelId(defaultAircraftModelId());
+                    created.setQuotedAmount(new BigDecimal("99.00"));
+                    return created;
+                });
+        application.setStatus(ApplicationStatus.SELECTED);
+        TaskApplication saved = taskApplicationRepository.save(application);
+        taskApplicationRepository.findByTaskIdOrderByCreateTimeAsc(task.getId()).forEach(other -> {
+            if (!other.getId().equals(saved.getId())) {
+                other.setStatus(ApplicationStatus.CLOSED);
+                taskApplicationRepository.save(other);
+            }
+        });
+        return saved;
+    }
+
+    /** 任务的待撮合订单；缺失时按 MATCHING 草稿补造（直连仓储场景）。 */
+    private MissionOrder missionOrderOf(Task task) {
+        return orderRepository.findByTaskId(task.getId()).orElseGet(() ->
+                order(task.getUserId(), task, OrderStatus.MATCHING, "0.00"));
     }
 
     private WaypointDto waypoint(int index, double longitude, double latitude, double altitude) {

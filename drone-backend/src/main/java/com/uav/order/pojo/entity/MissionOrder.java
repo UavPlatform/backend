@@ -1,5 +1,6 @@
 package com.uav.order.pojo.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.uav.task.pojo.entity.Task;
 import com.uav.server.enums.OrderStatus;
 import jakarta.persistence.*;
@@ -42,6 +43,36 @@ public class MissionOrder {
 
     @Column(name = "pending_key", unique = true, length = 64)
     private String pendingKey;
+
+    /**
+     * 用户选定的应征记录（{@code task_application.id}，TASK-BACKEND-004 / ADR-0003 决定 2）。
+     * 选定时刻由 select-rider 写入，同时锁定 {@code totalAmount = quotedAmount}；
+     * 支付链路（/pay 与 handleNotify）据此硬校验金额，任何偏离一律
+     * {@link com.uav.server.enums.ApiErrorCode#AMOUNT_MISMATCH} 拒绝（不允许改价）。
+     */
+    @Column(name = "selected_application_id")
+    private Long selectedApplicationId;
+
+    /**
+     * 约定作业时间（ADR-0003 决定 4「用户确认约定时间」：下单时提交 scheduledTime）。
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Column(name = "scheduled_time")
+    private LocalDateTime scheduledTime;
+
+    /**
+     * 用户下单（选定应征 + 约定时间）时刻 = 用户侧确认时间（ADR-0003 决定 4）。
+     */
+    @Column(name = "user_confirmed_at")
+    private LocalDateTime userConfirmedAt;
+
+    /**
+     * 飞手确认接单与约定时间的时刻（ADR-0003 决定 4）。与 {@link #userConfirmedAt}
+     * 同时存在才允许 TaskStatus → IN_PROGRESS（双确认门禁）。
+     */
+    @Column(name = "rider_confirmed_at")
+    private LocalDateTime riderConfirmedAt;
+
 
     @Column(name = "create_time", nullable = false, updatable = false)
     private LocalDateTime createTime;

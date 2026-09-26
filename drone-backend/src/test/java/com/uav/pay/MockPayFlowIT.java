@@ -4,19 +4,26 @@ import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.pay.mapper.PayRecordRepository;
 import com.uav.pay.pojo.entity.PayRecord;
+import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.exception.PayNotifyException;
 import com.uav.server.util.UserContext;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
+import com.uav.task.mapper.TaskRepository;
+import com.uav.task.pojo.entity.Task;
 import com.uav.task.service.TaskService;
+import com.uav.user.pojo.entity.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -28,6 +35,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 1B-1a mock 支付链路集成测试（进程内 MockMvc，<b>不是端到端测试</b>）。
  * /pay/{orderNum}（mock 态，可省略 openid）→ pay_record 建 PENDING 流水 →
  * 复用真实 handleNotify 状态机（含 t3 金额比对）→ 订单 PAID + 流水 PAID。
+ *
+ * <p>ADR-0003 前置：发单只建 {@code MATCHING} 草稿订单（不可支付），每个用例先经共享工厂
+ * {@code fixtures.selectAndLock} 锁定金额（totalAmount = quotedAmount、订单 PENDING、
+ * matchStatus = AWAITING_PAYMENT），再走原 /pay 断言；支付成功后撮合状态由生产 handleNotify
+ * 推进为 {@code AWAITING_RIDER_CONFIRM}。另覆盖改价攻击：篡改 totalAmount 后 /pay 返回
+ * {@code AMOUNT_MISMATCH}、handleNotify 抛 {@link PayNotifyException}，订单均不入账。
  *
  * <p>层次自称（O6/P6）：本类经 MockMvc 在测试线程内同步调用 DispatcherServlet，真实 HTTP
  * 基础设施为 0，故既往「端到端测试」的表述已修正为「集成测试」；命名按 O4/R9 为 {@code *IT}。
@@ -71,6 +84,9 @@ class MockPayFlowIT extends IntegrationTestBase {
     private TaskService taskService;
 
     @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
     private com.uav.pay.service.WeChatPayService weChatPayService;
 
     @Test
@@ -79,7 +95,11 @@ class MockPayFlowIT extends IntegrationTestBase {
         TestAccounts.Account user = accounts().registerUser();
         UserContext.setUser(user.id(), user.userName(), user.role());
         var saved = taskService.createTask(fixtures.twoWaypointTask());
-        MissionOrder order = orderRepository.findByTaskId(saved.getId()).orElseThrow();
+        // 发单只建 MATCHING 草稿订单（不可支付）；金额锁定点在「用户选定应征」
+        MissionOrder draft = orderRepository.findByTaskId(saved.getId()).orElseThrow();
+        assertThat(draft.getOrderStatus()).isEqualTo(OrderStatus.MATCHING);
+        User rider = fixtures.rider();
+        MissionOrder order = fixtures.selectAndLock(saved, rider.getId());
         assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.PENDING);
 
         mockMvc.perform(post("/pay/" + order.getOrderNum())
@@ -92,6 +112,11 @@ class MockPayFlowIT extends IntegrationTestBase {
         // 订单终态
         MissionOrder after = orderRepository.findById(order.getId()).orElseThrow();
         assertThat(after.getOrderStatus()).isEqualTo(OrderStatus.PAID);
+
+        // 撮合状态随生产 handleNotify 推进：AWAITING_PAYMENT → AWAITING_RIDER_CONFIRM
+        // （真实提交、无外层测试事务，必须重新从仓储读取）
+        Task refreshed = taskRepository.findById(saved.getId()).orElseThrow();
+        assertThat(refreshed.getMatchStatus()).isEqualTo(MatchStatus.AWAITING_RIDER_CONFIRM);
 
         // pay_record 流水正确
         PayRecord record = payRecordRepository.findByOrderNum(order.getOrderNum()).orElseThrow();
@@ -109,7 +134,8 @@ class MockPayFlowIT extends IntegrationTestBase {
         TestAccounts.Account user = accounts().registerUser();
         UserContext.setUser(user.id(), user.userName(), user.role());
         var saved = taskService.createTask(fixtures.twoWaypointTask());
-        MissionOrder order = orderRepository.findByTaskId(saved.getId()).orElseThrow();
+        User rider = fixtures.rider();
+        MissionOrder order = fixtures.selectAndLock(saved, rider.getId());
 
         mockMvc.perform(post("/pay/" + order.getOrderNum())
                         .header("Authorization", user.authorization()))
@@ -126,7 +152,10 @@ class MockPayFlowIT extends IntegrationTestBase {
         TestAccounts.Account user = accounts().registerUser();
         UserContext.setUser(user.id(), user.userName(), user.role());
         var saved = taskService.createTask(fixtures.twoWaypointTask());
-        MissionOrder order = orderRepository.findByTaskId(saved.getId()).orElseThrow();
+        User rider = fixtures.rider();
+        MissionOrder order = fixtures.selectAndLock(saved, rider.getId());
+        // 金额分比对（P0-3）先于报价一致性校验（requireLockedQuote）触发：
+        // 本用例故意只错金额分，命中的必须是「回调金额不符」分支
 
         // 模拟 /pay 已创建的 PENDING 流水（pay() 的前置步骤）
         PayRecord record = new PayRecord();
@@ -138,7 +167,7 @@ class MockPayFlowIT extends IntegrationTestBase {
         payRecordRepository.save(record);
 
         // mock 通道传入错误金额（应付金额 +1 分）→ 复用真实 handleNotify → 必须拒绝
-        int expectedCents = order.getTotalAmount().multiply(java.math.BigDecimal.valueOf(100)).intValueExact();
+        int expectedCents = order.getTotalAmount().multiply(BigDecimal.valueOf(100)).intValueExact();
         assertThatThrownBy(() -> weChatPayService.handleNotify(
                         UniqueNames.unique("mock-wrong"), order.getOrderNum(), "SUCCESS", expectedCents + 1))
                 .isInstanceOf(PayNotifyException.class);
@@ -148,5 +177,51 @@ class MockPayFlowIT extends IntegrationTestBase {
         PayRecord afterRecord = payRecordRepository.findByOrderNum(order.getOrderNum()).orElseThrow();
         assertThat(afterRecord.getStatus()).isEqualTo(OrderStatus.PENDING);
         assertThat(afterRecord.getErrorMsg()).contains("金额不符");
+    }
+
+    @Test
+    @DisplayName("篡改订单金额支付被拒（改价攻击）：/pay 返回 AMOUNT_MISMATCH、回调入账抛 PayNotifyException")
+    void tamperedAmountPayRejected() throws Exception {
+        TestAccounts.Account user = accounts().registerUser();
+        UserContext.setUser(user.id(), user.userName(), user.role());
+        var saved = taskService.createTask(fixtures.twoWaypointTask());
+        User rider = fixtures.rider();
+        MissionOrder order = fixtures.selectAndLock(saved, rider.getId());
+        BigDecimal locked = order.getTotalAmount();
+
+        // 直连仓储篡改订单金额（模拟支付窗口期被改价 +0.01 元），绕过 select-rider 锁定值
+        order.setTotalAmount(locked.add(new BigDecimal("0.01")));
+        orderRepository.save(order);
+
+        // 1) /pay 前置硬校验 requireLockedQuote：totalAmount != quotedAmount → 400 AMOUNT_MISMATCH
+        mockMvc.perform(post("/pay/" + order.getOrderNum())
+                        .header("Authorization", user.authorization()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value(ApiErrorCode.AMOUNT_MISMATCH.getCode()));
+
+        MissionOrder afterPay = orderRepository.findById(order.getId()).orElseThrow();
+        assertThat(afterPay.getOrderStatus())
+                .as("改价被拒后订单必须保持 PENDING（未入账）")
+                .isEqualTo(OrderStatus.PENDING);
+
+        // 2) 回调入账同校验：先造 PENDING 流水（回调链路需要流水存在，篡改发生在流水之后），
+        //    回调传「篡改后的金额分」——金额分比对通过，但报价一致性校验失败 → PayNotifyException
+        PayRecord record = new PayRecord();
+        record.setOrderNum(order.getOrderNum());
+        record.setUserId(user.id());
+        record.setAmount(order.getTotalAmount());
+        record.setPayChannel("WECHAT");
+        record.setStatus(OrderStatus.PENDING);
+        payRecordRepository.save(record);
+
+        int tamperedCents = order.getTotalAmount().multiply(BigDecimal.valueOf(100)).intValueExact();
+        assertThatThrownBy(() -> weChatPayService.handleNotify(
+                        UniqueNames.unique("tampered"), order.getOrderNum(), "SUCCESS", tamperedCents))
+                .isInstanceOf(PayNotifyException.class);
+
+        MissionOrder afterNotify = orderRepository.findById(order.getId()).orElseThrow();
+        assertThat(afterNotify.getOrderStatus())
+                .as("回调被拒后订单不得入账为 PAID")
+                .isNotEqualTo(OrderStatus.PAID);
     }
 }

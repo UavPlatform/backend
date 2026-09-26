@@ -117,8 +117,8 @@ public class RiderController {
     @PostMapping("/apply")
     public Result<TaskApplicationVO> apply(@RequestBody RiderApplyDto dto) {
         Long riderId = UserContext.getUserId();
-        return Result.success("应征成功",
-                taskApplicationService.apply(dto.getTaskNum(), riderId, dto.getAircraftModelId()));
+        return Result.success("应征成功", taskApplicationService.apply(
+                dto.getTaskNum(), riderId, dto.getAircraftModelId(), dto.getQuotedAmount()));
     }
 
     @OperationLog("飞手确认订单")

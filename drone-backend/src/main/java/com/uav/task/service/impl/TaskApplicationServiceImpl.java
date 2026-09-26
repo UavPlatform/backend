@@ -7,6 +7,7 @@ import com.uav.chat.pojo.enums.MsgType;
 import com.uav.server.calculator.TransportPriceCalculator;
 import com.uav.server.calculator.TransportPriceRejection;
 import com.uav.server.calculator.TransportPriceResult;
+import com.uav.billing.service.BillConfigService;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.ApplicationStatus;
 import com.uav.server.enums.MatchStatus;
@@ -33,6 +34,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,9 +82,13 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
     @Autowired
     private ObjectProvider<SystemNotificationService> notificationServiceProvider;
 
+    /** 协商报价区间系数（MIN/MAX_NEGOTIATED_RATE）由 bill_config 管理端可调 */
+    @Autowired
+    private BillConfigService billConfigService;
+
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public TaskApplicationVO apply(String taskNum, Long riderId, Long aircraftModelId) {
+    public TaskApplicationVO apply(String taskNum, Long riderId, Long aircraftModelId, BigDecimal quotedAmount) {
         if (taskNum == null || taskNum.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "taskNum 不能为空");
         }
@@ -118,11 +124,14 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
                 model.getCoefficient(),
                 model.getMaxPayloadKg());
 
-        BigDecimal quotedAmount = switch (result) {
+        BigDecimal baseAmount = switch (result) {
             case TransportPriceResult.Quote quote -> quote.quotedAmount();
             case TransportPriceResult.Rejected rejected -> throw new BusinessException(
                     HttpStatus.BAD_REQUEST, rejectionCode(rejected.reason()), rejected.message());
         };
+
+        // 协商报价：平台基准价为主，飞手可在区间内改价（聊天中谈妥后重回应征即可刷新）
+        BigDecimal finalAmount = requireWithinNegotiationRange(quotedAmount, baseAmount);
 
         TaskApplication application = applicationRepository
                 .findByTaskIdAndRiderId(task.getId(), riderId)
@@ -133,7 +142,7 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
                     return created;
                 });
         application.setAircraftModelId(model.getId());
-        application.setQuotedAmount(quotedAmount);
+        application.setQuotedAmount(finalAmount);
         application.setStatus(ApplicationStatus.ACTIVE);
         TaskApplication saved = applicationRepository.save(application);
 
@@ -147,9 +156,39 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
         // 通知任务属主「收到应征」（事务提交后派发；含飞手/机型/系统报价）
         notifyOwnerAfterCommit(task, saved, model);
 
-        log.info("飞手应征: taskNum={}, riderId={}, model={}, quotedAmount={}元",
-                taskNum, riderId, model.getModelCode(), quotedAmount);
+        log.info("飞手应征: taskNum={}, riderId={}, model={}, 基准价={}元, 报价={}元{}",
+                taskNum, riderId, model.getModelCode(), baseAmount, finalAmount,
+                finalAmount.compareTo(baseAmount) == 0 ? "（同基准价）" : "（协商价）");
         return buildVo(task, saved, model);
+    }
+
+    /**
+     * 协商报价区间校验（广告：平台不干涉定价自由，只防恶意刷价）。
+     *
+     * <p>{@code riderQuote} 为 null 时直接取平台基准价（{@code base}）；否则须落在
+     * [{@code MIN_NEGOTIATED_RATE}, {@code MAX_NEGOTIATED_RATE}] × base 的闭区间内，
+     * 越界抛 INVALID_PARAM。两个系数均由 {@code bill_config} 管理端可调。
+     */
+    private BigDecimal requireWithinNegotiationRange(BigDecimal riderQuote, BigDecimal base) {
+        if (riderQuote == null) {
+            return base;
+        }
+        BigDecimal minRate = billConfigService.getBigDecimal("MIN_NEGOTIATED_RATE", new BigDecimal("0.5"));
+        BigDecimal maxRate = billConfigService.getBigDecimal("MAX_NEGOTIATED_RATE", new BigDecimal("1.5"));
+        BigDecimal quote = riderQuote.setScale(2, RoundingMode.HALF_UP);
+        if (quote.signum() <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "报价必须大于 0");
+        }
+        BigDecimal floor = base.multiply(minRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal ceiling = base.multiply(maxRate).setScale(2, RoundingMode.HALF_UP);
+        if (quote.compareTo(floor) < 0 || quote.compareTo(ceiling) > 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    String.format("报价须在平台基准价的 %d%% ~ %d%% 之间（基准价 %s 元，允许 %s ~ %s 元）",
+                            minRate.multiply(BigDecimal.valueOf(100)).intValue(),
+                            maxRate.multiply(BigDecimal.valueOf(100)).intValue(),
+                            base.toPlainString(), floor.toPlainString(), ceiling.toPlainString()));
+        }
+        return quote;
     }
 
     /**

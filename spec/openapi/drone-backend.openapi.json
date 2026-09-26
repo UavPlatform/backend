@@ -3104,6 +3104,9 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "quotedAmount" : {
+            "type" : "number"
+          },
           "taskNum" : {
             "type" : "string"
           }

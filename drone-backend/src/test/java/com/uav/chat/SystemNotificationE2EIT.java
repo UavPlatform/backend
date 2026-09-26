@@ -183,7 +183,7 @@ class SystemNotificationE2EIT extends RealProtocolTestBase {
         fixtures.bindDrone(rider.id(), UniqueNames.djiId(), fixtures.defaultAircraftModelId());
 
         var applied = taskApplicationService.apply(task.getTaskNum(), rider.id(),
-                fixtures.defaultAircraftModelId());
+                fixtures.defaultAircraftModelId(), null);
         assertThat(findByName(messageService.getUnreadMessages(owner.id()), "APPLICATION_RECEIVED"))
                 .as("应征后属主应收到 APPLICATION_RECEIVED")
                 .isPresent();

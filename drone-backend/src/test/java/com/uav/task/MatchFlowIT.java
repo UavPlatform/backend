@@ -152,7 +152,7 @@ class MatchFlowIT extends IntegrationTestBase {
     /** 走生产链路推进到「已支付、待飞手确认」（选定 + 生产支付状态机）。 */
     private Task paidTask(TestAccounts.Account owner, TestAccounts.Account rider, String name) {
         Task task = publish(owner, name);
-        taskApplicationService.apply(task.getTaskNum(), rider.id(), modelId("FC30"));
+        taskApplicationService.apply(task.getTaskNum(), rider.id(), modelId("FC30"), null);
         TaskApplication application = taskApplicationRepository
                 .findByTaskIdAndRiderId(task.getId(), rider.id()).orElseThrow();
         taskService.selectRider(task.getTaskNum(), owner.id(), application.getId(),
@@ -443,14 +443,14 @@ class MatchFlowIT extends IntegrationTestBase {
 
         // 已进入待支付：新应征被拒（MATCH_STATUS_INVALID）
         assertThatThrownBy(() -> taskApplicationService.apply(
-                task.getTaskNum(), riderB.id(), modelId("M350RTK")))
+                task.getTaskNum(), riderB.id(), modelId("M350RTK"), null))
                 .isInstanceOf(BusinessException.class)
                 .matches(e -> ((BusinessException) e).getCode()
                         .equals(ApiErrorCode.MATCH_STATUS_INVALID.getCode()));
 
         // 不能应征自己的任务
         assertThatThrownBy(() -> taskApplicationService.apply(
-                task.getTaskNum(), owner.id(), modelId("FC30")))
+                task.getTaskNum(), owner.id(), modelId("FC30"), null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("自己");
 

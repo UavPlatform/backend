@@ -2,6 +2,7 @@ package com.uav.task.service;
 
 import com.uav.task.pojo.vo.TaskApplicationVO;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -18,9 +19,11 @@ public interface TaskApplicationService {
      * @param taskNum         任务编号
      * @param riderId         应征飞手（当前登录用户）
      * @param aircraftModelId 本次使用的机型
-     * @return 应征记录（含系统报价 quotedAmount）
+     * @param quotedAmount    飞手报价（元），可选：null 取平台基准价；否则须落在基准价的
+     *                        [{@code MIN_NEGOTIATED_RATE}, {@code MAX_NEGOTIATED_RATE}] 区间内
+     * @return 应征记录（含最终报价 quotedAmount，用户选定时按此锁定成交价）
      */
-    TaskApplicationVO apply(String taskNum, Long riderId, Long aircraftModelId);
+    TaskApplicationVO apply(String taskNum, Long riderId, Long aircraftModelId, BigDecimal quotedAmount);
 
     /**
      * 任务上下文应征列表（按应征时间正序）。

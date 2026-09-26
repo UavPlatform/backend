@@ -26,7 +26,6 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.hasItems;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -112,6 +111,18 @@ class TaskApplicationIT extends IntegrationTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andReturn().getResponse().getContentAsString());
+    }
+
+    /** 应征但只取 HTTP 状态码（用于断言拒绝分支，如报价越界 / 机型门禁） */
+    private int applyStatus(TestAccounts.Account rider, String taskNum, long aircraftModelId,
+                            String extraJsonFields) throws Exception {
+        String body = "{\"taskNum\":\"" + taskNum + "\",\"aircraftModelId\":" + aircraftModelId
+                + extraJsonFields + "}";
+        return mockMvc.perform(post("/rider/apply")
+                        .header("Authorization", rider.authorization())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andReturn().getResponse().getStatus();
     }
 
     /** 应征列表（属主），返回 data 数组。 */
@@ -207,24 +218,55 @@ class TaskApplicationIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("客户端提交自定义金额（price 字段）被忽略：报价只来自服务端计算")
-    void clientSubmittedPriceIsIgnored() throws Exception {
+    @DisplayName("未知金额字段 price 被忽略：报价只认平台基准价或 DTO 内的 quotedAmount")
+    void unknownPriceFieldIgnored() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         String taskNum = createTransportTask(owner, "2.00");
         TestAccounts.Account rider = riderMappedTo("FC30");
 
-        JsonNode applied = applyOk(rider, taskNum, modelId("FC30"), ",\"price\":0.01,\"quotedAmount\":99999");
+        // price 不在 RiderApplyDto 中 → 被忽略；未传 quotedAmount → 取平台基准价
+        JsonNode applied = applyOk(rider, taskNum, modelId("FC30"), ",\"price\":0.01");
         BigDecimal quoted = decimal(applied.path("data"), "quotedAmount");
         BigDecimal expected = expectedQuote(taskNum, "2.00", "1.000");
         assertThat(quoted)
-                .as("自定义金额必须被忽略，落库报价仍为平台公式结果")
+                .as("缺省报价取平台基准价；未知字段 price 不影响报价")
                 .isEqualByComparingTo(expected)
                 .isNotEqualByComparingTo("0.01");
-        assertThat(quoted).isNotEqualByComparingTo("99999");
 
-        // 列表回读同样只暴露服务端报价
+        // 列表回读同样暴露该报价
         JsonNode list = applications(owner, taskNum);
         assertThat(decimal(list.get(0), "quotedAmount")).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    @DisplayName("飞手报价：区间内生效、越界拒绝（平台基准价为主，协商为辅）")
+    void riderQuoteMustStayWithinNegotiationRange() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        String taskNum = createTransportTask(owner, "2.00");
+        TestAccounts.Account rider = riderMappedTo("FC30");
+        BigDecimal base = expectedQuote(taskNum, "2.00", "1.000");
+
+        // 区间内（基准价 ×1.2）：飞手报价即最终报价，用户选定时按此锁定成交价
+        BigDecimal within = base.multiply(new BigDecimal("1.2")).setScale(2, RoundingMode.HALF_UP);
+        JsonNode applied = applyOk(rider, taskNum, modelId("FC30"),
+                ",\"quotedAmount\":" + within.toPlainString());
+        assertThat(decimal(applied.path("data"), "quotedAmount"))
+                .as("区间内报价应被采纳（协商定价）")
+                .isEqualByComparingTo(within);
+
+        // 高于上限（默认 150%）：拒绝，防恶意刷价
+        BigDecimal tooHigh = base.multiply(new BigDecimal("1.51")).setScale(2, RoundingMode.HALF_UP);
+        assertThat(applyStatus(rider, taskNum, modelId("FC30"),
+                ",\"quotedAmount\":" + tooHigh.toPlainString()))
+                .as("报价高于基准价 150% 应被拒")
+                .isEqualTo(400);
+
+        // 低于下限（默认 50%）：拒绝，防「一分钱买服务」
+        BigDecimal tooLow = base.multiply(new BigDecimal("0.49")).setScale(2, RoundingMode.HALF_UP);
+        assertThat(applyStatus(rider, taskNum, modelId("FC30"),
+                ",\"quotedAmount\":" + tooLow.toPlainString()))
+                .as("报价低于基准价 50% 应被拒")
+                .isEqualTo(400);
     }
 
     @Test

@@ -33,7 +33,8 @@ public class BillConfigSeeder implements ApplicationRunner {
         put("nightRate", new String[]{"0.2", "夜间附加费率（系数，0.2=前三项费用加 20%）"});
         put("nightStart", new String[]{"22", "夜间开始小时（24小时制）"});
         put("nightEnd", new String[]{"6", "夜间结束小时（24小时制）"});
-        put("MIN_NEGOTIATED_RATE", new String[]{"0.5", "协商价最低为参考价的倍数"});
+        put("MIN_NEGOTIATED_RATE", new String[]{"0.5", "飞手报价下限：平台基准价的倍数"});
+        put("MAX_NEGOTIATED_RATE", new String[]{"1.5", "飞手报价上限：平台基准价的倍数（防恶意刷价）"});
         put("WEIGHT_TYPES", new String[]{"[\"TRANSPORT\"]", "按重量计费的任务类型"});
     }};
 

@@ -1,1 +1,0 @@
-ALTER TABLE task MODIFY task_type VARCHAR(32);

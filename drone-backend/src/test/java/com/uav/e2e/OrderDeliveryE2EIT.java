@@ -47,11 +47,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>覆盖链路：建单（POST /task/create 生成 MissionOrder=PENDING）→ 支付（POST /pay/{orderNum}）
  * → 接单（POST /rider/accept，需飞手已绑定无人机）→ 交付（POST /rider/complete）。
  *
- * <p>schema 来源（**限定本 E2E profile**）：本 profile 显式关闭 Flyway（`spring.flyway.enabled=false`；主配置 `application.yml` 为 `true`），
- * schema 100% 由 Hibernate `ddl-auto=create-drop` 建立；Flyway 迁移链断裂由**独立干净库探针**证明（QA-B16），**不在本 profile 内复现**。
- *
- * <p><b>强制表述：本 harness 的结构保真未验证</b>（QA-B16）。schema 由本 profile 的 Hibernate `create-drop` 决定，
- * <b>不得</b>由此推出「迁移链健康」；要证明迁移链是坏的须走**独立探针**（独立类、独立命名，红才是预期）。
+ * <p>schema 来源（**限定本 E2E profile**）：Flyway {@code db/migration/V1__baseline.sql}
+ * 为唯一 DDL 来源，JPA {@code ddl-auto=validate} 仅校验映射一致性（ADR-0001）。
  *
  * <p>为何 profile 用 test 而非专用 e2e：com.uav.pay.MockPayGuard 把 mock 支付白名单硬编码为 [dev, test]
  * （src/main，测试不可改），非白名单 profile 会拒绝启用 mock 支付。故复用 test profile 满足门禁，
@@ -86,21 +83,12 @@ import static org.assertj.core.api.Assertions.assertThat;
                         + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai",
                 "spring.datasource.username=${T4_DB_USER}",
                 "spring.datasource.password=${T4_DB_PASSWORD}",
-                // ── harness 语义：create-drop（已实测不受跨 schema 误判影响），脚本初始化显式关闭 ──
-                "spring.jpa.hibernate.ddl-auto=create-drop",
+                // ── schema：Flyway baseline + JPA validate（ADR-0001）──
+                "spring.jpa.hibernate.ddl-auto=validate",
                 "spring.jpa.show-sql=false",
-                // 不钉死方言：主路径是 mysql:8.4（与生产同镜像），Hibernate 自动识别正确。
-                // 仅当退回 MariaDB 12.3.3（最后手段）时才需外部追加：
-                //   -Dspring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MariaDBDialect
-                // ── schema 来源：**只有 Hibernate create-drop** ──
-                // 契约 §5-2 明令禁止同时开 `flyway.enabled` 与 `ddl-auto=create-drop`：那会让 V2 报
-                // `success=1` 却从不落地声明的外键（QA-B16 假阳性）。实测见报告 §14。
-                // 因此改为：Flyway 关闭；chat 三表（非 ORM 管理）直接执行**迁移文件本身**
-                // （MySQL 方言，含 IF NOT EXISTS），而不是复制 H2 的 schema.sql（t2 建议）。
-                "spring.flyway.enabled=false",
-                "spring.sql.init.mode=always",
-                "spring.jpa.defer-datasource-initialization=true",
-                "spring.sql.init.schema-locations=classpath:db/migration/chat/V1__init_chat_tables.sql",
+                "spring.flyway.enabled=true",
+                "spring.flyway.locations=classpath:db/migration",
+                "spring.sql.init.mode=never",
                 // ── 应用自身的 mock 支付开关（非测试替身）──
                 "wechat.pay.mock-enabled=true",
                 // ── 主 application.yml 必填占位符 ──
@@ -190,28 +178,16 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("QA-B16 特征化：V2 迁移声明的 fk_rider_uav_user 当前【不存在】（修链后本测试失败即为预期信号）")
-    void qaB16DeclaredForeignKeyIsStillMissing() throws Exception {
-        // 把 QA-B16 从「文档结论」变成「可回归的门禁」：实测锁定现状 —— 迁移脚本声明了
-        // `CONSTRAINT fk_rider_uav_user FOREIGN KEY (user_id) REFERENCES user(id)`，但在本 harness 下
-        // 该外键**从未落地**（全库外键数 0），因为建表实际由 Hibernate 完成。
-        //
-        // ⚠️ 预期信号：一旦 QA-B16 修复（需授权改 src/main），本断言会【失败】——那是好事。
-        //    届时把 isZero() 翻转为 isEqualTo(1)，本测试即成为「迁移链已修复」的正向门禁。
+    @DisplayName("ADR-0001：Flyway baseline 声明的 fk_rider_uav_user 已落地")
+    void flywayBaselineForeignKeyIsPresent() throws Exception {
         try (Connection c = dataSource.getConnection()) {
             int declaredFk = scalarInt(c,
                     "select count(*) from information_schema.table_constraints"
                             + " where table_schema = database()"
                             + " and constraint_name = 'fk_rider_uav_user'");
-            int allFks = scalarInt(c,
-                    "select count(*) from information_schema.table_constraints"
-                            + " where table_schema = database() and constraint_type = 'FOREIGN KEY'");
             assertThat(declaredFk)
-                    .as("fk_rider_uav_user 存在性：0 = QA-B16 未修复（修复后请翻转本断言）")
-                    .isZero();
-            assertThat(allFks)
-                    .as("全库外键数：0 印证迁移声明的约束从未落地")
-                    .isZero();
+                    .as("fk_rider_uav_user 应由 Flyway baseline 创建")
+                    .isEqualTo(1);
         }
     }
 

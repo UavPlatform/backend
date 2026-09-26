@@ -20,19 +20,18 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     open-in-view: false
-    defer-datasource-initialization: true
   sql:
     init:
-      mode: always
+      mode: never
 
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: 0
-    locations: classpath:db/migration/chat,classpath:db/migration/task,classpath:db/migration/user
+    baseline-version: 1
+    locations: classpath:db/migration
 
   servlet:
     multipart:

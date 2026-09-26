@@ -143,11 +143,6 @@
 			<version>0.4</version>
 		</dependency>
         <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
-            <version>3.5.16</version>
-        </dependency>
-        <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-core</artifactId>
             <version>5.8.44</version>
@@ -186,11 +181,10 @@
             <version>2.2.11</version>
         </dependency>
 
-        <!-- Flyway: chat 模块数据库迁移（JPA 模块仍由 ddl-auto=update 管理） -->
+        <!-- Flyway: 全部表结构 SSOT（ADR-0001；JPA ddl-auto=validate） -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
-            <version>11.7.0</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>

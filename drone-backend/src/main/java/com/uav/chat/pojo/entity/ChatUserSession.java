@@ -1,29 +1,34 @@
 package com.uav.chat.pojo.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Entity
+@Table(name = "chat_user_session", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_session_user", columnNames = {"session_id", "user_id"})
+})
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("chat_user_session")
 public class ChatUserSession {
-    @TableId(type = IdType.AUTO)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @TableField("session_id")
+    @Column(name = "session_id", nullable = false)
     private Long sessionId;
-    @TableField("user_id")
+
+    @Column(name = "user_id", nullable = false)
     private Long userId;
-    @TableField("join_time")
+
+    @Column(name = "join_time", nullable = false)
     private Long joinTime;
-    @TableField("last_read_time")
-    private Long lastReadTime; // 可选，最后读取消息时间
+
+    @Column(name = "last_read_time")
+    private Long lastReadTime;
 }

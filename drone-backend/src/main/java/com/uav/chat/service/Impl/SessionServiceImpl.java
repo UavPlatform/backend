@@ -1,23 +1,20 @@
 package com.uav.chat.service.Impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.uav.chat.mapper.ChatMessageMapper;
-import com.uav.chat.mapper.ChatSessionMapper;
 import com.uav.chat.pojo.dto.SessionDTO;
 import com.uav.chat.pojo.entity.ChatMessage;
 import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
 import com.uav.chat.pojo.vo.SessionVO;
+import com.uav.chat.repository.ChatMessageRepository;
+import com.uav.chat.repository.ChatSessionRepository;
 import com.uav.chat.service.SessionService;
 import com.uav.chat.service.UserSessionService;
 import com.uav.server.util.UserContext;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.User;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
@@ -27,18 +24,25 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSession> implements SessionService {
-    @Autowired
-    private UserSessionService userSessionService;
+public class SessionServiceImpl implements SessionService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final ChatSessionRepository chatSessionRepository;
+    private final UserSessionService userSessionService;
+    private final UserRepository userRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
-    @Autowired
-    private ChatMessageMapper chatMessageMapper;
+    public SessionServiceImpl(ChatSessionRepository chatSessionRepository,
+                              UserSessionService userSessionService,
+                              UserRepository userRepository,
+                              ChatMessageRepository chatMessageRepository) {
+        this.chatSessionRepository = chatSessionRepository;
+        this.userSessionService = userSessionService;
+        this.userRepository = userRepository;
+        this.chatMessageRepository = chatMessageRepository;
+    }
 
-//    @Transactional(rollbackFor = Exception.class)
     @Override
+    @Transactional
     public SessionVO createSession(SessionDTO dto) {
         Long userId = UserContext.getUserId();
         List<Long> ids = new java.util.ArrayList<>(dto.getUserIds());
@@ -63,7 +67,8 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
         long currentTimeMillis = System.currentTimeMillis();
         session.setCreateTime(currentTimeMillis);
         session.setOwnerId(userId);
-        super.save(session);
+        chatSessionRepository.saveAndFlush(session);
+
         List<ChatUserSession> chatUserSessions = distinctIds.stream()
                 .map(id -> ChatUserSession.builder()
                         .sessionId(session.getId())
@@ -72,7 +77,7 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                         .lastReadTime(currentTimeMillis)
                         .build())
                 .collect(Collectors.toList());
-        userSessionService.saveBatch(chatUserSessions);
+        userSessionService.saveAll(chatUserSessions);
 
         SessionVO vo = BeanUtil.copyProperties(session, SessionVO.class);
         vo.setUserIds(distinctIds);
@@ -87,56 +92,44 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
     }
 
     @Override
+    @Transactional
     public String deleteSession(Long sessionId) {
-        String respStr = "";
-        ChatSession session = super.getById(sessionId);
+        ChatSession session = chatSessionRepository.findById(sessionId).orElse(null);
         if (session == null) {
-            respStr = "会话不存在";
-            return respStr;
+            return "会话不存在";
         }
         Long ownerId = session.getOwnerId();
         Long userId = UserContext.getUserId();
         if (ownerId != null && Objects.equals(ownerId, userId)) {
-            respStr = super.removeById(sessionId) ? "会话已删除" : "会话删除失败";
+            chatSessionRepository.deleteById(sessionId);
+            return "会话已删除";
         }
-        else {
-            respStr = "只有群主可以删除会话";
-        }
-        return respStr;
+        return "只有群主可以删除会话";
     }
 
     @Override
     public List<SessionVO> listSession() {
         Long userId = UserContext.getUserId();
 
-        // 1. 查询当前用户参与的会话关联记录
-        LambdaQueryWrapper<ChatUserSession> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(ChatUserSession::getUserId, userId);
-        List<ChatUserSession> userSessions = userSessionService.list(wrapper);
+        List<ChatUserSession> userSessions = userSessionService.findByUserId(userId);
         if (userSessions.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 2. 批量查询会话详情
         List<Long> sessionIds = userSessions.stream()
                 .map(ChatUserSession::getSessionId)
                 .collect(Collectors.toList());
-        List<ChatSession> sessions = baseMapper.selectBatchIds(sessionIds); // 使用 Mapper 批量查询
+        List<ChatSession> sessions = chatSessionRepository.findAllById(sessionIds);
 
-        // 3. 转换成 Map 方便匹配
         Map<Long, ChatSession> sessionMap = sessions.stream()
                 .collect(Collectors.toMap(ChatSession::getId, Function.identity()));
 
-        // 4. 查询这些会话的所有成员
-        LambdaQueryWrapper<ChatUserSession> memberWrapper = Wrappers.lambdaQuery();
-        memberWrapper.in(ChatUserSession::getSessionId, sessionIds);
-        List<ChatUserSession> allMembers = userSessionService.list(memberWrapper);
+        List<ChatUserSession> allMembers = userSessionService.findBySessionIdIn(sessionIds);
         Map<Long, List<Long>> memberMap = allMembers.stream()
                 .collect(Collectors.groupingBy(
                         ChatUserSession::getSessionId,
                         Collectors.mapping(ChatUserSession::getUserId, Collectors.toList())));
 
-        // 构建 sessionId -> lastReadTime 映射，用于计算未读数
         Map<Long, Long> lastReadMap = userSessions.stream()
                 .collect(Collectors.toMap(ChatUserSession::getSessionId, us -> {
                     Long lrt = us.getLastReadTime();
@@ -148,33 +141,31 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
                 .distinct()
                 .map(sessionId -> {
                     ChatSession session = sessionMap.get(sessionId);
-                    if (session == null) return null;
+                    if (session == null) {
+                        return null;
+                    }
                     SessionVO vo = BeanUtil.copyProperties(session, SessionVO.class);
                     List<Long> memberIds = memberMap.getOrDefault(sessionId, Collections.emptyList());
                     vo.setUserIds(memberIds);
-                    // 私聊：找对方用户名
                     if (session.getType() != null && session.getType() == 0 && memberIds.size() == 2) {
                         Long otherId = memberIds.stream().filter(id -> !id.equals(userId)).findFirst().orElse(null);
                         if (otherId != null) {
                             User otherUser = userRepository.findById(otherId).orElse(null);
-                            if (otherUser != null) vo.setOtherUserName(otherUser.getUserName());
+                            if (otherUser != null) {
+                                vo.setOtherUserName(otherUser.getUserName());
+                            }
                         }
                     }
-                    // 最后一条消息
-                    com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatMessage> msgWrapper =
-                            Wrappers.<ChatMessage>lambdaQuery()
-                                    .eq(ChatMessage::getSessionId, sessionId)
-                                    .orderByDesc(ChatMessage::getCreateTime)
-                                    .last("LIMIT 1");
-                    ChatMessage lastMsg = chatMessageMapper.selectOne(msgWrapper);
+                    ChatMessage lastMsg = chatMessageRepository
+                            .findFirstBySessionIdOrderByCreateTimeDesc(sessionId)
+                            .orElse(null);
                     if (lastMsg != null) {
                         vo.setLastMessage(lastMsg.getContent());
                         vo.setLastMessageTime(lastMsg.getCreateTime());
                     }
-                    // 未读消息数
                     Long since = lastReadMap.get(sessionId);
                     if (since != null) {
-                        vo.setUnreadCount(chatMessageMapper.countUnread(sessionId, since, userId));
+                        vo.setUnreadCount(chatMessageRepository.countUnread(sessionId, since, userId));
                     } else {
                         vo.setUnreadCount(0);
                     }
@@ -186,11 +177,8 @@ public class SessionServiceImpl extends ServiceImpl<ChatSessionMapper, ChatSessi
 
     @Override
     public List<Long> getUserIdsBySessionId(Long sessionId) {
-        LambdaQueryWrapper<ChatUserSession> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(ChatUserSession::getSessionId, sessionId);
-        return userSessionService.list(wrapper).stream()
+        return userSessionService.findBySessionId(sessionId).stream()
                 .map(ChatUserSession::getUserId)
                 .collect(Collectors.toList());
     }
-
 }

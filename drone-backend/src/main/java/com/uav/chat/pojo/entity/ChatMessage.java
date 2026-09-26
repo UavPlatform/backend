@@ -1,61 +1,57 @@
 package com.uav.chat.pojo.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.FastjsonTypeHandler;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Data
-@TableName(value = "chat_messages", autoResultMap = true)
+@Entity
+@Table(name = "chat_messages")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatMessage {
 
-    @TableId(type = IdType.AUTO)
-    private Long id;                 // 数据库自增主键，仅内部使用
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @TableField("msg_id")
-    private String msgId;            // 业务唯一ID（雪花算法生成字符串）
+    @Column(name = "msg_id", nullable = false, unique = true, length = 64)
+    private String msgId;
 
-    @TableField("from_user_id")
+    @Column(name = "from_user_id", nullable = false)
     private Long fromUserId;
 
-    @TableField("session_id")
+    @Column(name = "session_id", nullable = false)
     private Long sessionId;
 
-    @TableField(value = "content", typeHandler = JacksonTypeHandler.class)
+    @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    /**
-     * 消息状态：0-正常(已发送/未读)，1-已读(已废除)，2-已撤回（撤回后内容不显示），3-发送失败(?暂定)
-     */
     @Builder.Default
-    @TableField("status")
+    @Column(name = "status", nullable = false)
     private Integer status = 0;
 
-    // 撤回专用字段
-    @TableField("recall_time")
+    @Column(name = "recall_time")
     private Long recallTime;
 
-    // 用户侧软删除：各自独立，不影响其他人
-    @TableField(value = "deleted_by_user_ids", typeHandler = JacksonTypeHandler.class)
+    @Builder.Default
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "deleted_by_user_ids")
     private List<Long> deletedByUserIds = new ArrayList<>();
 
     @Builder.Default
-    @TableField("create_time")
+    @Column(name = "create_time", nullable = false)
     private Long createTime = System.currentTimeMillis();
 
     @Builder.Default
-    @TableField("msg_type")
+    @Column(name = "msg_type", nullable = false)
     private Integer msgType = 0;
 }

@@ -1,11 +1,13 @@
 package com.uav.task.pojo.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.uav.server.enums.CargoCategory;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -62,6 +64,22 @@ public class Task {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @Column(name = "task_time")
     private LocalDateTime taskTime;
+
+    /**
+     * 吊运货物重量（kg）（V3__transport_application.sql）。ADR-0003 报价公式因子
+     * {@code weightCharge = 重量 × transport.pricing.price-per-kg}。
+     * 可空：存量任务与非吊运任务不填；吊运应征时缺重量会被拒绝计价。
+     */
+    @Column(name = "cargo_weight_kg", precision = 8, scale = 2)
+    private BigDecimal cargoWeightKg;
+
+    /**
+     * 吊运货物类别（V3__transport_application.sql），与 {@code transport.pricing.category-surcharge}
+     * 配置表对齐；可空 = 未知类别（按 unknown-category-surcharge 计费）。
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cargo_category", length = 32)
+    private CargoCategory cargoCategory;
 
     @Column(name = "reward")
     private Double reward;

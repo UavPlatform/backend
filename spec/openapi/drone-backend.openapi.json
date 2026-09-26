@@ -1196,6 +1196,36 @@
         },
         "type" : "object"
       },
+      "ResultListTaskApplicationVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskApplicationVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultListUav" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -1665,6 +1695,33 @@
         },
         "type" : "object"
       },
+      "ResultTaskApplicationVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/TaskApplicationVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultTaskPageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -1984,6 +2041,18 @@
         },
         "type" : "object"
       },
+      "RiderApplyDto" : {
+        "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "taskNum" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RiderInfoDto" : { },
       "RiderRegisterDto" : {
         "description" : "飞手注册参数",
@@ -2145,8 +2214,70 @@
         },
         "type" : "object"
       },
+      "TaskApplicationVO" : {
+        "description" : "飞手应征记录（含平台系统报价）",
+        "properties" : {
+          "aircraftModelId" : {
+            "description" : "应征使用的机型 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "aircraftModelName" : {
+            "description" : "机型显示名（如 DJI FlyCart 30）",
+            "type" : "string"
+          },
+          "applicationId" : {
+            "description" : "应征记录 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "appliedAt" : {
+            "description" : "应征时间（首次应征时间）",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "maxPayloadKg" : {
+            "description" : "机型最大载重（kg）",
+            "type" : "number"
+          },
+          "modelCode" : {
+            "description" : "机型型号编码（如 FC30、M350RTK）",
+            "type" : "string"
+          },
+          "quotedAmount" : {
+            "description" : "平台系统报价（元）：成交价必须严格等于该值，不允许改价",
+            "type" : "number"
+          },
+          "riderId" : {
+            "description" : "应征飞手用户 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "riderName" : {
+            "description" : "应征飞手用户名",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "应征状态（ACTIVE=应征中；SELECTED/CLOSED 为用户选定阶段语义）",
+            "enum" : [ "ACTIVE", "CLOSED", "SELECTED" ],
+            "type" : "string"
+          },
+          "taskNum" : {
+            "description" : "任务编号",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "TaskDto" : {
         "properties" : {
+          "cargoCategory" : {
+            "enum" : [ "AGRICULTURAL", "CONSTRUCTION", "EQUIPMENT" ],
+            "type" : "string"
+          },
+          "cargoWeightKg" : {
+            "type" : "number"
+          },
           "description" : {
             "type" : "string"
           },
@@ -4396,6 +4527,47 @@
         "tags" : [ "Rider API" ]
       }
     },
+    "/rider/apply" : {
+      "post" : {
+        "description" : "提交 taskNum + aircraftModelId，服务端按 ADR-0003 平台计价公式（航点距离 + 货物重量/类别 + 机型系数）计算并持久化系统报价 quotedAmount；不接受客户端金额字段——请求携带 price 等字段一律忽略（不允许改价）。设备/机型门禁：UAV_NOT_FOUND / AIRCRAFT_MODEL_REQUIRED / AIRCRAFT_MODEL_NOT_FOUND / AIRCRAFT_MODEL_NOT_TRANSPORTABLE / AIRCRAFT_MODEL_MISMATCH；超重拒绝：EXCEEDS_PAYLOAD",
+        "operationId" : "apply",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "query",
+          "name" : "taskNum",
+          "required" : true
+        }, {
+          "description" : "本次应征使用的机型 ID",
+          "in" : "query",
+          "name" : "aircraftModelId",
+          "required" : true
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RiderApplyDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultTaskApplicationVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手应征任务",
+        "tags" : [ "Rider API" ]
+      }
+    },
     "/rider/cancel" : {
       "post" : {
         "description" : "骑手取消已接受的任务，任务回到空闲状态",
@@ -4886,6 +5058,35 @@
           }
         },
         "summary" : "获取当前用户的任务列表",
+        "tags" : [ "Task API" ]
+      }
+    },
+    "/task/{taskNum}/applications" : {
+      "get" : {
+        "description" : "任务属主按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主被拒）",
+        "operationId" : "listApplications",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListTaskApplicationVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "应征列表",
         "tags" : [ "Task API" ]
       }
     },

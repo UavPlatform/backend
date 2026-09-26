@@ -81,6 +81,13 @@ public class TaskServiceImpl implements TaskService {
         // 1A-7a：任务期望执行时间入库（APP P0-4 契约修复，可选字段）
         task.setTaskTime(dto.getTaskTime());
         task.setReward(dto.getReward());
+        // 吊运货物字段（TASK-BACKEND-003 扩展）：仅数据采集，下单/支付流程不变（属 TASK-BACKEND-004）
+        if (dto.getCargoWeightKg() != null && dto.getCargoWeightKg().signum() <= 0) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                    "货物重量必须为正数");
+        }
+        task.setCargoWeightKg(dto.getCargoWeightKg());
+        task.setCargoCategory(dto.getCargoCategory());
 
         List<TaskWaypoint> waypoints = dto.getWaypoints().stream()
                 .map(wp -> {

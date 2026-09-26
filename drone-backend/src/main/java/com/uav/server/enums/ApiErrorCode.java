@@ -41,7 +41,8 @@ public enum ApiErrorCode {
     AIRCRAFT_MODEL_REQUIRED("AIRCRAFT_MODEL_REQUIRED", "未指定机型，不能用于吊运应征"),
     AIRCRAFT_MODEL_NOT_FOUND("AIRCRAFT_MODEL_NOT_FOUND", "机型不存在或已停用"),
     AIRCRAFT_MODEL_NOT_TRANSPORTABLE("AIRCRAFT_MODEL_NOT_TRANSPORTABLE", "该机型不可承接吊运"),
-    AIRCRAFT_MODEL_MISMATCH("AIRCRAFT_MODEL_MISMATCH", "绑定设备与提交的机型不一致");
+    AIRCRAFT_MODEL_MISMATCH("AIRCRAFT_MODEL_MISMATCH", "绑定设备与提交的机型不一致"),
+    EXCEEDS_PAYLOAD("EXCEEDS_PAYLOAD", "货物重量超过所选机型最大载重，不能应征");
 
     private final String code;
     private final String defaultMessage;

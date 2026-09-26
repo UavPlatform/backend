@@ -4,6 +4,8 @@ import com.uav.server.annotation.RequireRole;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.server.result.Result;
+import com.uav.task.pojo.vo.TaskApplicationVO;
+import com.uav.task.service.TaskApplicationService;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.task.mapper.TaskAssignmentRepository;
@@ -41,6 +43,9 @@ public class UserTaskController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskApplicationService taskApplicationService;
 
     @Autowired
     private TaskAssignmentRepository taskAssignmentRepository;
@@ -97,6 +102,15 @@ public class UserTaskController {
         Long userId = UserContext.getUserId();
         Task task = taskService.getTaskByTaskNum(taskNum, userId);
         return Result.success("获取成功", toTaskVo(task));
+    }
+
+    @OperationLog("查询应征列表")
+    @Operation(summary = "应征列表", description = "任务属主按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主被拒）",
+            parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @GetMapping("/{taskNum}/applications")
+    public Result<List<TaskApplicationVO>> listApplications(@PathVariable String taskNum) {
+        Long userId = UserContext.getUserId();
+        return Result.success("获取成功", taskApplicationService.listByTask(taskNum, userId));
     }
 
     private TaskVo toTaskVo(Task task) {

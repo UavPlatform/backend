@@ -5,15 +5,18 @@ import com.uav.server.annotation.RequireRole;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.task.mapper.TaskAssignmentRepository;
+import com.uav.task.pojo.dto.RiderApplyDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.vo.RiderStatsVO;
 import com.uav.task.pojo.vo.TaskActionHints;
+import com.uav.task.pojo.vo.TaskApplicationVO;
 import com.uav.task.pojo.vo.TaskVo;
 import com.uav.server.result.Result;
 import com.uav.task.pojo.vo.TaskPageVO;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.util.UserContext;
+import com.uav.task.service.TaskApplicationService;
 import com.uav.task.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,6 +36,9 @@ public class RiderController {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskApplicationService taskApplicationService;
 
     @Autowired
     private TaskAssignmentRepository taskAssignmentRepository;
@@ -109,6 +115,25 @@ public class RiderController {
     }
 
     // ── 写操作：需要绑定无人机 ──
+    // （应征 /rider/apply 刻意不加 @RequireDrone：设备与机型门禁由
+    //  requireTransportDevice 在服务端给出精确错误码，如 UAV_NOT_FOUND、AIRCRAFT_MODEL_REQUIRED）
+
+    @OperationLog("飞手应征")
+    @Operation(summary = "飞手应征任务", description = "提交 taskNum + aircraftModelId，服务端按 ADR-0003 平台计价公式"
+            + "（航点距离 + 货物重量/类别 + 机型系数）计算并持久化系统报价 quotedAmount；"
+            + "不接受客户端金额字段——请求携带 price 等字段一律忽略（不允许改价）。"
+            + "设备/机型门禁：UAV_NOT_FOUND / AIRCRAFT_MODEL_REQUIRED / AIRCRAFT_MODEL_NOT_FOUND / "
+            + "AIRCRAFT_MODEL_NOT_TRANSPORTABLE / AIRCRAFT_MODEL_MISMATCH；超重拒绝：EXCEEDS_PAYLOAD",
+            parameters = {
+                    @Parameter(name = "taskNum", description = "任务编号", required = true),
+                    @Parameter(name = "aircraftModelId", description = "本次应征使用的机型 ID", required = true)
+            })
+    @PostMapping("/apply")
+    public Result<TaskApplicationVO> apply(@RequestBody RiderApplyDto dto) {
+        Long riderId = UserContext.getUserId();
+        return Result.success("应征成功",
+                taskApplicationService.apply(dto.getTaskNum(), riderId, dto.getAircraftModelId()));
+    }
 
     @RequireDrone
     @OperationLog("接受任务")

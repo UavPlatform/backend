@@ -1226,6 +1226,36 @@
         },
         "type" : "object"
       },
+      "ResultListTaskChatSessionVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/TaskChatSessionVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultListUav" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2127,6 +2157,10 @@
       },
       "SessionDTO" : {
         "properties" : {
+          "applicationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "avatar" : {
             "type" : "string"
           },
@@ -2134,6 +2168,9 @@
             "type" : "string"
           },
           "name" : {
+            "type" : "string"
+          },
+          "taskNum" : {
             "type" : "string"
           },
           "type" : {
@@ -2153,6 +2190,10 @@
       },
       "SessionVO" : {
         "properties" : {
+          "applicationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "avatar" : {
             "type" : "string"
           },
@@ -2183,6 +2224,9 @@
           "ownerId" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "taskNum" : {
+            "type" : "string"
           },
           "type" : {
             "format" : "int32",
@@ -2265,6 +2309,62 @@
           "taskNum" : {
             "description" : "任务编号",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TaskChatSessionVO" : {
+        "properties" : {
+          "applicationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "createTime" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessage" : {
+            "type" : "string"
+          },
+          "lastMessageTime" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "otherUserId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "otherUserName" : {
+            "type" : "string"
+          },
+          "ownerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "riderId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "riderName" : {
+            "type" : "string"
+          },
+          "sessionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "taskNum" : {
+            "type" : "string"
+          },
+          "type" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "unreadCount" : {
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -5088,6 +5188,35 @@
         },
         "summary" : "应征列表",
         "tags" : [ "Task API" ]
+      }
+    },
+    "/task/{taskNum}/chat-sessions" : {
+      "get" : {
+        "description" : "任务属主按 taskNum 聚合与各意向飞手的一对一会话（含对方飞手、applicationId、最后一条消息与未读数）；应征/选定飞手仅返回自己参与的会话；非属主非应征飞手 → 403",
+        "operationId" : "listTaskChatSessions",
+        "parameters" : [ {
+          "description" : "任务编号",
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListTaskChatSessionVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "按任务编号查询任务会话",
+        "tags" : [ "chat session API" ]
       }
     },
     "/tasks/{taskNum}/attachments" : {

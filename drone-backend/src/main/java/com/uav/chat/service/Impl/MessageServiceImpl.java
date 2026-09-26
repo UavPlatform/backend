@@ -6,9 +6,11 @@ import com.alibaba.fastjson.JSON;
 import com.uav.chat.pojo.dto.MessageDTO;
 import com.uav.chat.pojo.entity.ChatEnvelope;
 import com.uav.chat.pojo.entity.ChatMessage;
+import com.uav.chat.pojo.entity.ChatSession;
 import com.uav.chat.pojo.entity.ChatUserSession;
 import com.uav.chat.pojo.enums.MsgType;
 import com.uav.chat.repository.ChatMessageRepository;
+import com.uav.chat.repository.ChatSessionRepository;
 import com.uav.chat.service.MessageService;
 import com.uav.chat.service.UserSessionService;
 import com.uav.chat.websocket.ChatWebSocketHandler;
@@ -38,20 +40,31 @@ public class MessageServiceImpl implements MessageService {
     private final ChatWebSocketHandler chatWebSocketHandler;
     private final UserSessionService userSessionService;
     private final UserService userService;
+    private final ChatSessionRepository chatSessionRepository;
 
     public MessageServiceImpl(ChatMessageRepository chatMessageRepository,
                               ChatWebSocketHandler chatWebSocketHandler,
                               UserSessionService userSessionService,
-                              UserService userService) {
+                              UserService userService,
+                              ChatSessionRepository chatSessionRepository) {
         this.chatMessageRepository = chatMessageRepository;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.userSessionService = userSessionService;
         this.userService = userService;
+        this.chatSessionRepository = chatSessionRepository;
     }
 
     @Override
     public void sendMessage(@Valid MessageDTO dto) {
-        dto.setFromUserId(UserContext.getUserId());
+        Long userId = UserContext.getUserId();
+        // 任务会话（task_num 非空）补成员校验：只有任务属主与应征/选定飞手（建会话时落的成员）可发言；
+        // 非任务会话的存量 sendMessage 缺口不在本任务扩（见 TASK-BACKEND-005 汇报）
+        ChatSession session = chatSessionRepository.findById(dto.getSessionId()).orElse(null);
+        if (session != null && session.getTaskNum() != null
+                && userSessionService.countBySessionIdAndUserId(session.getId(), userId) == 0) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "无权向该任务会话发送消息");
+        }
+        dto.setFromUserId(userId);
         dto.setCreateTime(System.currentTimeMillis());
         dto.setMsgId(createMsgId());
 

@@ -3,13 +3,16 @@ package com.uav.support;
 import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.server.enums.ApplicationStatus;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
+import com.uav.task.mapper.TaskApplicationRepository;
 import com.uav.task.mapper.TaskRepository;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.dto.WaypointDto;
 import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.RiderUav;
@@ -54,6 +57,9 @@ public class TestFixtures {
 
     @Autowired
     private TaskRepository taskRepository;
+
+    @Autowired
+    private TaskApplicationRepository taskApplicationRepository;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -221,6 +227,21 @@ public class TestFixtures {
     /** 直接落库一个订单实体（金额/距离显式给定，避免依赖计价链路）。 */
     public MissionOrder order(User owner, Task task, OrderStatus status, String totalAmount) {
         return order(owner.getId(), task, status, totalAmount);
+    }
+
+    /**
+     * 直接落库一条飞手应征记录（ACTIVE，报价占位）——供只关心「应征关系存在」的场景造数
+     * （如聊天会话权限）。计价与状态机链路由 {@code TaskApplicationIT} 走生产 {@code /rider/apply} 覆盖。
+     * 机型取默认种子 FC30（应征表 {@code aircraft_model_id} 非空且有外键）。
+     */
+    public TaskApplication taskApplication(Task task, long riderId) {
+        TaskApplication application = new TaskApplication();
+        application.setTaskId(task.getId());
+        application.setRiderId(riderId);
+        application.setAircraftModelId(defaultAircraftModelId());
+        application.setQuotedAmount(new BigDecimal("99.00"));
+        application.setStatus(ApplicationStatus.ACTIVE);
+        return taskApplicationRepository.save(application);
     }
 
     /**

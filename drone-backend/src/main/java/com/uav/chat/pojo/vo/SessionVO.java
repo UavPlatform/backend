@@ -24,4 +24,7 @@ public class SessionVO {
     private String lastMessage;   // 最后一条消息内容
     private Long lastMessageTime; // 最后一条消息时间
     private Integer unreadCount;  // 未读消息数
+
+    private String taskNum;       // 绑定的吊运任务编号（任务会话；非任务会话为 null）
+    private Long applicationId;   // 关联的应征记录 ID（任务会话；可空）
 }

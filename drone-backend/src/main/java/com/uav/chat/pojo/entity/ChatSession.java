@@ -35,6 +35,20 @@ public class ChatSession {
     @Column(name = "owner_id", nullable = false)
     private Long ownerId;
 
+    /**
+     * 绑定的吊运任务编号（V4__chat_session_task.sql，ADR-0003 决定 1）。
+     * 可空：存量会话与非任务会话为 {@code null}；任务内嵌会话写入对应 {@code task.num}。
+     */
+    @Column(name = "task_num", length = 64)
+    private String taskNum;
+
+    /**
+     * 关联的应征记录 ID（ADR-0003「及可选 applicationId」）。
+     * 创建任务会话时（任务属主 ↔ 应征飞手）应征记录存在则带上，可空。
+     */
+    @Column(name = "application_id")
+    private Long applicationId;
+
     @Column(name = "avatar", length = 500)
     private String avatar;
 

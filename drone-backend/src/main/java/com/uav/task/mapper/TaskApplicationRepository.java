@@ -17,6 +17,9 @@ public interface TaskApplicationRepository extends JpaRepository<TaskApplication
     /** 任务的应征列表（按应征时间正序）。 */
     List<TaskApplication> findByTaskIdOrderByCreateTimeAsc(Long taskId);
 
+    /** 该飞手是否应征过该任务（只读放行判定：应征飞手可见任务上下文，TASK-BACKEND-007）。 */
+    boolean existsByTaskIdAndRiderId(Long taskId, Long riderId);
+
     /** 任务在指定撮合状态下的应征（选定阶段 SELECTED 至多一条）。 */
     Optional<TaskApplication> findByTaskIdAndStatus(Long taskId, ApplicationStatus status);
 

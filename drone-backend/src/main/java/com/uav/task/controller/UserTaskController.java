@@ -96,12 +96,16 @@ public class UserTaskController {
     }
 
     @OperationLog("查询应征列表")
-    @Operation(summary = "应征列表", description = "任务属主按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主被拒）",
+    @Operation(summary = "应征列表",
+            description = "任务属主、应征飞手与管理员（role=2，监管端只读）按任务编号查询飞手应征列表："
+                    + "飞手、机型、载重、系统报价 quotedAmount、应征时间、状态"
+                    + "（非属主非应征的普通用户 403）",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
+    @RequireRole({0, 1, 2})
     @GetMapping("/{taskNum}/applications")
     public Result<List<TaskApplicationVO>> listApplications(@PathVariable String taskNum) {
         Long userId = UserContext.getUserId();
-        return Result.success("获取成功", taskApplicationService.listByTask(taskNum, userId));
+        return Result.success("获取成功", taskApplicationService.listByTask(taskNum, userId, UserContext.getRole()));
     }
 
     @OperationLog("选定应征下单")

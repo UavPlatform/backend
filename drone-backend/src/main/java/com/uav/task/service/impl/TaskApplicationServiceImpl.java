@@ -18,6 +18,7 @@ import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.task.pojo.vo.TaskApplicationVO;
 import com.uav.task.service.TaskApplicationService;
+import com.uav.task.service.TaskReadAccess;
 import com.uav.task.service.TaskService;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.User;
@@ -72,6 +73,9 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskReadAccess taskReadAccess;
 
     @Autowired
     private ObjectProvider<SystemNotificationService> notificationServiceProvider;
@@ -183,9 +187,13 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<TaskApplicationVO> listByTask(String taskNum, Long userId) {
-        // 属主校验复用既有约定：非属主 → FORBIDDEN + ROUTE_NOT_FOUND（"无权查看此任务"）
-        Task task = taskService.getTaskByTaskNum(taskNum, userId);
+    public List<TaskApplicationVO> listByTask(String taskNum, Long userId, Integer role) {
+        // 只读放行（TASK-BACKEND-007）：任务属主/应征飞手/管理员；其余沿用既有约定
+        // FORBIDDEN + ROUTE_NOT_FOUND（"无权查看此任务"）。任务不存在仍 404。
+        Task task = taskService.getTaskByTaskNum(taskNum);
+        if (!taskReadAccess.canRead(task, userId, role)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权查看此任务");
+        }
         List<TaskApplication> applications = applicationRepository
                 .findByTaskIdOrderByCreateTimeAsc(task.getId());
         List<TaskApplicationVO> vos = new ArrayList<>(applications.size());

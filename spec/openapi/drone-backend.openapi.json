@@ -46,6 +46,10 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "deviceId" : {
+            "description" : "作业设备DJI ID（解析链 task → task_assignment → rider_uav → 在线设备；任务未接单/飞手未绑定设备/设备离线时为 null，前端按“无作业设备”占位）",
+            "type" : "string"
+          },
           "orderNum" : {
             "description" : "订单号",
             "type" : "string"
@@ -67,6 +71,16 @@
             "description" : "下单用户名称",
             "type" : "string"
           },
+          "paidAt" : {
+            "description" : "支付完成时间：优先取 PayRecord.payTime（支付成功回调时刻）；无支付流水但订单已支付/已结案时回退订单 updateTime（状态迁移时刻）；未支付或待撮合时为 null，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "riderConfirmedAt" : {
+            "description" : "飞手确认接单时间（ADR-0003 决定 4；飞手未确认时为 null），格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "taskName" : {
             "description" : "关联任务名称",
             "type" : "string"
@@ -85,6 +99,11 @@
           },
           "updateTime" : {
             "description" : "更新时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userConfirmedAt" : {
+            "description" : "用户下单确认时间（选定应征 + 约定作业时间，ADR-0003 决定 4；无订单或未下单时为 null），格式 yyyy-MM-dd HH:mm:ss",
             "format" : "date-time",
             "type" : "string"
           },
@@ -387,6 +406,10 @@
             "description" : "任务描述",
             "type" : "string"
           },
+          "deviceId" : {
+            "description" : "作业设备DJI ID（解析链 task → task_assignment → rider_uav → 在线设备；任务未接单/飞手未绑定设备/设备离线时为 null，前端按“无作业设备”占位）",
+            "type" : "string"
+          },
           "id" : {
             "description" : "任务ID",
             "format" : "int64",
@@ -413,10 +436,20 @@
             "description" : "发布用户名称",
             "type" : "string"
           },
+          "paidAt" : {
+            "description" : "支付完成时间：优先取 PayRecord.payTime（支付成功回调时刻）；无支付流水但订单已支付/已结案时回退订单 updateTime（状态迁移时刻）；未支付或待撮合时为 null，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "reward" : {
             "description" : "任务奖励金额，单位：元（服务端按航点距离计价，客户端传入的 reward 仅作参考）",
             "format" : "double",
             "type" : "number"
+          },
+          "riderConfirmedAt" : {
+            "description" : "飞手确认接单时间（ADR-0003 决定 4；飞手未确认时为 null），格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
           },
           "riderName" : {
             "description" : "接单飞手名称（未接单时为 null）",
@@ -453,6 +486,11 @@
           },
           "updateTime" : {
             "description" : "更新时间，格式 yyyy-MM-dd HH:mm:ss",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userConfirmedAt" : {
+            "description" : "用户下单确认时间（选定应征 + 约定作业时间，ADR-0003 决定 4；无订单或未下单时为 null），格式 yyyy-MM-dd HH:mm:ss",
             "format" : "date-time",
             "type" : "string"
           },
@@ -5725,7 +5763,7 @@
     },
     "/task/{taskNum}/applications" : {
       "get" : {
-        "description" : "任务属主按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主被拒）",
+        "description" : "任务属主、应征飞手与管理员（role=2，监管端只读）按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主非应征的普通用户 403）",
         "operationId" : "listApplications",
         "parameters" : [ {
           "description" : "任务编号",
@@ -5822,7 +5860,7 @@
     },
     "/tasks/{taskNum}/attachments" : {
       "get" : {
-        "description" : "任务所有者与接单飞手可看；逐条附 presigned 下载 URL（15 分钟有效）",
+        "description" : "任务所有者、接单飞手与管理员（role=2，监管端只读）可看；逐条附 presigned 下载 URL（15 分钟有效）",
         "operationId" : "list",
         "parameters" : [ {
           "description" : "任务编号",
@@ -5851,7 +5889,7 @@
     },
     "/tasks/{taskNum}/attachments/download-url" : {
       "get" : {
-        "description" : "任务所有者或接单飞手可看",
+        "description" : "任务所有者、接单飞手与管理员（role=2，监管端只读）可看",
         "operationId" : "downloadUrl",
         "parameters" : [ {
           "description" : "任务编号",

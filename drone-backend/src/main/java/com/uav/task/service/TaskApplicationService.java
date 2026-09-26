@@ -23,10 +23,14 @@ public interface TaskApplicationService {
     TaskApplicationVO apply(String taskNum, Long riderId, Long aircraftModelId);
 
     /**
-     * 任务属主查询应征列表（按应征时间正序）；非属主被拒（FORBIDDEN）。
+     * 任务上下文应征列表（按应征时间正序）。
+     *
+     * <p>只读放行（TASK-BACKEND-007）：任务属主 / 应征飞手 / 管理员（role=2）；
+     * 其余（非属主非应征的普通用户）→ FORBIDDEN。
      *
      * @param taskNum 任务编号
-     * @param userId  当前登录用户（必须是任务属主）
+     * @param userId  当前登录用户 ID
+     * @param role    当前登录角色（0 普通用户 / 1 飞手 / 2 管理员）
      */
-    List<TaskApplicationVO> listByTask(String taskNum, Long userId);
+    List<TaskApplicationVO> listByTask(String taskNum, Long userId, Integer role);
 }

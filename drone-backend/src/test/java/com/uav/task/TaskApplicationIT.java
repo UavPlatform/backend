@@ -41,7 +41,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>覆盖：应征 → 属主列表含机型与 quotedAmount；同任务不同机型报价不同且可复现；
  * 客户端自定义金额被忽略；未映射机型 → AIRCRAFT_MODEL_REQUIRED；超重 → EXCEEDS_PAYLOAD；
- * 非属主查列表被拒；V3 迁移落地（R10 双兼容查询）。
+ * 只读放行边界（属主/应征/管理员 200，非属主非应征 403，TASK-BACKEND-007）；
+ * V3 迁移落地（R10 双兼容查询）。
  */
 class TaskApplicationIT extends IntegrationTestBase {
 
@@ -300,7 +301,7 @@ class TaskApplicationIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("应征列表仅任务属主可查：非属主 → 403")
+    @DisplayName("应征列表只读边界：非属主非应征普通用户 → 403")
     void applicationListOwnerOnly() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         String taskNum = createTransportTask(owner, "2.00");
@@ -315,6 +316,35 @@ class TaskApplicationIT extends IntegrationTestBase {
 
         // 属主仍可查
         assertThat(applications(owner, taskNum).size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("只读放行（TASK-BACKEND-007）：管理员与应征飞手 200，非应征飞手 403")
+    void applicationListReadableByAdminAndApplicant() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        String taskNum = createTransportTask(owner, "2.00");
+        TestAccounts.Account rider = riderMappedTo("FC30");
+        applyOk(rider, taskNum, modelId("FC30"), "");
+
+        // 管理员（role=2，监管端旁听只读）→ 200
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/task/" + taskNum + "/applications")
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].riderName").value(rider.userName()));
+
+        // 应征飞手本人 → 200
+        mockMvc.perform(get("/task/" + taskNum + "/applications")
+                        .header("Authorization", rider.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1));
+
+        // 非应征飞手（role=1）→ 403：权限=属主/应征/管理员
+        TestAccounts.Account bystander = accounts().registerRider(UniqueNames.userName("rider"), null);
+        mockMvc.perform(get("/task/" + taskNum + "/applications")
+                        .header("Authorization", bystander.authorization()))
+                .andExpect(status().isForbidden());
     }
 
     @Test

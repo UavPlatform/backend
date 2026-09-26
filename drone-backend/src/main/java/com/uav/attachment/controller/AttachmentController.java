@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * 1B-9b 交付物附件接口（presigned URL 模式，后端不经手文件字节流）。
- * 授权：上传=任务接单飞手；查看/下载=任务所有者或接单飞手。
+ * 授权：上传=任务接单飞手或任务所有者（写路径不变）；查看/下载=任务所有者、接单飞手与管理员（role=2 只读）。
  */
 @Tag(name = "Task Attachment API", description = "任务交付物附件（MinIO presigned URL）")
 @RestController
@@ -51,16 +51,20 @@ public class AttachmentController {
     }
 
     @OperationLog("查看交付物列表")
-    @Operation(summary = "附件列表", description = "任务所有者与接单飞手可看；逐条附 presigned 下载 URL（15 分钟有效）",
+    @Operation(summary = "附件列表",
+            description = "任务所有者、接单飞手与管理员（role=2，监管端只读）可看；"
+                    + "逐条附 presigned 下载 URL（15 分钟有效）",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @GetMapping
     public Result<List<Map<String, Object>>> list(@PathVariable String taskNum) {
         Long callerId = com.uav.server.util.UserContext.getUserId();
-        return Result.success(attachmentService.listAttachments(callerId, taskNum));
+        return Result.success(attachmentService.listAttachments(callerId,
+                com.uav.server.util.UserContext.getRole(), taskNum));
     }
 
     @OperationLog("请求交付物下载凭证")
-    @Operation(summary = "获取交付物下载凭证", description = "任务所有者或接单飞手可看",
+    @Operation(summary = "获取交付物下载凭证",
+            description = "任务所有者、接单飞手与管理员（role=2，监管端只读）可看",
             parameters = {
                     @Parameter(name = "taskNum", description = "任务编号", required = true),
                     @Parameter(name = "objectKey", description = "附件对象键", required = true)
@@ -69,6 +73,7 @@ public class AttachmentController {
     public Result<Map<String, Object>> downloadUrl(@PathVariable String taskNum,
                                                    @RequestParam String objectKey) {
         Long callerId = com.uav.server.util.UserContext.getUserId();
-        return Result.success(attachmentService.downloadUrl(callerId, taskNum, objectKey));
+        return Result.success(attachmentService.downloadUrl(callerId,
+                com.uav.server.util.UserContext.getRole(), taskNum, objectKey));
     }
 }

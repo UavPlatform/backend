@@ -9,6 +9,9 @@ import com.uav.admin.pojo.vo.AdminTaskVo;
 import com.uav.admin.pojo.vo.AdminUserDetailVo;
 import com.uav.admin.pojo.vo.AdminUserVo;
 import com.uav.aircraft.pojo.entity.AircraftModel;
+import com.uav.live.service.impl.LiveDeviceResolver;
+import com.uav.pay.mapper.PayRecordRepository;
+import com.uav.pay.pojo.entity.PayRecord;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
@@ -25,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +46,10 @@ import java.util.stream.Collectors;
  * <p>TASK-BACKEND-006 增补监管端主体查询：注册用户（role=0）/ 注册飞手（role=1）列表与详情，
  * 飞手详情含绑定无人机表（djiId/机型/在线/可用）与关联订单；无人机启停复用
  * {@code POST /admin/uav/available}（按 djiId），不另设端点。
+ *
+ * <p>TASK-BACKEND-007 增补监管上下文回显：任务/订单 VO 暴露 {@code deviceId}
+ * （复用 {@link LiveDeviceResolver} 解析链）与 {@code userConfirmedAt}/{@code riderConfirmedAt}/{@code paidAt}
+ * （口径见 {@link #paidAt}），供管理视图时间线/计价/证据与监管视图遥测+监看直接取数。
  */
 @Slf4j
 @Service
@@ -57,15 +65,28 @@ public class AdminQueryService {
     /** uav.online_status / is_available 的「是」值。 */
     private static final char FLAG_ON = '1';
 
+    /**
+     * 「已支付口径」的订单状态（paidAt 回退分支）：出现这些状态即认为钱已收过，
+     * 即便查不到支付流水也回退订单 updateTime 作为支付完成时间的近似。
+     */
+    private static final Set<OrderStatus> PAID_STATES =
+            Set.of(OrderStatus.PAID, OrderStatus.WAITING_CONFIRM, OrderStatus.COMPLETED,
+                    OrderStatus.REFUNDED, OrderStatus.DISPUTED);
+
     @PersistenceContext
     private EntityManager em;
 
     private final UserRepository userRepository;
     private final TaskAssignmentRepository taskAssignmentRepository;
+    private final LiveDeviceResolver liveDeviceResolver;
+    private final PayRecordRepository payRecordRepository;
 
-    public AdminQueryService(UserRepository userRepository, TaskAssignmentRepository taskAssignmentRepository) {
+    public AdminQueryService(UserRepository userRepository, TaskAssignmentRepository taskAssignmentRepository,
+                             LiveDeviceResolver liveDeviceResolver, PayRecordRepository payRecordRepository) {
         this.userRepository = userRepository;
         this.taskAssignmentRepository = taskAssignmentRepository;
+        this.liveDeviceResolver = liveDeviceResolver;
+        this.payRecordRepository = payRecordRepository;
     }
 
     // ---------- 订单 ----------
@@ -100,9 +121,9 @@ public class AdminQueryService {
                 em.createQuery("SELECT COUNT(o) FROM MissionOrder o " + whereSql, Long.class), params)
                 .getSingleResult();
 
+        Map<String, PayRecord> payRecords = payRecordsByOrderNum(orderNumsOf(orders));
         List<AdminOrderVo> content = orders.stream()
-                .map(o -> AdminOrderVo.of(o, resolveOwnerName(o.getUserId()),
-                        o.getTask() != null ? o.getTask().getTaskName() : null))
+                .map(o -> toOrderVo(o, payRecords))
                 .collect(Collectors.toList());
         return AdminPageVo.of(content, ps[0], ps[1], total);
     }
@@ -115,8 +136,8 @@ public class AdminQueryService {
                 .setParameter("orderNum", orderNum)
                 .getResultStream().findFirst()
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
-        return AdminOrderVo.of(order, resolveOwnerName(order.getUserId()),
-                order.getTask() != null ? order.getTask().getTaskName() : null);
+        Map<String, PayRecord> payRecords = payRecordsByOrderNum(List.of(order.getOrderNum()));
+        return toOrderVo(order, payRecords);
     }
 
     // ---------- 任务 ----------
@@ -318,14 +339,11 @@ public class AdminQueryService {
                 order != null ? order.getOrderStatus() : null,
                 task.getMatchStatus());
 
-        return AdminTaskVo.of(task, ownerName,
-                order != null ? order.getOrderNum() : null,
-                order != null ? order.getOrderStatus().getCode() : null,
-                order != null ? order.getOrderStatus().name() : null,
-                order != null ? order.getOrderStatus().getDesc() : null,
-                order != null ? order.getTotalAmount() : null,
-                order != null ? order.getTotalDistance() : null,
-                riderName, completeNote, actionHint);
+        Map<String, PayRecord> payRecords = payRecordsByOrderNum(
+                order != null ? List.of(order.getOrderNum()) : List.of());
+        return AdminTaskVo.of(task, ownerName, order,
+                resolveDeviceId(task.getId()), riderName, completeNote, actionHint,
+                paidAt(order, payRecords));
     }
 
     /** 用户名关键字 → {@code AND LOWER(u.userName) LIKE :keyword}（同时小写入参，H2/MySQL 一致）。 */
@@ -410,10 +428,74 @@ public class AdminQueryService {
 
     /** 订单 → 摘要 VO 列表（属主名与任务名逐条补齐，与订单列表同构）。 */
     private List<AdminOrderVo> toOrderVos(List<com.uav.order.pojo.entity.MissionOrder> orders) {
+        Map<String, PayRecord> payRecords = payRecordsByOrderNum(orderNumsOf(orders));
         return orders.stream()
-                .map(o -> AdminOrderVo.of(o, resolveOwnerName(o.getUserId()),
-                        o.getTask() != null ? o.getTask().getTaskName() : null))
+                .map(o -> toOrderVo(o, payRecords))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 订单 → 管理端订单 VO：补齐属主名/任务名 + 监管上下文（TASK-BACKEND-007）。
+     *
+     * @param payRecords 按订单号批量预取的支付流水（避免列表逐单查询）
+     */
+    private AdminOrderVo toOrderVo(com.uav.order.pojo.entity.MissionOrder order,
+                                   Map<String, PayRecord> payRecords) {
+        return AdminOrderVo.of(order, resolveOwnerName(order.getUserId()),
+                order.getTask() != null ? order.getTask().getTaskName() : null,
+                resolveDeviceId(order.getTask() != null ? order.getTask().getId() : null),
+                paidAt(order, payRecords));
+    }
+
+    private List<String> orderNumsOf(List<com.uav.order.pojo.entity.MissionOrder> orders) {
+        return orders.stream()
+                .map(com.uav.order.pojo.entity.MissionOrder::getOrderNum)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    /** 批量取支付流水并按订单号建索引（同一订单号多条时保留首条，正常为 1:1）。 */
+    private Map<String, PayRecord> payRecordsByOrderNum(List<String> orderNums) {
+        if (orderNums.isEmpty()) {
+            return Map.of();
+        }
+        return payRecordRepository.findByOrderNumIn(orderNums).stream()
+                .collect(Collectors.toMap(PayRecord::getOrderNum, r -> r, (a, b) -> a));
+    }
+
+    /**
+     * 支付完成时间 {@code paidAt}（口径见 AdminOrderVo/AdminTaskVo schema）：
+     * <ol>
+     *   <li>优先 {@code PayRecord.payTime}——微信/mock 支付成功回调落库的时刻；</li>
+     *   <li>无支付流水但订单已处于「已支付口径」状态（{@link #PAID_STATES}）时，
+     *       回退 {@code MissionOrder.updateTime}——订单状态迁移到当前状态的时刻（近似值）；</li>
+     *   <li>待支付/待撮合/已取消 → null。</li>
+     * </ol>
+     */
+    private LocalDateTime paidAt(com.uav.order.pojo.entity.MissionOrder order,
+                                 Map<String, PayRecord> payRecords) {
+        if (order == null) {
+            return null;
+        }
+        PayRecord record = payRecords.get(order.getOrderNum());
+        if (record != null && record.getPayTime() != null) {
+            return record.getPayTime();
+        }
+        if (PAID_STATES.contains(order.getOrderStatus())) {
+            return order.getUpdateTime();
+        }
+        return null;
+    }
+
+    /**
+     * 任务 → 作业设备（监管图传上下文，TASK-BACKEND-007）：复用 {@link LiveDeviceResolver}
+     * 的解析链 task → task_assignment → rider_uav → 在线设备；未接单/无绑定/离线 → null。
+     */
+    private String resolveDeviceId(Long taskId) {
+        if (taskId == null) {
+            return null;
+        }
+        return liveDeviceResolver.resolveForTask(taskId).deviceId();
     }
 
     private String resolveOwnerName(Long userId) {

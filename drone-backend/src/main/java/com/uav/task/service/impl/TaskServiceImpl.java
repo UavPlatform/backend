@@ -37,7 +37,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -541,11 +543,24 @@ public class TaskServiceImpl implements TaskService {
             return List.of();
         }
 
+        // 一次批量聚合替代每飞手 3 次查询（N×3），口径与 getRiderStats 一致
+        List<Long> riderIds = riders.stream().map(User::getId).toList();
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        Map<Long, Object[]> statsByRider = new HashMap<>();
+        for (Object[] row : taskAssignmentRepository.batchRiderStats(riderIds, todayStart)) {
+            statsByRider.put(((Number) row[0]).longValue(), row);
+        }
+
         List<RiderStatsVO> result = new ArrayList<>();
         for (User rider : riders) {
-            RiderStatsVO vo = getRiderStats(rider.getId());
+            RiderStatsVO vo = new RiderStatsVO();
             vo.setRiderId(rider.getId());
             vo.setRiderName(rider.getUserName());
+            Object[] stats = statsByRider.get(rider.getId());
+            vo.setTodayOrders(stats != null ? ((Number) stats[1]).longValue() : 0L);
+            vo.setTotalCompleted(stats != null ? ((Number) stats[2]).longValue() : 0L);
+            // 与 sumRewardByRiderId 的 COALESCE(SUM, 0) 一致：无记录时为 0.0 而非 null
+            vo.setTotalEarnings(stats != null ? ((Number) stats[3]).doubleValue() : 0.0);
             result.add(vo);
         }
         result.sort(Comparator.comparingLong(RiderStatsVO::getTotalCompleted).reversed());

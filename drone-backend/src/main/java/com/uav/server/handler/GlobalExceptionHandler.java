@@ -8,6 +8,7 @@ import com.uav.server.exception.UnauthorizedException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +28,17 @@ public class GlobalExceptionHandler {
         log.warn("参数校验失败: {}", msg);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Result.fail(400, ApiErrorCode.INVALID_PARAM.getCode(), msg));
+    }
+
+    /**
+     * 请求体无法解析（非法 JSON、枚举值不存在、日期格式错误等）属于客户端参数错误 → 400 INVALID_PARAM，
+     * 而非落入兜底 500。提示不回显原始输入（可能含身份证号等敏感字段）。
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Result<Void>> handleNotReadable(HttpMessageNotReadableException e) {
+        log.warn("请求体解析失败: {}", e.getClass().getSimpleName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Result.fail(400, ApiErrorCode.INVALID_PARAM.getCode(), "请求体格式错误或字段取值不合法"));
     }
 
     @ExceptionHandler(UnauthorizedException.class)

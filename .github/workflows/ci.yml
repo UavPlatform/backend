@@ -1,0 +1,126 @@
+# 后端 PR / main 测试门禁（docs/quality/backend-test-strategy.md §5/§6）。
+#
+# 必需状态检查（Branch protection → Require status checks）请勾选：backend-tests
+#
+# 执行内容：
+#   1. sh mvnw -B verify —— 单元层（*Test，Surefire）+ 集成/端到端层（*IT / *E2EIT，Failsafe），
+#      含 OpenApiContractGateE2EIT；T4_DB_* 指向本 job 的 MySQL 8.4 服务容器，
+#      使 OrderDeliveryE2EIT 的真库用例实际执行（不再「4 skipped」，docs §6：跳过不得掩盖配置）。
+#   2. 断言实际执行数：Tests run 为 0 或存在 skipped 均判失败（docs §5「Tests run: 0 不算通过」）。
+#   3. 结构门禁：check-test-layers.sh --selftest、check-thread-context-cleanup.sh --selftest、
+#      openapi-export.sh --check（与 Docker Publish 中的门禁同口径）。
+#   失败时上传 surefire/failsafe 报告。
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: backend-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      # 真库端到端（OrderDeliveryE2EIT）：只接受真实 MySQL（不接受 MariaDB/H2 顶替）；
+      # 安全红线要求端口不得为 3306，故映射到 13306。库与账号仅存活于本 job。
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: drone_ci
+          MYSQL_USER: drone_ci
+          MYSQL_PASSWORD: ci-only-password
+          TZ: Asia/Shanghai
+        ports:
+          - 13306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run unit + integration + E2E tests (mvnw verify)
+        working-directory: ./drone-backend
+        env:
+          T4_DB_HOST: 127.0.0.1
+          T4_DB_PORT: "13306"
+          T4_DB_NAME: drone_ci
+          T4_DB_USER: drone_ci
+          T4_DB_PASSWORD: ci-only-password
+        run: sh mvnw -B verify
+
+      - name: Assert tests actually ran (no zero-run, no skips)
+        working-directory: ./drone-backend
+        run: |
+          set -euo pipefail
+          sum_attr() { # $1=attr, rest=files
+            local attr=$1; shift
+            local total=0 v
+            for f in "$@"; do
+              v=$(grep -o -m1 "<testsuite [^>]*" "$f" | grep -o " ${attr}=\"[0-9]*\"" | grep -o '[0-9]*' || echo 0)
+              total=$((total + ${v:-0}))
+            done
+            echo "$total"
+          }
+          shopt -s nullglob
+          unit=(target/surefire-reports/TEST-*.xml)
+          it=(target/failsafe-reports/TEST-*.xml)
+          [ ${#unit[@]} -gt 0 ] || { echo "::error::未找到 Surefire 报告（单元层 0 执行）"; exit 1; }
+          [ ${#it[@]} -gt 0 ] || { echo "::error::未找到 Failsafe 报告（集成层 0 执行）"; exit 1; }
+          u_run=$(sum_attr tests "${unit[@]}"); u_skip=$(sum_attr skipped "${unit[@]}")
+          i_run=$(sum_attr tests "${it[@]}");   i_skip=$(sum_attr skipped "${it[@]}")
+          {
+            echo "### backend-tests"
+            echo "| 层 | Tests run | Skipped |"
+            echo "| --- | --- | --- |"
+            echo "| 单元（Surefire） | $u_run | $u_skip |"
+            echo "| 集成/E2E（Failsafe） | $i_run | $i_skip |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "unit run=$u_run skipped=$u_skip; it run=$i_run skipped=$i_skip"
+          [ "$u_run" -gt 0 ] || { echo "::error::单元层 Tests run: 0"; exit 1; }
+          [ "$i_run" -gt 0 ] || { echo "::error::集成层 Tests run: 0"; exit 1; }
+          [ "$u_skip" -eq 0 ] && [ "$i_skip" -eq 0 ] || {
+            echo "::error::存在 skipped 用例（CI 已提供 MySQL，真库用例不应被跳过）"; exit 1; }
+
+      - name: Check test layers and execution-layer naming
+        run: bash tools/check-test-layers.sh --selftest
+
+      - name: Check R8 thread-context cleanup
+        run: bash tools/check-thread-context-cleanup.sh --selftest
+
+      # 放在报告断言之后：--check 会删除并重写 failsafe-summary.xml 与门禁报告。
+      - name: Check OpenAPI structure contract
+        run: bash tools/openapi-export.sh --check
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            drone-backend/target/surefire-reports/
+            drone-backend/target/failsafe-reports/
+          if-no-files-found: ignore
+          retention-days: 7

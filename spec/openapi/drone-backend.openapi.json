@@ -262,10 +262,30 @@
             },
             "type" : "array"
           },
+          "idExpired" : {
+            "description" : "证件是否已过期（有效期早于今天）；未登记有效期为 false",
+            "type" : "boolean"
+          },
+          "idExpiryDate" : {
+            "description" : "证件有效期截止日；未登记为 null",
+            "format" : "date",
+            "type" : "string"
+          },
+          "idNumberMasked" : {
+            "description" : "脱敏身份证号（前 3 后 4）；未登记为 null",
+            "type" : "string"
+          },
           "orders" : {
             "description" : "关联订单（按创建时间倒序，无订单为空数组）",
             "items" : {
               "$ref" : "#/components/schemas/AdminOrderVo"
+            },
+            "type" : "array"
+          },
+          "qualifications" : {
+            "description" : "驾驶资质（机型 × 执照等级；无资质为空数组）",
+            "items" : {
+              "$ref" : "#/components/schemas/RiderQualificationVO"
             },
             "type" : "array"
           },
@@ -2019,6 +2039,33 @@
         },
         "type" : "object"
       },
+      "ResultRiderInfoVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/RiderInfoVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultRiderStatsVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2458,7 +2505,164 @@
         },
         "type" : "object"
       },
-      "RiderInfoDto" : { },
+      "RiderInfoDto" : {
+        "description" : "飞手资料局部更新（字段为 null 表示不修改）",
+        "properties" : {
+          "age" : {
+            "description" : "年龄（16~100）",
+            "example" : 30,
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 16,
+            "type" : "integer"
+          },
+          "idExpiryDate" : {
+            "description" : "证件有效期截止日（yyyy-MM-dd，不得早于今天）",
+            "example" : "2036-01-01",
+            "format" : "date",
+            "type" : "string"
+          },
+          "idNumber" : {
+            "description" : "居民身份证号（18 位，末位可为 X；服务端校验格式与校验码，返回时一律脱敏）",
+            "example" : "11010519491231002X",
+            "type" : "string"
+          },
+          "location" : {
+            "description" : "所在地",
+            "example" : "广东省深圳市",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "qualifications" : {
+            "description" : "驾驶资质全集（null 不修改；[] 清空）；同一机型只能出现一次",
+            "items" : {
+              "$ref" : "#/components/schemas/RiderQualificationDto"
+            },
+            "maxItems" : 50,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "selfIntroduction" : {
+            "description" : "自我介绍",
+            "example" : "五年吊运作业经验",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiderInfoVO" : {
+        "description" : "飞手资料（身份证号脱敏）",
+        "properties" : {
+          "age" : {
+            "description" : "年龄；未填为 null",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "createTime" : {
+            "description" : "资料创建时间；从未保存资料为 null",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "idExpired" : {
+            "description" : "证件是否已过期（有效期早于今天）；未填有效期为 false",
+            "type" : "boolean"
+          },
+          "idExpiryDate" : {
+            "description" : "证件有效期截止日；未填为 null",
+            "format" : "date",
+            "type" : "string"
+          },
+          "idNumberMasked" : {
+            "description" : "脱敏身份证号（前 3 后 4，如 110***********002X）；未填为 null",
+            "type" : "string"
+          },
+          "location" : {
+            "description" : "所在地",
+            "type" : "string"
+          },
+          "qualifications" : {
+            "description" : "驾驶资质（无资质为空数组）",
+            "items" : {
+              "$ref" : "#/components/schemas/RiderQualificationVO"
+            },
+            "type" : "array"
+          },
+          "selfIntroduction" : {
+            "description" : "自我介绍",
+            "type" : "string"
+          },
+          "updateTime" : {
+            "description" : "资料最近更新时间；从未保存资料为 null",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "userId" : {
+            "description" : "飞手ID（user.id）",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userName" : {
+            "description" : "用户名（昵称）",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RiderQualificationDto" : {
+        "description" : "驾驶资质条目：机型（取自 /api/aircraft-models）× 执照等级",
+        "properties" : {
+          "aircraftModelId" : {
+            "description" : "机型ID（aircraft_model.id，须为启用机型）",
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "licenseGrade" : {
+            "description" : "执照等级：VLOS 视距内 / BVLOS 超视距 / TEACHER 教员",
+            "enum" : [ "BVLOS", "TEACHER", "VLOS" ],
+            "example" : "VLOS",
+            "type" : "string"
+          }
+        },
+        "required" : [ "aircraftModelId", "licenseGrade" ],
+        "type" : "object"
+      },
+      "RiderQualificationVO" : {
+        "description" : "飞手驾驶资质（机型 × 执照等级）",
+        "properties" : {
+          "aircraftModelId" : {
+            "description" : "机型ID（aircraft_model.id）",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "description" : "资质ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "licenseGrade" : {
+            "description" : "执照等级枚举名",
+            "enum" : [ "BVLOS", "TEACHER", "VLOS" ],
+            "type" : "string"
+          },
+          "licenseGradeLabel" : {
+            "description" : "执照等级中文名（视距内/超视距/教员）",
+            "type" : "string"
+          },
+          "modelCode" : {
+            "description" : "型号编码（如 FC30）；机型缺失时为 null",
+            "type" : "string"
+          },
+          "modelName" : {
+            "description" : "机型显示名（如 DJI FlyCart 30）；机型缺失时为 null",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "RiderRegisterDto" : {
         "description" : "飞手注册参数",
         "properties" : {
@@ -4525,36 +4729,6 @@
         "tags" : [ "chat session API" ]
       }
     },
-    "/info/edit" : {
-      "post" : {
-        "description" : "飞手编辑个人资料；当前为占位实现，仅返回成功",
-        "operationId" : "editSelfInfo",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/RiderInfoDto"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "编辑本人资料",
-        "tags" : [ "Rider Info API" ]
-      }
-    },
     "/live/close" : {
       "post" : {
         "description" : "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话并补齐该设备全体观众的观看记录；设备离线则直接补终态。协议详见 DroneWebSocketHandler#sendStopLiveCommand javadoc。",
@@ -5424,6 +5598,54 @@
         },
         "summary" : "解绑无人机",
         "tags" : [ "Rider Register API" ]
+      }
+    },
+    "/rider/info" : {
+      "get" : {
+        "description" : "飞手查看本人资料、证件有效期（身份证号脱敏）与驾驶资质（机型 × 执照等级）；从未保存资料时除用户名外均为空",
+        "operationId" : "getInfo",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultRiderInfoVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查看本人资料",
+        "tags" : [ "Rider Info API" ]
+      },
+      "patch" : {
+        "description" : "局部更新：字段为 null 不修改。身份证号校验格式与校验位；证件有效期不得早于今天；qualifications 传数组时按机型做集合差异（缺失删除、新机型新增、等级变化更新，[] 清空），机型须为启用机型（否则 AIRCRAFT_MODEL_NOT_FOUND）。参数错误 400 INVALID_PARAM",
+        "operationId" : "editInfo",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RiderInfoDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultRiderInfoVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "编辑本人资料",
+        "tags" : [ "Rider Info API" ]
       }
     },
     "/rider/my-tasks" : {
@@ -6639,7 +6861,7 @@
     "description" : "飞手注册接口",
     "name" : "Rider Register API"
   }, {
-    "description" : "飞手资料维护（占位实现，尚未接入持久化）",
+    "description" : "飞手资料与驾驶资质维护",
     "name" : "Rider Info API"
   }, {
     "description" : "骑手接单接口",

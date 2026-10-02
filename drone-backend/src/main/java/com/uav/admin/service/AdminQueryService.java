@@ -12,6 +12,8 @@ import com.uav.aircraft.pojo.entity.AircraftModel;
 import com.uav.live.service.impl.LiveDeviceResolver;
 import com.uav.pay.mapper.PayRecordRepository;
 import com.uav.pay.pojo.entity.PayRecord;
+import com.uav.rider.pojo.vo.RiderInfoVO;
+import com.uav.rider.service.RiderInfoService;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
@@ -50,6 +52,9 @@ import java.util.stream.Collectors;
  * <p>TASK-BACKEND-007 增补监管上下文回显：任务/订单 VO 暴露 {@code deviceId}
  * （复用 {@link LiveDeviceResolver} 解析链）与 {@code userConfirmedAt}/{@code riderConfirmedAt}/{@code paidAt}
  * （口径见 {@link #paidAt}），供管理视图时间线/计价/证据与监管视图遥测+监看直接取数。
+ *
+ * <p>飞手详情另回显证照（脱敏身份证号、有效期）与驾驶资质（机型 × 执照等级），数据来自
+ * {@link RiderInfoService}，与飞手本人 {@code GET /rider/info} 同口径。
  */
 @Slf4j
 @Service
@@ -80,13 +85,16 @@ public class AdminQueryService {
     private final TaskAssignmentRepository taskAssignmentRepository;
     private final LiveDeviceResolver liveDeviceResolver;
     private final PayRecordRepository payRecordRepository;
+    private final RiderInfoService riderInfoService;
 
     public AdminQueryService(UserRepository userRepository, TaskAssignmentRepository taskAssignmentRepository,
-                             LiveDeviceResolver liveDeviceResolver, PayRecordRepository payRecordRepository) {
+                             LiveDeviceResolver liveDeviceResolver, PayRecordRepository payRecordRepository,
+                             RiderInfoService riderInfoService) {
         this.userRepository = userRepository;
         this.taskAssignmentRepository = taskAssignmentRepository;
         this.liveDeviceResolver = liveDeviceResolver;
         this.payRecordRepository = payRecordRepository;
+        this.riderInfoService = riderInfoService;
     }
 
     // ---------- 订单 ----------
@@ -310,8 +318,10 @@ public class AdminQueryService {
                 .setParameter("riderId", userId)
                 .getSingleResult();
 
+        RiderInfoVO profile = riderInfoService.getInfo(userId);
         return new AdminPilotDetailVo(pilot.getId(), pilot.getUserName(), pilot.getStatus(), pilot.getRole(),
-                completed, toDroneVos(bindings), toOrderVos(orders));
+                completed, profile.idNumberMasked(), profile.idExpiryDate(), profile.idExpired(),
+                profile.qualifications(), toDroneVos(bindings), toOrderVos(orders));
     }
 
     // ---------- 内部 ----------

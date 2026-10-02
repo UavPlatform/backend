@@ -16,6 +16,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -169,6 +173,18 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
         String deviceId = UniqueNames.djiId();
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), deviceId);
 
+        // 业务前置：握手通过后 DroneWebSocketHandler 只接纳已「申请连接」的设备，否则立即以
+        // POLICY_VIOLATION 关闭。原用例缺这一步，只靠「服务端关闭帧尚未到达」的时间窗通过（CI 上偶发红）；
+        // 这里走真实接口 POST /api/ws/request（绑定该设备的飞手本人）完成申请，使断言确定性成立。
+        HttpResponse<String> apply = HttpClient.newHttpClient().send(
+                HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/ws/request?deviceId=" + deviceId))
+                        .header("Authorization", rider.authorization())
+                        .POST(HttpRequest.BodyPublishers.noBody())
+                        .timeout(Duration.ofSeconds(10))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertThat(apply.statusCode()).as("设备连接申请应成功，响应=%s", apply.body()).isEqualTo(200);
+
         WebSocketContainer container = ContainerProvider.getWebSocketContainer();
         URI uri = appendToken(URI.create(wsBaseUrl() + "/ws/drone?deviceId=" + deviceId), rider.token());
         OpenLatchEndpoint endpoint = new OpenLatchEndpoint();
@@ -176,6 +192,10 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
         openSessions.add(session);
 
         assertThat(endpoint.opened.await(10, TimeUnit.SECONDS)).isTrue();
+        // 服务端拒绝是异步关闭：稍候再断言仍保持连接，避免与关闭帧赛跑而假绿
+        assertThat(endpoint.closed.await(1, TimeUnit.SECONDS))
+                .as("已申请设备的绑定飞手连接不应被服务端关闭，closeReason=%s", endpoint.closeReason.get())
+                .isFalse();
         assertThat(session.isOpen()).isTrue();
     }
 
@@ -192,6 +212,8 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
     static class OpenLatchEndpoint extends Endpoint {
         final CountDownLatch opened = new CountDownLatch(1);
         final AtomicReference<Throwable> error = new AtomicReference<>();
+        final CountDownLatch closed = new CountDownLatch(1);
+        final AtomicReference<CloseReason> closeReason = new AtomicReference<>();
 
         @Override
         public void onOpen(Session session, EndpointConfig config) {
@@ -199,8 +221,9 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
         }
 
         @Override
-        public void onClose(Session session, CloseReason closeReason) {
-            // no-op
+        public void onClose(Session session, CloseReason reason) {
+            closeReason.set(reason);
+            closed.countDown();
         }
 
         @Override

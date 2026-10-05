@@ -12,7 +12,12 @@ public interface OrderService {
      */
     MissionOrder createOrder(Long userId, String taskNum);
 
-    Page<MissionOrder> listOrders(Long userId, int page, int size);
+    /**
+     * 我买到的订单（App「我的交易 - 我买到的」），按创建时间倒序。
+     *
+     * @param status 订单状态过滤：枚举名（如 COMPLETED）或状态码（如 4）；为空表示不过滤
+     */
+    Page<MissionOrder> listOrders(Long userId, int page, int size, String status);
 
     MissionOrder getOrderDetail(String orderNum, Long userId);
 

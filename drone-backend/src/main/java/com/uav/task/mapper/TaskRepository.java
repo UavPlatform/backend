@@ -29,6 +29,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @EntityGraph(attributePaths = "waypoints")
     Page<Task> findByUserIdOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
+    long countByUserId(Long userId);
+
     @EntityGraph(attributePaths = "waypoints")
     Optional<Task> findByTaskNum(String taskNum);
 

@@ -36,6 +36,75 @@ public interface OrderRepository extends JpaRepository<MissionOrder, Long> {
     @EntityGraph(attributePaths = "task")
     Page<MissionOrder> findByUserIdOrderByCreateTimeDesc(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = "task")
+    Page<MissionOrder> findByUserIdAndOrderStatusOrderByCreateTimeDesc(
+            Long userId, OrderStatus orderStatus, Pageable pageable);
+
+    // ── App「我的交易」：我买到的 ∪ 我卖出的 ──
+    // 卖方的权威口径是订单上的成交指针 selectedApplicationId（选定应征时写入，重新选定会改指），
+    // 而不是履约记录 task_assignment（取消接单会被删除，无法表达「成交」）。
+
+    @EntityGraph(attributePaths = "task")
+    @Query("SELECT o FROM MissionOrder o WHERE o.selectedApplicationId IN "
+            + "(SELECT a.id FROM TaskApplication a WHERE a.riderId = :riderId) "
+            + "ORDER BY o.createTime DESC")
+    Page<MissionOrder> findSoldOrders(@Param("riderId") Long riderId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "task")
+    @Query("SELECT o FROM MissionOrder o WHERE o.orderStatus = :orderStatus AND o.selectedApplicationId IN "
+            + "(SELECT a.id FROM TaskApplication a WHERE a.riderId = :riderId) "
+            + "ORDER BY o.createTime DESC")
+    Page<MissionOrder> findSoldOrdersByStatus(@Param("riderId") Long riderId,
+                                              @Param("orderStatus") OrderStatus orderStatus,
+                                              Pageable pageable);
+
+    @EntityGraph(attributePaths = "task")
+    @Query("SELECT o FROM MissionOrder o WHERE "
+            + "(o.userId = :userId OR o.selectedApplicationId IN "
+            + " (SELECT a.id FROM TaskApplication a WHERE a.riderId = :userId)) "
+            + "ORDER BY o.createTime DESC")
+    Page<MissionOrder> findMyTrades(@Param("userId") Long userId, Pageable pageable);
+
+    @EntityGraph(attributePaths = "task")
+    @Query("SELECT o FROM MissionOrder o WHERE o.orderStatus = :orderStatus AND "
+            + "(o.userId = :userId OR o.selectedApplicationId IN "
+            + " (SELECT a.id FROM TaskApplication a WHERE a.riderId = :userId)) "
+            + "ORDER BY o.createTime DESC")
+    Page<MissionOrder> findMyTradesByStatus(@Param("userId") Long userId,
+                                            @Param("orderStatus") OrderStatus orderStatus,
+                                            Pageable pageable);
+
+    /** 待评价：仅「已完成」可评价（{@code OrderReviewServiceImpl} 硬校验），且尚未提交过评价。 */
+    @EntityGraph(attributePaths = "task")
+    @Query("SELECT o FROM MissionOrder o WHERE o.userId = :userId AND o.orderStatus = :orderStatus "
+            + "AND NOT EXISTS (SELECT r.id FROM OrderReview r WHERE r.orderNum = o.orderNum) "
+            + "ORDER BY o.createTime DESC")
+    Page<MissionOrder> findPendingReviewOrders(@Param("userId") Long userId,
+                                               @Param("orderStatus") OrderStatus orderStatus,
+                                               Pageable pageable);
+
+    // ── 统计计数（一次 count，不在内存过滤）──
+
+    long countByUserId(Long userId);
+
+    @Query("SELECT COUNT(o) FROM MissionOrder o WHERE o.selectedApplicationId IN "
+            + "(SELECT a.id FROM TaskApplication a WHERE a.riderId = :riderId)")
+    long countSoldOrders(@Param("riderId") Long riderId);
+
+    @Query("SELECT COUNT(o) FROM MissionOrder o WHERE "
+            + "o.userId = :userId OR o.selectedApplicationId IN "
+            + "(SELECT a.id FROM TaskApplication a WHERE a.riderId = :userId)")
+    long countMyTrades(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(o) FROM MissionOrder o WHERE o.orderStatus = :orderStatus AND "
+            + "(o.userId = :userId OR o.selectedApplicationId IN "
+            + " (SELECT a.id FROM TaskApplication a WHERE a.riderId = :userId))")
+    long countMyTradesByStatus(@Param("userId") Long userId, @Param("orderStatus") OrderStatus orderStatus);
+
+    @Query("SELECT COUNT(o) FROM MissionOrder o WHERE o.userId = :userId AND o.orderStatus = :orderStatus "
+            + "AND NOT EXISTS (SELECT r.id FROM OrderReview r WHERE r.orderNum = o.orderNum)")
+    long countPendingReviewOrders(@Param("userId") Long userId, @Param("orderStatus") OrderStatus orderStatus);
+
     Optional<MissionOrder> findByTaskId(Long taskId);
 
     /** 1B-9a：超时未验收的订单（WAITING_CONFIRM 且 update_time 早于阈值） */

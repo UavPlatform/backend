@@ -52,6 +52,8 @@ class TaskApplicationIT extends IntegrationTestBase {
     private static final BigDecimal PRICE_PER_METER = new BigDecimal("0.05");
     private static final BigDecimal PRICE_PER_KG = new BigDecimal("2.00");
     private static final BigDecimal CONSTRUCTION_SURCHARGE = new BigDecimal("50.00");
+    private static final BigDecimal DAILY_SUPPLIES_SURCHARGE = new BigDecimal("30.00");
+    private static final BigDecimal FURNITURE_SURCHARGE = new BigDecimal("60.00");
 
     @Autowired
     private AircraftModelRepository aircraftModelRepository;
@@ -70,12 +72,18 @@ class TaskApplicationIT extends IntegrationTestBase {
 
     /** 属主创建吊运任务（2 航点 + 货物字段），返回 taskNum。 */
     private String createTransportTask(TestAccounts.Account owner, String cargoWeightKg) throws Exception {
+        return createTransportTask(owner, cargoWeightKg, CargoCategory.CONSTRUCTION);
+    }
+
+    /** 同上，货物品类可指定（航点固定，故不同类别任务的距离费/重量费完全一致）。 */
+    private String createTransportTask(TestAccounts.Account owner, String cargoWeightKg,
+                                       CargoCategory cargoCategory) throws Exception {
         TaskDto dto = fixtures.twoWaypointTask(UniqueNames.unique("task"));
         dto.setType(TaskType.TRANSPORT);
         if (cargoWeightKg != null) {
             dto.setCargoWeightKg(new BigDecimal(cargoWeightKg));
         }
-        dto.setCargoCategory(CargoCategory.CONSTRUCTION);
+        dto.setCargoCategory(cargoCategory);
         String body = mockMvc.perform(post("/task/create")
                         .header("Authorization", owner.authorization())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -134,13 +142,19 @@ class TaskApplicationIT extends IntegrationTestBase {
      * {@code quotedAmount = (distance×0.05 + weight×2.00 + 类别附加费) × 机型系数}，2 位 HALF_UP。
      */
     private BigDecimal expectedQuote(String taskNum, String weight, String coefficient) {
+        return expectedQuote(taskNum, weight, coefficient, CONSTRUCTION_SURCHARGE);
+    }
+
+    /** 同上，类别附加费可指定（用于复核新增类别「生活物资」「家具家居」的配置值）。 */
+    private BigDecimal expectedQuote(String taskNum, String weight, String coefficient,
+                                     BigDecimal categorySurcharge) {
         Task task = taskRepository.findByTaskNum(taskNum)
                 .orElseThrow(() -> new AssertionError("任务不存在: " + taskNum));
         BigDecimal distance = RoutePriceCalculator.calculateTotalDistance(task.getWaypoints());
         BigDecimal distanceCharge = RoutePriceCalculator.calculatePrice(distance, PRICE_PER_METER);
         BigDecimal weightCharge = PRICE_PER_KG.multiply(new BigDecimal(weight))
                 .setScale(2, RoundingMode.HALF_UP);
-        return distanceCharge.add(weightCharge).add(CONSTRUCTION_SURCHARGE)
+        return distanceCharge.add(weightCharge).add(categorySurcharge)
                 .multiply(new BigDecimal(coefficient)).setScale(2, RoundingMode.HALF_UP);
     }
 
@@ -225,6 +239,36 @@ class TaskApplicationIT extends IntegrationTestBase {
         // 列表回读同样只暴露服务端报价
         JsonNode list = applications(owner, taskNum);
         assertThat(decimal(list.get(0), "quotedAmount")).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    @DisplayName("新增货物品类计费：家具家居 60 元、生活物资 30 元，与建材 50 元只差类别附加费")
+    void newCargoCategoriesPricedFromConfig() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        // 三张任务航点、货物重量、机型全同 → 报价之差即类别附加费之差
+        String constructionTask = createTransportTask(owner, "2.00", CargoCategory.CONSTRUCTION);
+        String furnitureTask = createTransportTask(owner, "2.00", CargoCategory.FURNITURE);
+        String dailyTask = createTransportTask(owner, "2.00", CargoCategory.DAILY_SUPPLIES);
+        TestAccounts.Account rider = riderMappedTo("FC30");
+
+        BigDecimal construction = decimal(
+                applyOk(rider, constructionTask, modelId("FC30"), "").path("data"), "quotedAmount");
+        BigDecimal furniture = decimal(
+                applyOk(rider, furnitureTask, modelId("FC30"), "").path("data"), "quotedAmount");
+        BigDecimal daily = decimal(
+                applyOk(rider, dailyTask, modelId("FC30"), "").path("data"), "quotedAmount");
+
+        assertThat(construction).isEqualByComparingTo(
+                expectedQuote(constructionTask, "2.00", "1.000", CONSTRUCTION_SURCHARGE));
+        assertThat(furniture).isEqualByComparingTo(
+                expectedQuote(furnitureTask, "2.00", "1.000", FURNITURE_SURCHARGE));
+        assertThat(daily).isEqualByComparingTo(
+                expectedQuote(dailyTask, "2.00", "1.000", DAILY_SUPPLIES_SURCHARGE));
+
+        assertThat(furniture.subtract(construction))
+                .as("家具家居（60 元）比建材（50 元）贵 10 元").isEqualByComparingTo("10.00");
+        assertThat(daily.subtract(construction))
+                .as("生活物资（30 元）比建材（50 元）便宜 20 元").isEqualByComparingTo("-20.00");
     }
 
     @Test

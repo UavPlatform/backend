@@ -25,4 +25,7 @@ public interface TaskApplicationRepository extends JpaRepository<TaskApplication
 
     /** 任务的全部应征（删除任务前清理 FK fk_task_application_task）。 */
     List<TaskApplication> findByTaskId(Long taskId);
+
+    /** 飞手名下指定状态的应征（「我的接单」进行中：应征中/已选定待支付/待我确认）。 */
+    List<TaskApplication> findByRiderIdAndStatusIn(Long riderId, java.util.Collection<ApplicationStatus> statuses);
 }

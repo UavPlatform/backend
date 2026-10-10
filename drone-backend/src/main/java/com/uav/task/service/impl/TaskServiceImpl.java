@@ -393,13 +393,31 @@ public class TaskServiceImpl implements TaskService {
     public List<Task> getRiderActiveTasks(Long riderId) {
         List<TaskAssignment> assignments = taskAssignmentRepository
                 .findByRiderIdAndCompleteTimeIsNullOrderByAcceptTimeDesc(riderId);
-        List<Long> taskIds = assignments.stream()
+        List<Long> assignedTaskIds = assignments.stream()
                 .map(TaskAssignment::getTaskId)
                 .toList();
-        if (taskIds.isEmpty()) {
-            return List.of();
-        }
-        return taskRepository.findAllById(taskIds);
+
+        // 接单记录（task_assignment）在飞手确认时才创建；确认之前的撮合阶段
+        // （应征中/洽谈中 → 待用户支付 → 待我确认）只体现在应征记录上。
+        // 飞手端「我的接单 · 进行中」按 ADR-0003 分组展示这些阶段，所以一并返回，
+        // 否则用户付款后飞手在 App 里找不到「确认订单」入口。
+        List<Long> applicationTaskIds = taskApplicationRepository
+                .findByRiderIdAndStatusIn(riderId, List.of(ApplicationStatus.ACTIVE, ApplicationStatus.SELECTED))
+                .stream()
+                .map(TaskApplication::getTaskId)
+                .filter(id -> !assignedTaskIds.contains(id))
+                .distinct()
+                .toList();
+        List<Task> preConfirm = findAllInOrder(applicationTaskIds).stream()
+                .filter(task -> task.getTaskStatus() == TaskStatus.IDLE)
+                .filter(task -> task.getMatchStatus() != MatchStatus.CLOSED)
+                .sorted(java.util.Comparator.comparing(Task::getUpdateTime,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .toList();
+
+        List<Task> result = new java.util.ArrayList<>(preConfirm);
+        result.addAll(findAllInOrder(assignedTaskIds));
+        return result;
     }
 
     @Override
@@ -409,10 +427,19 @@ public class TaskServiceImpl implements TaskService {
         List<Long> taskIds = assignments.stream()
                 .map(TaskAssignment::getTaskId)
                 .toList();
+        return findAllInOrder(taskIds);
+    }
+
+    /** findAllById 不保证顺序：按接单记录（acceptTime 倒序）重排，最新接单在前。 */
+    private List<Task> findAllInOrder(List<Long> taskIds) {
         if (taskIds.isEmpty()) {
             return List.of();
         }
-        return taskRepository.findAllById(taskIds);
+        java.util.Map<Long, Task> byId = new java.util.HashMap<>();
+        for (Task task : taskRepository.findAllById(taskIds)) {
+            byId.put(task.getId(), task);
+        }
+        return taskIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
     }
 
     @Override

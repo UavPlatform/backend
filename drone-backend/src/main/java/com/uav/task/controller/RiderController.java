@@ -68,7 +68,8 @@ public class RiderController {
     public Result<TaskPageVO> getMyActiveTasks() {
         Long riderId = UserContext.getUserId();
         List<Task> tasks = taskService.getRiderActiveTasks(riderId);
-        List<TaskVo> taskVos = tasks.stream().map(TaskVo::from).toList();
+        // 与详情共用装配：列表也要带订单号/成交价/订单状态/约定时间，飞手端卡片才不会显示「面议」
+        List<TaskVo> taskVos = tasks.stream().map(taskVoAssembler::assemble).toList();
         return Result.success(new TaskPageVO(taskVos, 0, 1,taskVos.size()));
     }
 
@@ -78,7 +79,7 @@ public class RiderController {
     public Result<TaskPageVO> getMyAllTasks() {
         Long riderId = UserContext.getUserId();
         List<Task> tasks = taskService.getRiderAllTasks(riderId);
-        List<TaskVo> taskVos = tasks.stream().map(TaskVo::from).toList();
+        List<TaskVo> taskVos = tasks.stream().map(taskVoAssembler::assemble).toList();
         return Result.success(new TaskPageVO(taskVos, 0, 1, taskVos.size()));
     }
 

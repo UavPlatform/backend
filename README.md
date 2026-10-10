@@ -29,3 +29,23 @@ Web backend code for the drone platform.
 2. 契约门禁挂在 **Failsafe（`*E2EIT`）** 上，因此它随 `sh mvnw -B verify` 执行；`sh mvnw -B test` 只跑单元层，**不包含**契约门禁。门禁默认**只读**：把运行中实现与冻结规格做**整文档深比较**，端点/参数/字段/枚举任一漂移即红；只有显式 `-Dopenapi.export=true` 才写 `spec/openapi/`（由 `tools/openapi-export.sh` 封装）。脚本会先删除上一次的报告与 `failsafe-summary.xml`，并断言本次报告为 `Tests run: 1, Failures: 0, Errors: 0`，避免"0 用例/陈旧报告"被当成通过；
 3. 控制器注解纪律：**不要**用「不带 `implementation` 的 `type = "object"` 示例型 `content`」覆盖真实返回类型——那会让契约在消费端退化成 `Record<string, never>`。要写示例请写在 VO 的 `@Schema(example = …)` 上；
 4. 新增/修改端点后：导出 → 评审 → 提交 → 通知消费端用同一 sha256 对账（`frontend`：`pnpm api`）。
+
+## 本地演示环境
+
+用于客户演示/联调的一套可复现数据（**仅开发与演示环境，禁止对生产库执行**）：
+
+1. 以 dev profile 启动后端，并开启 mock 支付与对象存储：
+   - `WECHAT_PAY_MOCK_ENABLED=true`（mock 支付守卫只允许 dev/test profile）；
+   - `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` 指向任一 S3 兼容存储
+     （MinIO、或本地 `moto_server` 均可）；未配置时「待验收/已完成」场景会自动降级跳过。
+2. 运行种子脚本（只依赖 Python 3 标准库，只调公开 HTTP API，不直接写库）：
+
+   ```bash
+   python3 tools/demo-seed.py --base http://127.0.0.1:8081
+   ```
+
+   脚本幂等：账号已存在直接登录；演示客户名下已有需求时不再重复造单（`--force` 再造一套）。
+   在空库上约数秒完成，产出 1 个客户、3 个飞手（含实名资料与驾驶资质、绑定机型）以及覆盖撮合全阶段的 6 个需求：
+   招募飞手 / 洽谈中（两个机型报价）/ 待飞手确认 / 进行中 / 待验收（含交付凭证）/ 已完成（含评价）。
+3. 账号：`demo_kehu`（客户）、`pilot_liming` / `pilot_zhaoqiang` / `pilot_chenyu`（飞手），密码统一 `Demo@2026`；
+   监管端 `admin / 123456`（`AdminSeedInitializer` 默认种子）。

@@ -151,4 +151,49 @@ class UnreadSemanticsIT extends IntegrationTestBase {
                         .header("Authorization", outsider.authorization()))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("⑤ 本人发送的消息不计入本人未读；对方未读照常 +1")
+    void ownMessagesAreNotUnreadForSender() {
+        TestAccounts.Account a = accounts().registerUser();
+        TestAccounts.Account b = accounts().registerUser();
+        Long sessionId = seedSessionWithMembers(a, b);
+        long now = System.currentTimeMillis();
+        insertMessage(sessionId, a.id(), "我发的 1", now - 3_000);
+        insertMessage(sessionId, a.id(), "我发的 2", now - 2_000);
+        insertMessage(sessionId, b.id(), "对方回复", now - 1_000);
+
+        assertThat(unreadCount(a.id(), sessionId)).isEqualTo(1);
+        assertThat(unreadCount(b.id(), sessionId)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("⑥ 本人已删除的消息不计入未读（含 JSON 数组首/尾元素）")
+    void messagesDeletedBySelfAreNotUnread() {
+        TestAccounts.Account a = accounts().registerUser();
+        TestAccounts.Account b = accounts().registerUser();
+        Long sessionId = seedSessionWithMembers(a, b);
+        long now = System.currentTimeMillis();
+        chatMessageRepository.save(ChatMessage.builder()
+                .msgId(UniqueNames.unique("msg"))
+                .fromUserId(b.id())
+                .sessionId(sessionId)
+                .content("a 删掉的（首元素）")
+                .status(0)
+                .createTime(now - 2_000)
+                .deletedByUserIds(new ArrayList<>(java.util.List.of(a.id(), 999_999L)))
+                .build());
+        chatMessageRepository.save(ChatMessage.builder()
+                .msgId(UniqueNames.unique("msg"))
+                .fromUserId(b.id())
+                .sessionId(sessionId)
+                .content("a 删掉的（尾元素）")
+                .status(0)
+                .createTime(now - 1_000)
+                .deletedByUserIds(new ArrayList<>(java.util.List.of(999_999L, a.id())))
+                .build());
+        insertMessage(sessionId, b.id(), "正常消息", now);
+
+        assertThat(unreadCount(a.id(), sessionId)).isEqualTo(1);
+    }
 }

@@ -45,12 +45,18 @@ public class OrderController {
     private com.uav.live.service.impl.LiveDeviceResolver liveDeviceResolver;
 
     @OperationLog("查询订单列表")
-    @Operation(summary = "订单列表", description = "获取当前用户的所有订单，按创建时间倒序")
+    @Operation(summary = "订单列表", description = "获取当前用户的所有订单（App「我的交易 - 我买到的」），按创建时间倒序",
+            parameters = {
+                    @Parameter(name = "status", description = "订单状态过滤（枚举名如 COMPLETED，或状态码如 4），不传为全部"),
+                    @Parameter(name = "page", description = "页码，从 0 开始"),
+                    @Parameter(name = "size", description = "每页条数")
+            })
     @GetMapping("/list")
     public Result<OrderListVO> listOrders(@RequestParam(defaultValue = "0") int page,
-                                           @RequestParam(defaultValue = "20") int size) {
+                                           @RequestParam(defaultValue = "20") int size,
+                                           @RequestParam(required = false) String status) {
         Long userId = UserContext.getUserId();
-        Page<MissionOrder> orderPage = orderService.listOrders(userId, page, size);
+        Page<MissionOrder> orderPage = orderService.listOrders(userId, page, size, status);
 
         List<OrderVO> orderList = orderPage.getContent().stream()
                 .map(OrderVO::from)

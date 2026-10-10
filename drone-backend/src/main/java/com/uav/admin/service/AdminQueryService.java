@@ -512,21 +512,9 @@ public class AdminQueryService {
         return userRepository.findById(userId).map(User::getUserName).orElse(null);
     }
 
+    /** 委托 {@link OrderStatus#fromNameOrCode}：监管端与 App 端的 status 入参口径共用一份实现。 */
     private OrderStatus resolveOrderStatus(String status) {
-        if (!notBlank(status)) {
-            return null;
-        }
-        String s = status.trim();
-        try {
-            return OrderStatus.valueOf(s.toUpperCase());
-        } catch (IllegalArgumentException ignore) {
-            try {
-                return OrderStatus.fromCode(Integer.parseInt(s));
-            } catch (Exception ignore2) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
-                        "非法订单状态: " + status);
-            }
-        }
+        return OrderStatus.fromNameOrCode(status);
     }
 
     private TaskStatus resolveTaskStatus(String status) {

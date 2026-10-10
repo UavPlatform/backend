@@ -24,9 +24,11 @@ import java.util.Map;
  *     price-per-kg: 2.00
  *     unknown-category-surcharge: 0.00
  *     category-surcharge:
- *       CONSTRUCTION: 50.00   # 建材
- *       EQUIPMENT: 80.00      # 设备
- *       AGRICULTURAL: 30.00   # 农产品
+ *       CONSTRUCTION: 50.00    # 建材
+ *       EQUIPMENT: 80.00       # 设备
+ *       AGRICULTURAL: 30.00    # 农产品
+ *       DAILY_SUPPLIES: 30.00  # 生活物资
+ *       FURNITURE: 60.00       # 家具家居
  * </pre>
  */
 @Getter
@@ -38,7 +40,7 @@ public class TransportPricingConfig {
     /** 重量单价（元/kg）：{@code weightCharge = 货物重量 × 本单价}。null 由计算器构造期校验拒绝启动。 */
     private BigDecimal pricePerKg;
 
-    /** 货物类别附加费表（元），键为类别码（如 CONSTRUCTION/EQUIPMENT/AGRICULTURAL，查找大小写不敏感）。 */
+    /** 货物类别附加费表（元），键为类别码（如 CONSTRUCTION/EQUIPMENT/AGRICULTURAL/DAILY_SUPPLIES/FURNITURE，查找大小写不敏感）。 */
     private Map<String, BigDecimal> categorySurcharge = new HashMap<>();
 
     /** 未知类别附加费（元）：类别不在表中时按此值计费，保证行为确定、可审计。 */

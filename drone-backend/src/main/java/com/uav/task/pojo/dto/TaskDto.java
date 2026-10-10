@@ -30,7 +30,7 @@ public class TaskDto {
      */
     private BigDecimal cargoWeightKg;
 
-    /** 吊运货物类别（CONSTRUCTION/EQUIPMENT/AGRICULTURAL，与计价配置表对齐）；不填按未知类别计费。 */
+    /** 吊运货物类别（CONSTRUCTION/EQUIPMENT/AGRICULTURAL/DAILY_SUPPLIES/FURNITURE，与计价配置表对齐）；不填按未知类别计费。 */
     private CargoCategory cargoCategory;
 
     private List<WaypointDto> waypoints;

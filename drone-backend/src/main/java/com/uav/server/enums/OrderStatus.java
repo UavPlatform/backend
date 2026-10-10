@@ -1,6 +1,8 @@
 package com.uav.server.enums;
 
+import com.uav.server.exception.BusinessException;
 import lombok.Getter;
+import org.springframework.http.HttpStatus;
 
 @Getter
 public enum OrderStatus {
@@ -34,6 +36,32 @@ public enum OrderStatus {
             }
         }
         throw new IllegalArgumentException("无效的订单状态码: " + code);
+    }
+
+    /**
+     * 解析查询入参：接受枚举名（如 {@code COMPLETED}）或状态码（如 {@code 4}），大小写不敏感。
+     *
+     * <p>供各列表接口的 {@code status} 查询参数使用，App 端与监管端共用同一份实现：非法取值一律以
+     * {@link ApiErrorCode#INVALID_PARAM} 明确报错，禁止静默忽略。
+     *
+     * @param status 枚举名或状态码字符串，可为空
+     * @return 对应状态；入参为空白时返回 null（语义为「不过滤」）
+     */
+    public static OrderStatus fromNameOrCode(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String value = status.trim();
+        try {
+            return valueOf(value.toUpperCase());
+        } catch (IllegalArgumentException ignore) {
+            try {
+                return fromCode(Integer.parseInt(value));
+            } catch (Exception ignore2) {
+                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
+                        "非法订单状态: " + status);
+            }
+        }
     }
 
 }

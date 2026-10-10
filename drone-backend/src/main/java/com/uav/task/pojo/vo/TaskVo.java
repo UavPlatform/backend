@@ -64,7 +64,7 @@ public class TaskVo {
     /** 吊运货物重量 kg（TASK-BACKEND-003 采集，TASK-BACKEND-004 回显给发单/详情页） */
     private BigDecimal cargoWeightKg;
 
-    /** 吊运货物类别（CONSTRUCTION/EQUIPMENT/AGRICULTURAL） */
+    /** 吊运货物类别（CONSTRUCTION/EQUIPMENT/AGRICULTURAL/DAILY_SUPPLIES/FURNITURE） */
     private com.uav.server.enums.CargoCategory cargoCategory;
 
     /** 任务期望执行时间（1A-7a）：与发布侧一致的 "yyyy-MM-dd HH:mm:ss" 格式 */

@@ -4,7 +4,8 @@ import lombok.Getter;
 
 /**
  * 吊运货物类别（REQ-BACKEND-001 计价规则「货物类别」，与
- * {@code transport.pricing.category-surcharge} 配置表一一对齐：CONSTRUCTION/EQUIPMENT/AGRICULTURAL）。
+ * {@code transport.pricing.category-surcharge} 配置表一一对齐：CONSTRUCTION/EQUIPMENT/AGRICULTURAL/
+ * DAILY_SUPPLIES/FURNITURE）。
  *
  * <p>类别决定报价中的类别附加费；未指定类别（null）按
  * {@code transport.pricing.unknown-category-surcharge} 计费，行为确定。新增类别必须同步
@@ -20,7 +21,13 @@ public enum CargoCategory {
     EQUIPMENT("设备"),
 
     /** 农产品。 */
-    AGRICULTURAL("农产品");
+    AGRICULTURAL("农产品"),
+
+    /** 生活物资。 */
+    DAILY_SUPPLIES("生活物资"),
+
+    /** 家具家居。 */
+    FURNITURE("家具家居");
 
     private final String description;
 

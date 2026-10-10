@@ -80,6 +80,8 @@ transport:
       CONSTRUCTION: 50.00              # 建材
       EQUIPMENT: 80.00                 # 设备
       AGRICULTURAL: 30.00              # 农产品
+      DAILY_SUPPLIES: 30.00            # 生活物资
+      FURNITURE: 60.00                 # 家具家居
 
 # 1B-9b 交付物存储（MinIO S3 兼容）。生产经环境变量注入；为空=未配置，交付物接口返回 503。
 minio:

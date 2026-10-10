@@ -79,8 +79,13 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<MissionOrder> listOrders(Long userId, int page, int size) {
-        return orderRepository.findByUserIdOrderByCreateTimeDesc(userId, PageRequest.of(page, size));
+    public Page<MissionOrder> listOrders(Long userId, int page, int size, String status) {
+        OrderStatus orderStatus = OrderStatus.fromNameOrCode(status);
+        PageRequest pageable = PageRequest.of(page, size);
+        if (orderStatus == null) {
+            return orderRepository.findByUserIdOrderByCreateTimeDesc(userId, pageable);
+        }
+        return orderRepository.findByUserIdAndOrderStatusOrderByCreateTimeDesc(userId, orderStatus, pageable);
     }
 
     @Override

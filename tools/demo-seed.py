@@ -9,8 +9,15 @@
   - backend 以 dev profile 运行，且 wechat.pay.mock-enabled=true（否则支付步骤会失败）；
   - 配置了 MinIO/S3 兼容存储（MINIO_*），否则「交付物上传」相关场景会被跳过。
 
+生产防护（任一不满足即拒绝执行，且在发出任何写请求之前检查）：
+  1. --base 的主机必须是 localhost / 127.0.0.1 / ::1；指向其他主机（如内网演示机）须显式加
+     --i-know-this-is-not-prod；
+  2. dev profile 标记：环境变量 SPRING_PROFILES_ACTIVE（与启动 backend 时一致）或 --profile
+     必须是 dev 或 test，且不得含 prod——与 MockPayGuard 的 profile 白名单同口径。
+
 用法：
-  python3 tools/demo-seed.py [--base http://127.0.0.1:8081] [--password Demo@2026] [--force]
+  SPRING_PROFILES_ACTIVE=dev python3 tools/demo-seed.py [--base http://127.0.0.1:8081] \
+      [--password Demo@2026] [--force] [--profile dev] [--i-know-this-is-not-prod]
 
   默认幂等：账号已存在则直接登录；演示客户名下已有需求时不再重复造单（--force 强制再造一套）。
   运行结束打印账号表与各场景的 taskNum，便于演示时直接定位。
@@ -19,13 +26,16 @@
 import argparse
 import base64
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-ADMIN_HINT = "admin / 123456（AdminSeedInitializer 默认种子，可用 admin.seed.* 覆盖）"
+ADMIN_HINT = "按部署配置 admin.seed.name / admin.seed.password（AdminSeedInitializer），脚本不读取也不打印管理员口令"
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+SAFE_PROFILES = {"dev", "test"}
 
 CUSTOMER = "demo_kehu"
 PILOTS = [
@@ -153,12 +163,36 @@ def upload_evidence(api, pilot, task_num):
         api.put_bytes(cred["uploadUrl"], png, "image/png")
 
 
+def guard_not_production(base, profile, not_prod_ack):
+    """在任何写请求之前拒绝疑似生产的目标；返回拒绝原因，None 表示放行。"""
+    host = (urllib.parse.urlparse(base).hostname or "").lower()
+    if not host:
+        return f"无法从 --base 解析主机：{base!r}"
+    if host not in LOCAL_HOSTS and not not_prod_ack:
+        return (f"--base 指向非本机主机 {host}；种子脚本只允许本机后端。"
+                "若确认目标是开发/演示环境（非生产），请显式加 --i-know-this-is-not-prod")
+    profiles = {p.strip().lower() for p in (profile or "").split(",") if p.strip()}
+    if not profiles:
+        return "缺少 dev profile 标记：请设置 SPRING_PROFILES_ACTIVE=dev（与启动 backend 一致）或传 --profile dev"
+    if any("prod" in p for p in profiles) or not profiles & SAFE_PROFILES:
+        return f"profile 标记 {sorted(profiles)} 不在白名单 {sorted(SAFE_PROFILES)} 内（或含 prod），拒绝执行"
+    return None
+
+
 def main():
-    ap = argparse.ArgumentParser(description="飞翼通 本地/演示环境种子数据（经公开 API 造数）")
-    ap.add_argument("--base", default="http://127.0.0.1:8081", help="backend 基址")
+    ap = argparse.ArgumentParser(description="飞翼通 本地/演示环境种子数据（经公开 API 造数，禁止对生产执行）")
+    ap.add_argument("--base", default="http://127.0.0.1:8081", help="backend 基址（默认只允许本机）")
     ap.add_argument("--password", default="Demo@2026", help="演示账号统一密码")
     ap.add_argument("--force", action="store_true", help="演示客户已有需求时仍再造一套场景")
+    ap.add_argument("--profile", default=os.environ.get("SPRING_PROFILES_ACTIVE", ""),
+                    help="目标 backend 的激活 profile（默认取环境变量 SPRING_PROFILES_ACTIVE），必须为 dev/test")
+    ap.add_argument("--i-know-this-is-not-prod", dest="not_prod_ack", action="store_true",
+                    help="允许 --base 指向非本机主机（仅限确认非生产的开发/演示环境）")
     args = ap.parse_args()
+    refusal = guard_not_production(args.base, args.profile, args.not_prod_ack)
+    if refusal:
+        print(f"[拒绝] {refusal}", file=sys.stderr)
+        sys.exit(2)
     api = Api(args.base)
     pw = args.password
 
@@ -222,7 +256,7 @@ def main():
         upload_evidence(api, li, t["taskNum"])
         api.call("POST", "/rider/complete", li, query={"taskNum": t["taskNum"], "note": "已吊装至屋顶平台，客户现场签收。"})
         scenes.append(("待验收（飞手已上传证据并交付）", t["taskNum"]))
-    except Exception as e:  # noqa: BLE001 - 存储未配置时降级
+    except (RuntimeError, OSError) as e:  # 存储未配置：接口报错（RuntimeError）或预签名 PUT 失败（URLError ⊂ OSError）
         storage_ok = False
         print(f"[降级] 交付物上传失败（{e}），跳过待验收/已完成场景；请配置 MINIO_*")
         scenes.append(("进行中（交付物存储未配置，未能交付）", t["taskNum"]))
@@ -255,6 +289,8 @@ def print_accounts(pw):
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:  # noqa: BLE001
+    except (RuntimeError, OSError) as exc:
+        # 业务接口失败（RuntimeError）或网络/连接失败（URLError ⊂ OSError）：给出简洁提示；
+        # 其余异常（脚本缺陷、响应结构变化）保留完整堆栈，便于定位
         print(f"[失败] {exc}", file=sys.stderr)
         sys.exit(1)

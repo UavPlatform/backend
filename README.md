@@ -41,11 +41,15 @@ Web backend code for the drone platform.
 2. 运行种子脚本（只依赖 Python 3 标准库，只调公开 HTTP API，不直接写库）：
 
    ```bash
-   python3 tools/demo-seed.py --base http://127.0.0.1:8081
+   SPRING_PROFILES_ACTIVE=dev python3 tools/demo-seed.py --base http://127.0.0.1:8081
    ```
+
+   生产防护：在发出任何写请求之前，脚本拒绝 `--base` 指向非本机主机（确需对内网演示机执行时显式加
+   `--i-know-this-is-not-prod`），并要求 dev profile 标记（`SPRING_PROFILES_ACTIVE` 或 `--profile` 为 `dev`/`test` 且不含 `prod`，
+   与 `MockPayGuard` 白名单同口径）；任一不满足即退出码 2。
 
    脚本幂等：账号已存在直接登录；演示客户名下已有需求时不再重复造单（`--force` 再造一套）。
    在空库上约数秒完成，产出 1 个客户、3 个飞手（含实名资料与驾驶资质、绑定机型）以及覆盖撮合全阶段的 6 个需求：
    招募飞手 / 洽谈中（两个机型报价）/ 待飞手确认 / 进行中 / 待验收（含交付凭证）/ 已完成（含评价）。
 3. 账号：`demo_kehu`（客户）、`pilot_liming` / `pilot_zhaoqiang` / `pilot_chenyu`（飞手），密码统一 `Demo@2026`；
-   监管端 `admin / 123456`（`AdminSeedInitializer` 默认种子）。
+   监管端账号由 `AdminSeedInitializer` 按部署配置 `admin.seed.name` / `admin.seed.password` 播种，脚本不读取也不打印管理员口令。

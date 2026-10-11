@@ -57,10 +57,12 @@ class LegacyInfoEditGoneIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("JWT 排除只覆盖 /info/edit 本身：同前缀的其他路径仍需鉴权")
+    @DisplayName("@SkipJwt 只覆盖精确的 /info/edit：子路径、大写、尾斜杠变体仍需鉴权（无令牌 401）")
     void exclusionDoesNotLeakToSiblingPaths() throws Exception {
-        mockMvc.perform(post("/info/edit/x").contentType(MediaType.APPLICATION_JSON).content(BODY))
-                .andExpect(status().isUnauthorized());
+        for (String path : new String[]{"/info/edit/x", "/INFO/EDIT", "/Info/Edit", "/info/edit/"}) {
+            mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                    .andExpect(status().isUnauthorized());
+        }
     }
 
     @Test

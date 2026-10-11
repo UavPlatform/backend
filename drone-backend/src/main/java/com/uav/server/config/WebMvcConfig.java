@@ -25,10 +25,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         // WS 握手（Boot 4 起握手请求会先经过 MVC handler mapping）：
                         // 鉴权统一由 WsAuthHandshakeInterceptor / WsJwtHandshakeConfigurator 负责，
                         // 支持查询参数传 token，避免 JWT 拦截器按 REST 规则误拒（P0-1）
-                        "/ws/**",
-                        // 已下线接口统一返回 410（RemovedEndpointController），不论是否携带/过期令牌，
-                        // 旧客户端都能拿到明确的「请升级」提示，而不是 401 后反复重新登录
-                        "/info/edit"
+                        "/ws/**"
                 );
     }
 }

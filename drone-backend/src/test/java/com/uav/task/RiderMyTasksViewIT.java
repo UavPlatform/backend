@@ -251,4 +251,91 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
         assertThat(tasks.size()).as(path).isEqualTo(expectedSize);
         return count;
     }
+
+    private JsonNode detailOf(String taskNum, TestAccounts.Account rider) throws Exception {
+        String body = mockMvc.perform(get("/rider/task/detail").param("taskNum", taskNum)
+                        .header("Authorization", rider.authorization()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return MAPPER.readTree(body).path("data");
+    }
+
+    private static void assertNoWinnerFields(JsonNode vo, String where) {
+        assertThat(vo.path("totalAmount").isNull() || vo.path("totalAmount").isMissingNode())
+                .as("%s：不回显成交价", where).isTrue();
+        assertThat(vo.path("orderNum").isNull() || vo.path("orderNum").isMissingNode())
+                .as("%s：不回显订单号", where).isTrue();
+        assertThat(vo.path("scheduledTime").isNull() || vo.path("scheduledTime").isMissingNode())
+                .as("%s：不回显约定时间", where).isTrue();
+        assertThat(vo.path("riderId").isNull() || vo.path("riderId").isMissingNode())
+                .as("%s：不回显接单飞手", where).isTrue();
+        assertThat(vo.path("riderName").isNull() || vo.path("riderName").isMissingNode())
+                .as("%s：不回显接单飞手昵称", where).isTrue();
+    }
+
+    @Test
+    @DisplayName("隐私：落选飞手在列表与详情中只看到本人报价/机型，从不看到选定飞手的报价、机型与成交信息")
+    void losingRiderNeverSeesWinnersQuote() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account winner = accounts().registerRider();
+        TestAccounts.Account loser = accounts().registerRider();
+        TestAccounts.Account bystander = accounts().registerRider();
+        long m350 = aircraftModelRepository.findByModelCode("M350RTK").orElseThrow().getId();
+        fixtures.bindDrone(winner.id(), UniqueNames.djiId(), fc30());
+        fixtures.bindDrone(loser.id(), UniqueNames.djiId(), m350);
+        fixtures.bindDrone(bystander.id(), UniqueNames.djiId(), fc30());
+
+        Task task = publish(owner);
+        taskApplicationService.apply(task.getTaskNum(), winner.id(), fc30());
+        taskApplicationService.apply(task.getTaskNum(), loser.id(), m350);
+        TaskApplication winnerApp = taskApplicationRepository
+                .findByTaskIdAndRiderId(task.getId(), winner.id()).orElseThrow();
+        TaskApplication loserApp = taskApplicationRepository
+                .findByTaskIdAndRiderId(task.getId(), loser.id()).orElseThrow();
+        assertThat(loserApp.getQuotedAmount()).as("前提：两个机型报价不同")
+                .isNotEqualByComparingTo(winnerApp.getQuotedAmount());
+
+        // 选定前：详情与列表都是本人报价
+        assertThat(detailOf(task.getTaskNum(), loser).path("quotedAmount").decimalValue())
+                .isEqualByComparingTo(loserApp.getQuotedAmount());
+
+        taskService.selectRider(task.getTaskNum(), owner.id(), winnerApp.getId(), LocalDateTime.now().plusDays(1));
+        fixtures.payLockedOrder(task);
+
+        // 列表：落选应征（CLOSED）不在「进行中」，历史中也没有（无接单记录）
+        assertThat(taskNums(tasksOf("/rider/my-tasks", loser))).doesNotContain(task.getTaskNum());
+        assertThat(taskNums(tasksOf("/rider/my-tasks/history", loser))).doesNotContain(task.getTaskNum());
+
+        for (boolean confirmed : new boolean[]{false, true}) {
+            if (confirmed) {
+                taskService.riderConfirmOrder(task.getTaskNum(), winner.id());
+            }
+            String phase = confirmed ? "选定飞手确认后" : "已选定并支付";
+            JsonNode loserDetail = detailOf(task.getTaskNum(), loser);
+            assertThat(loserDetail.path("quotedAmount").decimalValue()).as("%s：落选飞手只见本人报价", phase)
+                    .isEqualByComparingTo(loserApp.getQuotedAmount())
+                    .isNotEqualByComparingTo(winnerApp.getQuotedAmount());
+            assertThat(loserDetail.path("aircraftModelId").asLong()).as(phase).isEqualTo(m350);
+            assertNoWinnerFields(loserDetail, phase + "·落选飞手详情");
+
+            JsonNode bystanderDetail = detailOf(task.getTaskNum(), bystander);
+            assertThat(bystanderDetail.path("quotedAmount").isNull()
+                    || bystanderDetail.path("quotedAmount").isMissingNode())
+                    .as("%s：未应征飞手无报价", phase).isTrue();
+            assertThat(bystanderDetail.path("aircraftModelId").isNull()
+                    || bystanderDetail.path("aircraftModelId").isMissingNode()).as(phase).isTrue();
+            assertNoWinnerFields(bystanderDetail, phase + "·未应征飞手详情");
+
+            JsonNode winnerDetail = detailOf(task.getTaskNum(), winner);
+            assertThat(winnerDetail.path("quotedAmount").decimalValue())
+                    .isEqualByComparingTo(winnerApp.getQuotedAmount());
+            assertThat(winnerDetail.path("totalAmount").decimalValue()).as("%s：选定飞手见成交价", phase)
+                    .isEqualByComparingTo(winnerApp.getQuotedAmount());
+            assertThat(winnerDetail.path("orderNum").asText()).isNotBlank();
+        }
+        JsonNode winnerActive = java.util.stream.StreamSupport
+                .stream(tasksOf("/rider/my-tasks", winner).spliterator(), false)
+                .filter(t -> t.path("taskNum").asText().equals(task.getTaskNum())).findFirst().orElseThrow();
+        assertThat(winnerActive.path("riderName").asText()).isEqualTo(winner.userName());
+    }
 }

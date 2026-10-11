@@ -43,12 +43,14 @@ public class RiderController {
 
     @OperationLog("飞手查看任务详情")
     @Operation(summary = "任务详情",
-            description = "飞手查看任意任务的详细信息（无需任务归属），含撮合状态、货物字段与订单/报价回显",
+            description = "飞手查看任意任务的详细信息（无需任务归属），含撮合状态与货物字段；报价与机型只回显本人应征，"
+                    + "成交价/订单号/约定时间/接单飞手仅在本人即选定飞手时回显（见 TaskVo.quotedAmount）",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @GetMapping("/task/detail")
     public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {
         Task task = taskService.getTaskByTaskNum(taskNum);
-        return Result.success(taskVoAssembler.assemble(task));
+        // 飞手可查看任意任务：按当前飞手过滤，不回显其他飞手的报价/机型/成交信息
+        return Result.success(taskVoAssembler.assembleForRider(task, UserContext.getUserId()));
     }
 
     @OperationLog("查看任务广场")
@@ -132,7 +134,7 @@ public class RiderController {
     public Result<TaskVo> confirmOrder(@RequestParam String taskNum) {
         Long riderId = UserContext.getUserId();
         Task task = taskService.riderConfirmOrder(taskNum, riderId);
-        return Result.success("确认成功，任务开始执行", taskVoAssembler.assemble(task));
+        return Result.success("确认成功，任务开始执行", taskVoAssembler.assembleForRider(task, riderId));
     }
 
     @RequireDrone

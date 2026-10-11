@@ -50,9 +50,18 @@ public class TaskVoAssembler {
     @Autowired
     private LiveDeviceResolver liveDeviceResolver;
 
-    /** 详情：用户端与飞手端共用（单条即批量装配的特例，两条路径不会漂移）。 */
+    /** 用户端（任务属主）/管理视角详情：完整回显选定应征、成交价与接单飞手。 */
     public TaskVo assemble(Task task) {
         return assembleAll(List.of(task), null).get(0);
+    }
+
+    /**
+     * 飞手视角详情（/rider/task/detail、/rider/confirm-order）：与列表同一规则，见
+     * {@link #assembleForRider(List, Long)}。飞手可查看任意任务详情，所以必须按当前飞手过滤，
+     * 不能把选定飞手的报价/机型/成交价泄露给其他飞手。
+     */
+    public TaskVo assembleForRider(Task task, Long riderId) {
+        return assembleAll(List.of(task), riderId).get(0);
     }
 
     /**
@@ -61,8 +70,10 @@ public class TaskVoAssembler {
      * <p>每类关联数据一次批量查询（接单记录、订单、应征、机型、飞手昵称、设备），
      * 查询数与列表长度无关，避免逐条 {@link #assemble} 的 N+1。
      *
-     * <p>应征中/洽谈中阶段尚未选定飞手、也可能尚无订单：此时以<b>本人应征</b>的系统报价
-     * （ADR-0003 平台计价，飞手不可改价）填充 {@code quotedAmount} 与机型，卡片据此显示价格而不是「面议」。
+     * <p>隐私规则（飞手视角）：{@code quotedAmount} 与机型<b>只取当前飞手本人的应征</b>（ADR-0003 平台计价，
+     * 飞手不可改价；未应征则为 null），从不取其他飞手的应征。若已选定/已接单的是<b>其他飞手</b>，
+     * 订单成交信息（订单号、成交价、约定时间、确认时间）、接单飞手（riderId/riderName/接单时间/完成说明）
+     * 与设备直播态一律不回显。
      */
     public List<TaskVo> assembleForRider(List<Task> tasks, Long riderId) {
         return assembleAll(tasks, riderId);
@@ -94,13 +105,23 @@ public class TaskVoAssembler {
                         .collect(Collectors.toMap(TaskApplication::getTaskId, a -> a, (a, b) -> a));
 
         Map<Long, TaskApplication> priceSourceByTask = new HashMap<>();
+        Set<Long> selectedOtherRider = new java.util.HashSet<>();
         for (Task task : tasks) {
             MissionOrder order = orderByTask.get(task.getId());
-            TaskApplication source = order != null && order.getSelectedApplicationId() != null
+            TaskApplication selected = order != null && order.getSelectedApplicationId() != null
                     ? applicationById.get(order.getSelectedApplicationId())
                     : selectedByTask.get(task.getId());
-            if (source == null) {
-                source = ownByTask.get(task.getId());
+            TaskAssignment assignment = assignmentByTask.get(task.getId());
+            TaskApplication source;
+            if (viewerRiderId == null) {
+                source = selected;                         // 属主/管理视角：选定应征
+            } else {
+                source = ownByTask.get(task.getId());      // 飞手视角：只看本人应征
+                boolean otherSelected = (selected != null && !viewerRiderId.equals(selected.getRiderId()))
+                        || (assignment != null && !viewerRiderId.equals(assignment.getRiderId()));
+                if (otherSelected) {
+                    selectedOtherRider.add(task.getId());
+                }
             }
             if (source != null) {
                 priceSourceByTask.put(task.getId(), source);
@@ -113,13 +134,15 @@ public class TaskVoAssembler {
                 .forEach(m -> modelById.put(m.getId(), m));
         Map<Long, String> riderNameById = new HashMap<>();
         userRepository.findAllById(assignmentByTask.values().stream()
+                        .filter(a -> !selectedOtherRider.contains(a.getTaskId()))
                         .map(TaskAssignment::getRiderId).collect(Collectors.toSet()))
                 .forEach(u -> riderNameById.put(u.getId(), u.getUserName()));
         Map<Long, LiveDeviceResolver.TaskLiveDevice> deviceByRider = new HashMap<>();
 
         List<TaskVo> result = new ArrayList<>(tasks.size());
         for (Task task : tasks) {
-            TaskAssignment assignment = assignmentByTask.get(task.getId());
+            boolean hideWinner = selectedOtherRider.contains(task.getId());
+            TaskAssignment assignment = hideWinner ? null : assignmentByTask.get(task.getId());
             TaskVo vo = TaskVo.from(task, assignment);
             if (assignment != null) {
                 vo.setRiderName(riderNameById.get(assignment.getRiderId()));
@@ -127,16 +150,18 @@ public class TaskVoAssembler {
 
             MissionOrder order = orderByTask.get(task.getId());
             if (order != null) {
+                vo.setOrderStatus(order.getOrderStatus().name());
+                vo.setTotalDistance(order.getTotalDistance());
+            }
+            if (order != null && !hideWinner) {   // 成交信息：属主/管理视角或本人即选定飞手
                 vo.setOrderNum(order.getOrderNum());
                 vo.setTotalAmount(order.getTotalAmount());
-                vo.setTotalDistance(order.getTotalDistance());
-                vo.setOrderStatus(order.getOrderStatus().name());
                 vo.setScheduledTime(order.getScheduledTime());
                 vo.setUserConfirmedAt(order.getUserConfirmedAt());
                 vo.setRiderConfirmedAt(order.getRiderConfirmedAt());
             }
 
-            // 选定应征（= 成交价/成交机型）；飞手视角未选定时退回本人应征的系统报价
+            // 属主/管理视角：选定应征（= 成交价/成交机型）；飞手视角：仅本人应征
             TaskApplication source = priceSourceByTask.get(task.getId());
             if (source != null) {
                 vo.setAircraftModelId(source.getAircraftModelId());

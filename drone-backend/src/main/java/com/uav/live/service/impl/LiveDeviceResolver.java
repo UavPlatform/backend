@@ -60,7 +60,17 @@ public class LiveDeviceResolver {
         if (assignment == null) {
             return TaskLiveDevice.idle(); // 尚未接单：无作业设备
         }
-        List<RiderUav> bindings = riderUavRepository.findByUserId(assignment.getRiderId());
+        return resolveForRider(assignment.getRiderId());
+    }
+
+    /**
+     * 按飞手解析其绑定设备中在线的一台及直播态；列表批量装配时同一飞手只解析一次。
+     */
+    public TaskLiveDevice resolveForRider(Long riderId) {
+        if (riderId == null) {
+            return TaskLiveDevice.idle();
+        }
+        List<RiderUav> bindings = riderUavRepository.findByUserId(riderId);
         String connectedDeviceId = bindings.stream()
                 .map(RiderUav::getDjiId)
                 .filter(appWebSocketService::isConnected)
@@ -70,7 +80,7 @@ public class LiveDeviceResolver {
             return TaskLiveDevice.idle(); // 绑定设备均离线
         }
         String liveState = liveSessionService.getSnapshot(connectedDeviceId).getState().name();
-        log.debug("任务 {} 解析到在线设备 {}（liveState={}）", taskId, connectedDeviceId, liveState);
+        log.debug("飞手 {} 解析到在线设备 {}（liveState={}）", riderId, connectedDeviceId, liveState);
         return new TaskLiveDevice(connectedDeviceId, liveState);
     }
 }

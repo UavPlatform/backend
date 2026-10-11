@@ -37,7 +37,10 @@ public class TaskVo {
      */
     private MatchStatus matchStatus;
 
-    /** 选定应征的系统报价（= 成交价 totalAmount，严格相等；未选定时为 null） */
+    /**
+     * 选定应征的系统报价（= 成交价 totalAmount，严格相等）。未选定时：飞手视角列表
+     * （/rider/my-tasks、/rider/my-tasks/history）为本人应征的系统报价（ADR-0003 平台计价），其余为 null。
+     */
     private BigDecimal quotedAmount;
 
     /** 选定应征的机型（用户下单后可见成交机型；未选定时为 null） */

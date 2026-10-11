@@ -28,4 +28,10 @@ public interface TaskApplicationRepository extends JpaRepository<TaskApplication
 
     /** 飞手名下指定状态的应征（「我的接单」进行中：应征中/已选定待支付/待我确认）。 */
     List<TaskApplication> findByRiderIdAndStatusIn(Long riderId, java.util.Collection<ApplicationStatus> statuses);
+
+    /** 列表批量装配用：一批任务中处于指定状态的应征（SELECTED 每任务至多一条）。 */
+    List<TaskApplication> findByTaskIdInAndStatus(java.util.Collection<Long> taskIds, ApplicationStatus status);
+
+    /** 列表批量装配用：某飞手在一批任务上的本人应征（每任务至多一条）。 */
+    List<TaskApplication> findByTaskIdInAndRiderId(java.util.Collection<Long> taskIds, Long riderId);
 }

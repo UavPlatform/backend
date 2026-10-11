@@ -12,6 +12,8 @@ import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
 import com.uav.task.mapper.TaskApplicationRepository;
+import com.uav.task.mapper.TaskAssignmentRepository;
+import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.task.pojo.dto.TaskDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskApplication;
@@ -19,6 +21,11 @@ import com.uav.task.service.TaskApplicationService;
 import com.uav.task.service.TaskService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.PersistenceContext;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
@@ -31,7 +38,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 飞手端「我的接单」列表（/rider/my-tasks、/rider/my-tasks/history）与详情同一装配：
  * 必须带订单号、成交价、订单状态、约定时间与成交机型，飞手端卡片才能显示成交价而不是「面议」；
- * 列表按接单时间倒序（最新在前）。
+ * 列表按接单时间倒序（最新在前，同秒按 id 倒序）。
+ *
+ * <p>回归说明：{@link #activeListCoversPreConfirmStages} 在修复前失败——接单记录在飞手确认时才创建，
+ * 旧实现只按接单记录查询，用户付款后「待我确认」的单不在列表里（expected 2 but was 0/1），
+ * 飞手在 App 里找不到「确认订单」入口；应征中卡片的 quotedAmount 在修复前为 null（App 显示「面议」）。
  */
 class RiderMyTasksViewIT extends IntegrationTestBase {
 
@@ -42,6 +53,9 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
     @Autowired private TaskApplicationRepository taskApplicationRepository;
     @Autowired private OrderRepository orderRepository;
     @Autowired private AircraftModelRepository aircraftModelRepository;
+    @Autowired private TaskAssignmentRepository taskAssignmentRepository;
+    @Autowired private EntityManagerFactory entityManagerFactory;
+    @PersistenceContext private EntityManager entityManager;
 
     private long fc30() {
         return aircraftModelRepository.findByModelCode("FC30").orElseThrow().getId();
@@ -113,6 +127,18 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
         assertThat(awaiting.path("scheduledTime").asText()).isNotBlank();
         assertThat(tasksOf("/rider/my-tasks", other).size()).as("他人：仅自己被选定的那单").isEqualTo(1);
 
+        // 应征中：尚未选定、尚无成交价 → 以本人应征的平台系统报价展示（ADR-0003），不再是「面议」
+        JsonNode applying = java.util.stream.StreamSupport.stream(active.spliterator(), false)
+                .filter(t -> t.path("taskNum").asText().equals(negotiating.getTaskNum()))
+                .findFirst().orElseThrow();
+        TaskApplication myApplication = taskApplicationRepository
+                .findByTaskIdAndRiderId(negotiating.getId(), rider.id()).orElseThrow();
+        assertThat(applying.path("quotedAmount").isNumber()).as("应征中卡片应带本人系统报价").isTrue();
+        assertThat(applying.path("quotedAmount").decimalValue())
+                .isPositive()
+                .isEqualByComparingTo(myApplication.getQuotedAmount());
+        assertThat(applying.path("aircraftModelName").asText()).isNotBlank();
+
         // 确认后转为接单记录：仍在进行中且不重复，同时进入接单历史
         taskService.riderConfirmOrder(awaitingMe.getTaskNum(), rider.id());
         JsonNode afterConfirm = tasksOf("/rider/my-tasks", rider);
@@ -154,5 +180,75 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
             assertThat(taskNums(tasks)).as("%s 最新接单在前", path)
                     .containsExactly(second.getTaskNum(), first.getTaskNum());
         }
+    }
+
+    @Test
+    @DisplayName("接单时间同秒（MySQL 秒精度）时按 id 倒序，顺序稳定")
+    void sameSecondAcceptTimeFallsBackToIdDesc() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
+        fixtures.bindDrone(rider.id(), UniqueNames.djiId(), fc30());
+        Task first = paidTask(owner, rider);
+        taskService.riderConfirmOrder(first.getTaskNum(), rider.id());
+        Task second = paidTask(owner, rider);
+        taskService.riderConfirmOrder(second.getTaskNum(), rider.id());
+
+        LocalDateTime sameSecond = LocalDateTime.now().withNano(0);
+        for (Task task : new Task[]{first, second}) {
+            TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElseThrow();
+            assignment.setAcceptTime(sameSecond);
+            taskAssignmentRepository.save(assignment);
+        }
+        long firstAssignmentId = taskAssignmentRepository.findByTaskId(first.getId()).orElseThrow().getId();
+        long secondAssignmentId = taskAssignmentRepository.findByTaskId(second.getId()).orElseThrow().getId();
+        assertThat(secondAssignmentId).isGreaterThan(firstAssignmentId);
+
+        for (String path : new String[]{"/rider/my-tasks", "/rider/my-tasks/history"}) {
+            assertThat(taskNums(tasksOf(path, rider))).as(path)
+                    .containsExactly(second.getTaskNum(), first.getTaskNum());
+        }
+    }
+
+    @Test
+    @DisplayName("列表批量装配：SQL 语句数与列表长度无关（无 N+1）")
+    void listAssemblyHasNoNPlusOne() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        TestAccounts.Account rider = accounts().registerRider();
+        fixtures.bindDrone(rider.id(), UniqueNames.djiId(), fc30());
+        Task one = paidTask(owner, rider);
+        taskService.riderConfirmOrder(one.getTaskNum(), rider.id());
+
+        Statistics stats = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean wasEnabled = stats.isStatisticsEnabled();
+        stats.setStatisticsEnabled(true);
+        try {
+            long withOne = statementsFor("/rider/my-tasks/history", rider, stats, 1);
+            for (int i = 0; i < 3; i++) {
+                Task more = paidTask(owner, rider);
+                taskService.riderConfirmOrder(more.getTaskNum(), rider.id());
+            }
+            long withFour = statementsFor("/rider/my-tasks/history", rider, stats, 4);
+            assertThat(withFour).as("1 单 %d 条 SQL，4 单不应更多", withOne).isEqualTo(withOne);
+
+            long activeWithFour = statementsFor("/rider/my-tasks", rider, stats, 4);
+            Task applying = publish(accounts().registerUser());
+            taskApplicationService.apply(applying.getTaskNum(), rider.id(), fc30());
+            assertThat(statementsFor("/rider/my-tasks", rider, stats, 5))
+                    .as("进行中多一张应征中卡片不应多出 SQL").isEqualTo(activeWithFour);
+        } finally {
+            stats.setStatisticsEnabled(wasEnabled);
+        }
+    }
+
+    private long statementsFor(String path, TestAccounts.Account rider, Statistics stats, int expectedSize)
+            throws Exception {
+        // 用例事务内共享一级缓存：先落库并清空，统计的才是接口本身的 SQL
+        entityManager.flush();
+        entityManager.clear();
+        stats.clear();
+        JsonNode tasks = tasksOf(path, rider);
+        long count = stats.getPrepareStatementCount();
+        assertThat(tasks.size()).as(path).isEqualTo(expectedSize);
+        return count;
     }
 }

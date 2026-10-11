@@ -17,9 +17,13 @@ public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, 
 
     Optional<TaskAssignment> findByTaskId(Long taskId);
 
-    List<TaskAssignment> findByRiderIdAndCompleteTimeIsNullOrderByAcceptTimeDesc(Long riderId);
+    /** accept_time 在 MySQL 上是秒精度，同秒接单以 id 倒序兜底，保证列表顺序稳定。 */
+    List<TaskAssignment> findByRiderIdAndCompleteTimeIsNullOrderByAcceptTimeDescIdDesc(Long riderId);
 
-    List<TaskAssignment> findByRiderIdOrderByAcceptTimeDesc(Long riderId);
+    /** 列表批量装配用：一次取回一批任务的接单记录。 */
+    List<TaskAssignment> findByTaskIdIn(Collection<Long> taskIds);
+
+    List<TaskAssignment> findByRiderIdOrderByAcceptTimeDescIdDesc(Long riderId);
 
     /** 已完成任务数 */
     long countByRiderIdAndCompleteTimeIsNotNull(Long riderId);

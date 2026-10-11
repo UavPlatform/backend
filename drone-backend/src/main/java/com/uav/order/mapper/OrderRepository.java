@@ -107,6 +107,9 @@ public interface OrderRepository extends JpaRepository<MissionOrder, Long> {
 
     Optional<MissionOrder> findByTaskId(Long taskId);
 
+    /** 列表批量装配用：一次取回一批任务的订单（每任务至多一单）。 */
+    List<MissionOrder> findByTaskIdIn(java.util.Collection<Long> taskIds);
+
     /** 1B-9a：超时未验收的订单（WAITING_CONFIRM 且 update_time 早于阈值） */
     @Query("SELECT o FROM MissionOrder o WHERE o.orderStatus = :status AND o.updateTime <= :cutoff")
     List<MissionOrder> findByOrderStatusAndUpdateTimeBefore(@Param("status") OrderStatus status,

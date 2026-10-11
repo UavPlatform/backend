@@ -38,17 +38,19 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 SAFE_PROFILES = {"dev", "test"}
 
 CUSTOMER = "demo_kehu"
+# 演示身份证号：行政区划码 000000 不存在（明显虚构），但格式与 GB 11643 校验位合法——
+# 后端 IdNumbers.isValid 会校验校验位，校验位错误的号码会被 400 拒绝，所以不能用非法校验位。
 PILOTS = [
     # 用户名, DJI 设备号, 机型码, 资料
     ("pilot_liming", "DEMO-FC30-0001", "FC30",
      {"age": 34, "location": "浙江湖州", "selfIntroduction": "6 年山区吊运经验，FlyCart 30 机长，熟悉基站与光伏建材吊装。",
-      "idNumber": "330501199201011234", "idExpiryDate": "2036-05-01", "grade": "BVLOS"}),
+      "idNumber": "000000199201010012", "idExpiryDate": "2036-05-01", "grade": "BVLOS"}),
     ("pilot_zhaoqiang", "DEMO-M350-0002", "M350RTK",
      {"age": 29, "location": "浙江杭州", "selfIntroduction": "测绘出身，M350 RTK 精准投放，擅长小件设备与应急物资。",
-      "idNumber": "110105199003071239", "idExpiryDate": "2034-09-30", "grade": "VLOS"}),
+      "idNumber": "000000199003070022", "idExpiryDate": "2034-09-30", "grade": "VLOS"}),
     ("pilot_chenyu", "DEMO-FC30-0003", "FC30",
      {"age": 41, "location": "浙江丽水", "selfIntroduction": "AOPA 教员，带队完成多次林区物资吊运。",
-      "idNumber": "330102198207151238", "idExpiryDate": "2031-12-31", "grade": "TEACHER"}),
+      "idNumber": "000000198207150038", "idExpiryDate": "2031-12-31", "grade": "TEACHER"}),
 ]
 
 # 安吉县一带的起吊点/卸货点（经度, 纬度）
@@ -59,6 +61,20 @@ SPOTS = {
     "village": (119.7100, 30.6290),
     "station": (119.7015, 30.6602),
 }
+
+
+class ApiError(RuntimeError):
+    """业务接口失败：携带 HTTP 状态与错误码，便于只对特定错误降级。"""
+
+    def __init__(self, method, path, status, code, message):
+        super().__init__(f"{method} {path} 失败: HTTP {status} {code} {message}")
+        self.path = path
+        self.status = status
+        self.code = code
+
+
+class StorageUnavailable(RuntimeError):
+    """对象存储未配置（上传凭证接口 503）或预签名直传不可达——唯一允许降级跳过的情形。"""
 
 
 class Api:
@@ -76,12 +92,14 @@ class Api:
             headers["Content-Type"] = "application/json"
         if token:
             headers["Authorization"] = "Bearer " + token
+        status = 200
         for attempt in range(6):
             req = urllib.request.Request(url, data=data, headers=headers, method=method)
             try:
                 with urllib.request.urlopen(req, timeout=20) as resp:
                     payload = json.loads(resp.read().decode("utf-8") or "{}")
             except urllib.error.HTTPError as e:
+                status = e.code
                 raw = e.read().decode("utf-8", "replace")
                 try:
                     payload = json.loads(raw)
@@ -94,7 +112,8 @@ class Api:
                     continue
             break
         if expect_ok and not payload.get("success"):
-            raise RuntimeError(f"{method} {path} 失败: {payload.get('code')} {payload.get('message')}")
+            raise ApiError(method, path, status, payload.get("errorCode") or payload.get("code"),
+                           payload.get("message"))
         return payload
 
     def put_bytes(self, url, content, content_type):
@@ -155,12 +174,21 @@ def select_and_pay(api, customer, task, app_id, when):
 
 
 def upload_evidence(api, pilot, task_num):
+    """上传两张交付凭证；只有「存储未配置/不可达」转成 StorageUnavailable，其余业务错误原样抛出。"""
     # 1x1 PNG：真实走 presigned PUT，交付物列表与监管端可直接预览
     png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
     for fname in ("吊运完成-卸货点.png", "绑扎与吊点.png"):
-        cred = api.call("POST", f"/tasks/{task_num}/attachments/upload-url", pilot,
-                        query={"fileName": fname, "contentType": "image/png", "sizeBytes": len(png)})["data"]
-        api.put_bytes(cred["uploadUrl"], png, "image/png")
+        try:
+            cred = api.call("POST", f"/tasks/{task_num}/attachments/upload-url", pilot,
+                            query={"fileName": fname, "contentType": "image/png", "sizeBytes": len(png)})["data"]
+        except ApiError as e:
+            if e.status == 503:  # MinioStorageService / AttachmentService：存储未配置 → 503
+                raise StorageUnavailable(str(e)) from e
+            raise
+        try:
+            api.put_bytes(cred["uploadUrl"], png, "image/png")
+        except OSError as e:  # 预签名地址指向的存储不可达（URLError/HTTPError ⊂ OSError）
+            raise StorageUnavailable(f"预签名直传失败：{e}") from e
 
 
 def guard_not_production(base, profile, not_prod_ack):
@@ -254,12 +282,13 @@ def main():
     api.call("POST", "/rider/confirm-order", li, query={"taskNum": t["taskNum"]})
     try:
         upload_evidence(api, li, t["taskNum"])
-        api.call("POST", "/rider/complete", li, query={"taskNum": t["taskNum"], "note": "已吊装至屋顶平台，客户现场签收。"})
-        scenes.append(("待验收（飞手已上传证据并交付）", t["taskNum"]))
-    except (RuntimeError, OSError) as e:  # 存储未配置：接口报错（RuntimeError）或预签名 PUT 失败（URLError ⊂ OSError）
+    except StorageUnavailable as e:  # 只有存储未配置/不可达才降级；其他业务错误照常失败退出
         storage_ok = False
         print(f"[降级] 交付物上传失败（{e}），跳过待验收/已完成场景；请配置 MINIO_*")
         scenes.append(("进行中（交付物存储未配置，未能交付）", t["taskNum"]))
+    else:
+        api.call("POST", "/rider/complete", li, query={"taskNum": t["taskNum"], "note": "已吊装至屋顶平台，客户现场签收。"})
+        scenes.append(("待验收（飞手已上传证据并交付）", t["taskNum"]))
 
     if storage_ok:
         t = create_task(api, customer, "林场水泥吊运", "水泥 1 袋 25 kg 分两次吊运。", "CONSTRUCTION", 25, "farm", "station")

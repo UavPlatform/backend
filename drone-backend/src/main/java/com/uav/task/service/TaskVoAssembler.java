@@ -70,10 +70,13 @@ public class TaskVoAssembler {
      * <p>每类关联数据一次批量查询（接单记录、订单、应征、机型、飞手昵称、设备），
      * 查询数与列表长度无关，避免逐条 {@link #assemble} 的 N+1。
      *
+     * <p>依据：REQ-BACKEND-001 验收标准 3（应征列表/报价面向发单用户）；飞手之间的报价与成交信息保密目前没有
+     * 明确的验收条目，需在 REQ-BACKEND-001 增补验收项或新立 ADR（见 backend#19 说明）。
+     *
      * <p>隐私规则（飞手视角）：{@code quotedAmount} 与机型<b>只取当前飞手本人的应征</b>（ADR-0003 平台计价，
      * 飞手不可改价；未应征则为 null），从不取其他飞手的应征。若已选定/已接单的是<b>其他飞手</b>，
-     * 订单成交信息（订单号、成交价、约定时间、确认时间）、接单飞手（riderId/riderName/接单时间/完成说明）
-     * 与设备直播态一律不回显。
+     * 接单飞手（riderId/riderName/接单时间/完成说明）与设备直播态不回显。订单成交信息（订单号——发单即生成草稿订单、
+     * 成交价、约定时间、确认时间）只在当前飞手<b>就是</b>选定飞手时回显；选定前对所有飞手都不回显。
      */
     public List<TaskVo> assembleForRider(List<Task> tasks, Long riderId) {
         return assembleAll(tasks, riderId);
@@ -106,6 +109,7 @@ public class TaskVoAssembler {
 
         Map<Long, TaskApplication> priceSourceByTask = new HashMap<>();
         Set<Long> selectedOtherRider = new java.util.HashSet<>();
+        Set<Long> viewerIsSelected = new java.util.HashSet<>();
         for (Task task : tasks) {
             MissionOrder order = orderByTask.get(task.getId());
             TaskApplication selected = order != null && order.getSelectedApplicationId() != null
@@ -121,6 +125,9 @@ public class TaskVoAssembler {
                         || (assignment != null && !viewerRiderId.equals(assignment.getRiderId()));
                 if (otherSelected) {
                     selectedOtherRider.add(task.getId());
+                } else if ((selected != null && viewerRiderId.equals(selected.getRiderId()))
+                        || (assignment != null && viewerRiderId.equals(assignment.getRiderId()))) {
+                    viewerIsSelected.add(task.getId());
                 }
             }
             if (source != null) {
@@ -142,6 +149,8 @@ public class TaskVoAssembler {
         List<TaskVo> result = new ArrayList<>(tasks.size());
         for (Task task : tasks) {
             boolean hideWinner = selectedOtherRider.contains(task.getId());
+            // 订单成交信息（含选定前就生成的草稿订单号）：属主/管理视角，或当前飞手即选定飞手才回显
+            boolean showOrderDeal = viewerRiderId == null || viewerIsSelected.contains(task.getId());
             TaskAssignment assignment = hideWinner ? null : assignmentByTask.get(task.getId());
             TaskVo vo = TaskVo.from(task, assignment);
             if (assignment != null) {
@@ -153,7 +162,7 @@ public class TaskVoAssembler {
                 vo.setOrderStatus(order.getOrderStatus().name());
                 vo.setTotalDistance(order.getTotalDistance());
             }
-            if (order != null && !hideWinner) {   // 成交信息：属主/管理视角或本人即选定飞手
+            if (order != null && showOrderDeal) {
                 vo.setOrderNum(order.getOrderNum());
                 vo.setTotalAmount(order.getTotalAmount());
                 vo.setScheduledTime(order.getScheduledTime());

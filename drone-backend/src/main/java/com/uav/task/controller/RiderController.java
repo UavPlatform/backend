@@ -44,7 +44,7 @@ public class RiderController {
     @OperationLog("飞手查看任务详情")
     @Operation(summary = "任务详情",
             description = "飞手查看任意任务的详细信息（无需任务归属），含撮合状态与货物字段；报价与机型只回显本人应征，"
-                    + "成交价/订单号/约定时间/接单飞手仅在本人即选定飞手时回显（见 TaskVo.quotedAmount）",
+                    + "订单号/成交价/约定时间/接单飞手仅在本人即选定飞手时回显，选定前对所有飞手不回显（见 TaskVo.quotedAmount）",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @GetMapping("/task/detail")
     public Result<TaskVo> getTaskDetail(@RequestParam String taskNum) {

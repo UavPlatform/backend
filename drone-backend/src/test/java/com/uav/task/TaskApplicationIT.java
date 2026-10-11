@@ -392,6 +392,41 @@ class TaskApplicationIT extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("隐私：竞争飞手互相看不到对方应征（身份/机型/报价），属主与管理员看全部")
+    void competingRidersSeeOnlyOwnApplication() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        String taskNum = createTransportTask(owner, "2.00");
+        TestAccounts.Account fc30Rider = riderMappedTo("FC30");
+        TestAccounts.Account m350Rider = riderMappedTo("M350RTK");
+        applyOk(fc30Rider, taskNum, modelId("FC30"), "");
+        applyOk(m350Rider, taskNum, modelId("M350RTK"), "");
+
+        for (TestAccounts.Account[] pair : new TestAccounts.Account[][]{
+                {fc30Rider, m350Rider}, {m350Rider, fc30Rider}}) {
+            TestAccounts.Account self = pair[0];
+            TestAccounts.Account rival = pair[1];
+            String body = mockMvc.perform(get("/task/" + taskNum + "/applications")
+                            .header("Authorization", self.authorization()))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            JsonNode data = MAPPER.readTree(body).path("data");
+            assertThat(data.size()).as("飞手只看到本人一条应征").isEqualTo(1);
+            assertThat(data.get(0).path("riderId").asLong()).isEqualTo(self.id());
+            assertThat(body).as("响应里不出现竞争飞手的昵称")
+                    .doesNotContain("\"" + rival.userName() + "\"");
+            for (JsonNode app : data) {
+                assertThat(app.path("riderId").asLong()).isNotEqualTo(rival.id());
+            }
+        }
+        assertThat(applications(owner, taskNum).size()).as("属主看全部").isEqualTo(2);
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/task/" + taskNum + "/applications")
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
     @DisplayName("V3 迁移：flyway 历史、task 货物列、task_application 表与唯一约束落地")
     void v3MigrationApplied() throws Exception {
         try (Connection c = dataSource.getConnection();

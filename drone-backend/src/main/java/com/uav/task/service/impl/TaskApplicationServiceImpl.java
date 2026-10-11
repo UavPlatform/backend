@@ -185,6 +185,9 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
         });
     }
 
+    /** user.role：2 管理员（监管平台会话）。 */
+    private static final int ROLE_ADMIN = 2;
+
     @Transactional(readOnly = true)
     @Override
     public List<TaskApplicationVO> listByTask(String taskNum, Long userId, Integer role) {
@@ -196,6 +199,14 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
         }
         List<TaskApplication> applications = applicationRepository
                 .findByTaskIdOrderByCreateTimeAsc(task.getId());
+        // 隐私：任务属主与管理员看全部应征；飞手（含仅有接单记录者）只看本人应征，
+        // 不暴露竞争飞手的 riderId/riderName/机型/报价。
+        boolean fullView = (role != null && role == ROLE_ADMIN) || userId.equals(task.getUserId());
+        if (!fullView) {
+            applications = applications.stream()
+                    .filter(application -> userId.equals(application.getRiderId()))
+                    .toList();
+        }
         List<TaskApplicationVO> vos = new ArrayList<>(applications.size());
         for (TaskApplication application : applications) {
             AircraftModel model = aircraftModelRepository.findById(application.getAircraftModelId())

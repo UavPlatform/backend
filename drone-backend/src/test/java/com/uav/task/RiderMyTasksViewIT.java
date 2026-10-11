@@ -296,8 +296,17 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
                 .isNotEqualByComparingTo(winnerApp.getQuotedAmount());
 
         // 选定前：详情与列表都是本人报价
-        assertThat(detailOf(task.getTaskNum(), loser).path("quotedAmount").decimalValue())
+        JsonNode beforeSelect = detailOf(task.getTaskNum(), loser);
+        assertThat(beforeSelect.path("quotedAmount").decimalValue())
                 .isEqualByComparingTo(loserApp.getQuotedAmount());
+        // 发单即生成草稿订单：选定前任何飞手都看不到订单号（列表与详情）
+        assertNoWinnerFields(beforeSelect, "选定前·应征飞手详情");
+        JsonNode applyingCard = java.util.stream.StreamSupport
+                .stream(tasksOf("/rider/my-tasks", loser).spliterator(), false)
+                .filter(t -> t.path("taskNum").asText().equals(task.getTaskNum())).findFirst().orElseThrow();
+        assertThat(applyingCard.path("orderNum").isNull() || applyingCard.path("orderNum").isMissingNode())
+                .as("选定前·应征中卡片不回显草稿订单号").isTrue();
+        assertThat(orderRepository.findByTaskId(task.getId())).as("前提：草稿订单已存在").isPresent();
 
         taskService.selectRider(task.getTaskNum(), owner.id(), winnerApp.getId(), LocalDateTime.now().plusDays(1));
         fixtures.payLockedOrder(task);

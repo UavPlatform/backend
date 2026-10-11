@@ -42,7 +42,7 @@ public class TaskVo {
     @Schema(description = "系统报价（ADR-0003 平台计价，不可改价）。用户端/管理端：选定应征的报价，等于成交价 totalAmount，"
             + "未选定时为 null。飞手端（/rider/task/detail、/rider/my-tasks、/rider/my-tasks/history、/rider/confirm-order）："
             + "始终是当前飞手本人应征的报价，未应征时为 null，从不返回其他飞手的报价；"
-            + "若选定的是其他飞手，则成交价、订单号、约定时间与接单飞手均不回显")
+            + "订单号/成交价/约定时间仅当当前飞手即选定飞手时回显（选定前对所有飞手为 null），若选定的是其他飞手则接单飞手也不回显")
     private BigDecimal quotedAmount;
 
     /** 机型：用户端/管理端为选定应征的机型（未选定为 null）；飞手端为本人应征的机型 */

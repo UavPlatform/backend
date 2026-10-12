@@ -15,7 +15,7 @@ jobs:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
-          host: drone.fuwaki.icu
+          host: ${{ secrets.DEPLOY_HOST }}
           username: github-runner
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: sudo /opt/drone/deploy.sh

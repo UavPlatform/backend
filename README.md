@@ -29,3 +29,14 @@ Web backend code for the drone platform.
 2. 契约门禁挂在 **Failsafe（`*E2EIT`）** 上，因此它随 `sh mvnw -B verify` 执行；`sh mvnw -B test` 只跑单元层，**不包含**契约门禁。门禁默认**只读**：把运行中实现与冻结规格做**整文档深比较**，端点/参数/字段/枚举任一漂移即红；只有显式 `-Dopenapi.export=true` 才写 `spec/openapi/`（由 `tools/openapi-export.sh` 封装）。脚本会先删除上一次的报告与 `failsafe-summary.xml`，并断言本次报告为 `Tests run: 1, Failures: 0, Errors: 0`，避免"0 用例/陈旧报告"被当成通过；
 3. 控制器注解纪律：**不要**用「不带 `implementation` 的 `type = "object"` 示例型 `content`」覆盖真实返回类型——那会让契约在消费端退化成 `Record<string, never>`。要写示例请写在 VO 的 `@Schema(example = …)` 上；
 4. 新增/修改端点后：导出 → 评审 → 提交 → 通知消费端用同一 sha256 对账（`frontend`：`pnpm api`）。
+
+## 接口限流（`@RateLimiter`）
+
+限流由 `com.uav.server.aspect.RateLimiterAspect` 实现：已登录按用户名、未登录按客户端 IP 计数，固定窗口，超限返回 HTTP 429「请求过于频繁，请稍后重试」。阈值写在各 Controller 方法的注解上（`limit` 次 / `windowSeconds` 秒），调整阈值须在 PR 中说明理由。
+
+需要特别说明的阈值：
+
+| 接口 | 阈值 | 理由 |
+| --- | --- | --- |
+| `POST /chat/Message/send` | 30 次 / 60 秒 / 用户 | 撮合洽谈（REQ-APP-002）中用户与飞手会连续确认吊点、绑扎、现场联系人，原 5 次/分钟在正常对话中即触发 429；30 次/分钟（平均 2 秒一条）仍可拦截脚本刷屏。 |
+| `POST /user/login` 等账号接口 | 3~5 次 / 60 秒 | 安全相关，保持从严；同一出口 IP 下频繁切换账号可能触发 429。 |

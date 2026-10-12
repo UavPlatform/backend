@@ -245,6 +245,29 @@ class TaskChatSessionIT extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("洽谈连发：同一用户 1 分钟内连发 10 条均成功；本人侧任务会话未读不计本人消息")
+    void negotiationBurstIsNotRateLimitedAndOwnMessagesNotUnread() throws Exception {
+        Scenario s = taskWithApplicant();
+
+        JsonNode session = createOk(s.owner(), taskSessionBody(s.task().getTaskNum(), s.rider().id()));
+        long sessionId = session.path("id").asLong();
+        Thread.sleep(20);
+
+        for (int i = 1; i <= 10; i++) {
+            assertThat(sendMessage(s.owner(), sessionId, "洽谈细节 " + i, null))
+                    .as("第 %d 条消息不应被限流", i)
+                    .isEqualTo(200);
+        }
+
+        JsonNode ownerItems = listTaskSessions(s.owner(), s.task().getTaskNum()).path("data");
+        assertThat(ownerItems.get(0).path("unreadCount").asInt())
+                .as("属主自己发的消息不是属主的未读")
+                .isZero();
+        JsonNode riderItems = listTaskSessions(s.rider(), s.task().getTaskNum()).path("data");
+        assertThat(riderItems.get(0).path("unreadCount").asInt()).isEqualTo(10);
+    }
+
+    @Test
     @DisplayName("越权发送：非成员向任务会话发消息 → 403 且不落库；成员发送成功")
     void sendMessageRequiresTaskSessionMembership() throws Exception {
         Scenario s = taskWithApplicant();

@@ -22,7 +22,9 @@ public class MessageController {
     private MessageService messageService;
 
     @OperationLog("发送消息")
-    @RateLimiter(limit = 5, windowSeconds = 60)
+    // 订单内洽谈是高频往返对话（吊点/绑扎/现场联系人），5 次/分钟会在正常洽谈中触发 429；
+    // 放宽到 30 次/分钟（平均 2 秒一条）仍可挡住脚本刷屏。
+    @RateLimiter(limit = 30, windowSeconds = 60)
     @Operation(summary = "发送消息", description = "发送消息")
     @PostMapping("/send")
     public Object sendMessage(@Valid @RequestBody MessageDTO dto) {

@@ -46,7 +46,8 @@ public enum ApiErrorCode {
     MATCH_STATUS_INVALID("MATCH_STATUS_INVALID", "当前撮合状态不允许此操作"),
     DOUBLE_CONFIRM_REQUIRED("DOUBLE_CONFIRM_REQUIRED", "双方尚未确认，任务不能开始执行"),
     DELIVERY_EVIDENCE_REQUIRED("DELIVERY_EVIDENCE_REQUIRED", "请先上传履约证据"),
-    AMOUNT_MISMATCH("AMOUNT_MISMATCH", "订单金额与系统报价不一致，已拒绝支付");
+    AMOUNT_MISMATCH("AMOUNT_MISMATCH", "订单金额与系统报价不一致，已拒绝支付"),
+    ENDPOINT_REMOVED("ENDPOINT_REMOVED", "该接口已下线，请升级客户端到最新版本");
 
     private final String code;
     private final String defaultMessage;

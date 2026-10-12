@@ -3113,6 +3113,7 @@
             "type" : "string"
           },
           "quotedAmount" : {
+            "description" : "系统报价（ADR-0003 平台计价，不可改价）。用户端/管理端：选定应征的报价，等于成交价 totalAmount，未选定时为 null。飞手端（/rider/task/detail、/rider/my-tasks、/rider/my-tasks/history、/rider/confirm-order）：始终是当前飞手本人应征的报价，未应征时为 null，从不返回其他飞手的报价；订单号/成交价/约定时间仅当当前飞手即选定飞手时回显（选定前对所有飞手为 null），若选定的是其他飞手则接单飞手也不回显",
             "type" : "number"
           },
           "riderConfirmedAt" : {
@@ -3149,6 +3150,7 @@
             "type" : "string"
           },
           "totalAmount" : {
+            "description" : "成交价（订单锁定金额 = 选定应征的 quotedAmount）。飞手端仅在当前飞手即选定飞手时回显，否则为 null",
             "type" : "number"
           },
           "totalDistance" : {
@@ -6005,7 +6007,7 @@
     },
     "/rider/task/detail" : {
       "get" : {
-        "description" : "飞手查看任意任务的详细信息（无需任务归属），含撮合状态、货物字段与订单/报价回显",
+        "description" : "飞手查看任意任务的详细信息（无需任务归属），含撮合状态与货物字段；报价与机型只回显本人应征，订单号/成交价/约定时间/接单飞手仅在本人即选定飞手时回显，选定前对所有飞手不回显（见 TaskVo.quotedAmount）",
         "operationId" : "getTaskDetail_1",
         "parameters" : [ {
           "description" : "任务编号",
@@ -6210,7 +6212,7 @@
     },
     "/task/{taskNum}/applications" : {
       "get" : {
-        "description" : "任务属主、应征飞手与管理员（role=2，监管端只读）按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态（非属主非应征的普通用户 403）",
+        "description" : "任务属主、应征飞手与管理员（role=2，监管端只读）按任务编号查询飞手应征列表：飞手、机型、载重、系统报价 quotedAmount、应征时间、状态。可见范围：任务属主与管理员返回全部应征；飞手只返回本人的应征（不含竞争飞手的身份、机型与报价，仅有接单记录而无应征时为空列表）；非属主非应征的普通用户 403",
         "operationId" : "listApplications",
         "parameters" : [ {
           "description" : "任务编号",

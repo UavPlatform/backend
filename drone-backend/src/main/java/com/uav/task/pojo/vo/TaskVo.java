@@ -6,6 +6,7 @@ import com.uav.task.pojo.entity.TaskAssignment;
 import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.enums.TaskType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ public class TaskVo {
     private String riderName;
     private LocalDateTime acceptTime;
     private String orderNum;
+    @Schema(description = "成交价（订单锁定金额 = 选定应征的 quotedAmount）。飞手端仅在当前飞手即选定飞手时回显，否则为 null")
     private BigDecimal totalAmount;
     private BigDecimal totalDistance;
     private String orderStatus;
@@ -37,10 +39,13 @@ public class TaskVo {
      */
     private MatchStatus matchStatus;
 
-    /** 选定应征的系统报价（= 成交价 totalAmount，严格相等；未选定时为 null） */
+    @Schema(description = "系统报价（ADR-0003 平台计价，不可改价）。用户端/管理端：选定应征的报价，等于成交价 totalAmount，"
+            + "未选定时为 null。飞手端（/rider/task/detail、/rider/my-tasks、/rider/my-tasks/history、/rider/confirm-order）："
+            + "始终是当前飞手本人应征的报价，未应征时为 null，从不返回其他飞手的报价；"
+            + "订单号/成交价/约定时间仅当当前飞手即选定飞手时回显（选定前对所有飞手为 null），若选定的是其他飞手则接单飞手也不回显")
     private BigDecimal quotedAmount;
 
-    /** 选定应征的机型（用户下单后可见成交机型；未选定时为 null） */
+    /** 机型：用户端/管理端为选定应征的机型（未选定为 null）；飞手端为本人应征的机型 */
     private Long aircraftModelId;
 
     /** 机型显示名（如 DJI FlyCart 30） */

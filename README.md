@@ -13,6 +13,33 @@ Web backend code for the drone platform.
 | 跑全量测试（`*Test` + `*IT`/`*E2EIT`，含契约门禁） | `cd drone-backend && sh mvnw -B verify` |
 | 检查测试分层与执行层命名（只读） | `bash tools/check-test-layers.sh`（自证：`bash tools/check-test-layers.sh --selftest`） |
 
+## 本地演示环境
+
+用于客户演示/联调的一套可复现数据（**仅开发与演示环境，禁止对生产库执行**）：
+
+1. 以 dev profile 启动后端，并开启 mock 支付与对象存储：
+   - `WECHAT_PAY_MOCK_ENABLED=true`（mock 支付守卫只允许 dev/test profile）；
+   - `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` 指向任一 S3 兼容存储
+     （MinIO、或本地 `moto_server` 均可）；未配置时「待验收/已完成」场景会自动降级跳过。
+2. 运行种子脚本（只依赖 Python 3 标准库，只调公开 HTTP API，不直接写库）：
+
+   ```bash
+   SPRING_PROFILES_ACTIVE=dev python3 tools/demo-seed.py --base http://127.0.0.1:8081
+   ```
+
+   生产防护：在发出任何写请求之前，脚本拒绝 `--base` 指向非本机主机（确需对内网演示机执行时显式加
+   `--i-know-this-is-not-prod`），并要求 dev profile 标记（`SPRING_PROFILES_ACTIVE` 或 `--profile` 为 `dev`/`test` 且不含 `prod`，
+   与 `MockPayGuard` 白名单同口径）；任一不满足即退出码 2。
+   **局限**：主机检查只看 `--base` 的主机名，无法识别 SSH 隧道/端口转发——`ssh -L 8081:<生产>:8081` 后
+   `--base http://127.0.0.1:8081` 会通过主机检查，profile 标记也只是操作者声明。**严禁通过隧道把脚本指向生产**；
+   兜底是生产 profile 下 `MockPayGuard` 拒绝 mock 支付，脚本会在第一笔支付处失败（但此前的注册、发单、应征已写入）。
+
+   脚本幂等：账号已存在直接登录；演示客户名下已有需求时不再重复造单（`--force` 再造一套）。
+   在空库上约数秒完成，产出 1 个客户、3 个飞手（含实名资料与驾驶资质、绑定机型）以及覆盖撮合全阶段的 6 个需求：
+   招募飞手 / 洽谈中（两个机型报价）/ 待飞手确认 / 进行中 / 待验收（含交付凭证）/ 已完成（含评价）。
+3. 账号：`demo_kehu`（客户）、`pilot_liming` / `pilot_zhaoqiang` / `pilot_chenyu`（飞手），密码统一 `Demo@2026`；
+   监管端账号由 `AdminSeedInitializer` 按部署配置 `admin.seed.name` / `admin.seed.password` 播种，脚本不读取也不打印管理员口令。
+
 ## OpenAPI 契约（结构单一事实源）
 
 结构事实源：`spec/openapi/drone-backend.openapi.json`（归一化后入库，消费端据此生成类型）。

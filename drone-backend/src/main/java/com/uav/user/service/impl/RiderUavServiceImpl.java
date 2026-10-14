@@ -2,6 +2,7 @@ package com.uav.user.service.impl;
 
 import com.uav.aircraft.pojo.entity.AircraftModel;
 import com.uav.aircraft.service.AircraftModelService;
+import com.uav.uav.service.UavDeviceArchiveService;
 import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.pojo.entity.RiderUav;
 import com.uav.user.service.RiderUavService;
@@ -23,6 +24,9 @@ public class RiderUavServiceImpl implements RiderUavService {
     @Autowired
     private AircraftModelService aircraftModelService;
 
+    @Autowired
+    private UavDeviceArchiveService uavDeviceArchiveService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void bindDrone(Long userId, String djiId, Long aircraftModelId) {
@@ -42,6 +46,7 @@ public class RiderUavServiceImpl implements RiderUavService {
         drone.setDjiId(djiId);
         drone.setAircraftModelId(aircraftModelId);
         riderUavRepository.save(drone);
+        uavDeviceArchiveService.ensureArchiveForBinding(djiId);
     }
 
     @Override

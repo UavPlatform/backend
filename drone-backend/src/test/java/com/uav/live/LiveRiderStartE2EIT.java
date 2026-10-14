@@ -143,7 +143,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
     }
 
     private void registerUav(String deviceId) {
-        Uav uav = new Uav();
+        Uav uav = uavRepository.findPrimaryByDjiId(deviceId).orElseGet(Uav::new);
         uav.setUavName("rs-" + deviceId);
         uav.setDjiId(deviceId);
         uav.setOnlineStatus('1');

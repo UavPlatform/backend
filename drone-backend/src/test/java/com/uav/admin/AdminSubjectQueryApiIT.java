@@ -244,6 +244,20 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("飞手注册绑机：自动补设备档案，详情不再把绑定设备标为未注册")
+    void pilotDetailRecognizesArchiveFromBindPath() throws Exception {
+        TestAccounts.Account rider = accounts().registerRider();
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+
+        JsonNode drone = droneByDjiId(
+                adminGet(get("/admin/pilots/" + rider.id()), admin).path("drones"), rider.djiId());
+        assertThat(drone.path("available").isNull())
+                .as("绑机后应有 uav 档案，available 不应为 null").isFalse();
+        assertThat(drone.path("available").asBoolean()).isTrue();
+        assertThat(drone.path("online").asBoolean()).isFalse();
+    }
+
+    @Test
     @DisplayName("无人机启用/禁用复用 /admin/uav/available（按 djiId），飞手详情可用状态随之翻转")
     void uavAvailableToggleVisibleInPilotDetail() throws Exception {
         TestAccounts.Account rider = accounts().registerRider();
@@ -335,12 +349,15 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         throw new AssertionError("无人机表中缺少 djiId=" + djiId + "，实际=" + drones);
     }
 
-    /** 造一行设备档案（uav 表），模拟设备已注册；时间字段走实体 @PrePersist。 */
+    /** 按 djiId 造/改设备档案（绑机路径可能已自动补档，此处 upsert 避免重复行）。 */
     private void saveUav(String djiId, char online, char available) {
-        Uav uav = new Uav();
-        uav.setUavName(UniqueNames.unique("uv"));
-        uav.setDjiId(djiId);
-        uav.setControllerModel("TestController");
+        Uav uav = uavRepository.findByDjiId(djiId).orElseGet(() -> {
+            Uav newUav = new Uav();
+            newUav.setDjiId(djiId);
+            newUav.setUavName(UniqueNames.unique("uv"));
+            newUav.setControllerModel("TestController");
+            return newUav;
+        });
         uav.setOnlineStatus(online);
         uav.setIsAvailable(available);
         uavRepository.save(uav);

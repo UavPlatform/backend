@@ -67,7 +67,7 @@ public class TaskServiceImpl implements TaskService {
     private TaskApplicationRepository taskApplicationRepository;
 
     @Autowired
-    private TaskAttachmentRepository taskAttachmentRepository;
+    private com.uav.attachment.service.AttachmentService attachmentService;
 
     @Autowired
     private OrderRepository orderRepository;
@@ -550,9 +550,9 @@ public class TaskServiceImpl implements TaskService {
         );
     }
 
-    /** 履约证据守卫（REQ-BACKEND-001 验收 5）：至少一条 task_attachment 才允许推进验收/结案。 */
+    /** 履约证据守卫（REQ-BACKEND-001 验收 5）：至少一条已完成上传且对象存在、大小正确的附件才允许推进验收/结案。 */
     private void requireEvidence(String taskNum) {
-        if (taskAttachmentRepository.findByTaskNumOrderByCreateTimeAsc(taskNum).isEmpty()) {
+        if (!attachmentService.hasVerifiedEvidence(taskNum)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.DELIVERY_EVIDENCE_REQUIRED,
                     "尚未上传履约证据（照片/视频等），不能推进完成确认");
         }

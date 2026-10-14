@@ -33,8 +33,8 @@ public class AttachmentController {
 
     @OperationLog("请求交付物上传凭证")
     @Operation(summary = "获取交付物上传凭证",
-            description = "仅任务的接单飞手可调用；校验类型（图片 jpeg/png/webp ≤20MB，视频 mp4/mov ≤500MB）后"
-                    + "返回 presigned PUT URL（15 分钟有效），客户端直传 MinIO",
+            description = "任务所有者或接单飞手可调用；校验类型（图片 jpeg/png/webp ≤20MB，视频 mp4/mov ≤500MB）后"
+                    + "返回 presigned PUT URL（15 分钟有效）并登记 PENDING；直传后须调用 confirm-upload",
             parameters = {
                     @Parameter(name = "taskNum", description = "任务编号", required = true),
                     @Parameter(name = "fileName", description = "原始文件名", required = true),
@@ -50,10 +50,18 @@ public class AttachmentController {
         return Result.success(attachmentService.requestUploadUrl(callerId, taskNum, fileName, contentType, sizeBytes));
     }
 
+    @Operation(summary = "确认附件上传完成", operationId = "confirmAttachmentUpload", description = "仅原上传者可确认；验证对象存在且大小一致后置为 UPLOADED，重复确认幂等")
+    @PostMapping("/confirm-upload")
+    public Result<Map<String, Object>> confirmUpload(@PathVariable String taskNum,
+                                                    @RequestParam String objectKey) {
+        return Result.success(attachmentService.confirmUpload(
+                com.uav.server.util.UserContext.getUserId(), taskNum, objectKey));
+    }
+
     @OperationLog("查看交付物列表")
     @Operation(summary = "附件列表",
             description = "任务所有者、接单飞手与管理员（role=2，监管端只读）可看；"
-                    + "逐条附 presigned 下载 URL（15 分钟有效）",
+                    + "仅返回已确认或核验通过的历史附件（uploadStatus=UPLOADED），校验对象存在且大小一致后附下载 URL",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
     @GetMapping
     public Result<List<Map<String, Object>>> list(@PathVariable String taskNum) {

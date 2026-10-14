@@ -35,6 +35,8 @@ public class OrderAutoConfirmService {
 
     private final com.uav.task.mapper.TaskRepository taskRepository;
 
+    private final com.uav.attachment.service.AttachmentService attachmentService;
+
     @Value("${order.auto-confirm-enabled:false}")
     private boolean enabled;
 
@@ -42,9 +44,11 @@ public class OrderAutoConfirmService {
     private int autoConfirmHours;
 
     public OrderAutoConfirmService(OrderRepository orderRepository,
-                                   com.uav.task.mapper.TaskRepository taskRepository) {
+                                   com.uav.task.mapper.TaskRepository taskRepository,
+                                   com.uav.attachment.service.AttachmentService attachmentService) {
         this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
+        this.attachmentService = attachmentService;
     }
 
     @Scheduled(fixedDelayString = "${order.auto-confirm-interval-ms:600000}",
@@ -78,21 +82,27 @@ public class OrderAutoConfirmService {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(hours);
         List<MissionOrder> expired = orderRepository
                 .findByOrderStatusAndUpdateTimeBefore(OrderStatus.WAITING_CONFIRM, cutoff);
+        int confirmed = 0;
         for (MissionOrder order : expired) {
+            var task = order.getTask();
+            if (task == null || !attachmentService.hasVerifiedEvidence(task.getTaskNum())) {
+                log.warn("[AUTO CONFIRM] Skip order without verified evidence: orderNum={}", order.getOrderNum());
+                continue;
+            }
             order.setOrderStatus(OrderStatus.COMPLETED);
             order.setExecutedAt(LocalDateTime.now());
             order.setExecuteResult("AUTO_CONFIRM");
             orderRepository.save(order);
             // TASK-BACKEND-004 / ADR-0003 决定 5：超时自动确认同样结案撮合状态（PENDING_ACCEPTANCE → CLOSED）
-            var task = order.getTask();
-            if (task != null && task.getMatchStatus() == MatchStatus.PENDING_ACCEPTANCE) {
+            if (task.getMatchStatus() == MatchStatus.PENDING_ACCEPTANCE) {
                 task.setMatchStatus(MatchStatus.CLOSED);
                 taskRepository.save(task);
             }
+            confirmed++;
         }
-        if (!expired.isEmpty()) {
-            log.info("[AUTO CONFIRM] 验收超时自动确认 {} 笔订单（阈值 {} 小时）", expired.size(), hours);
+        if (confirmed > 0) {
+            log.info("[AUTO CONFIRM] 验收超时自动确认 {} 笔订单（阈值 {} 小时）", confirmed, hours);
         }
-        return expired.size();
+        return confirmed;
     }
 }

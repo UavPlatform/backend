@@ -49,6 +49,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 class AttachmentFlowIT extends IntegrationTestBase {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.uav.attachment.service.MinioStorageService storage;
+
+    @org.junit.jupiter.api.BeforeEach
+    void storageAvailable() {
+        org.mockito.Mockito.when(storage.isConfigured()).thenReturn(true);
+        org.mockito.Mockito.when(storage.presignedPut(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn("http://storage.test/put");
+        org.mockito.Mockito.when(storage.presignedGet(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn("http://storage.test/get");
+    }
+
     @Autowired
     TaskAttachmentRepository taskAttachmentRepository;
 
@@ -133,6 +145,11 @@ class AttachmentFlowIT extends IntegrationTestBase {
         String objectKey = taskAttachmentRepository
                 .findByTaskNumOrderByCreateTimeAsc(currentTask.getTaskNum()).get(0).getObjectKey();
 
+        org.mockito.Mockito.when(storage.isValidObject(objectKey, 1024L)).thenReturn(true);
+        mockMvc.perform(post("/tasks/" + currentTask.getTaskNum() + "/attachments/confirm-upload")
+                        .param("objectKey", objectKey).header("Authorization", rider.authorization()))
+                .andExpect(status().isOk());
+
         TestAccounts.AdminAccount admin = accounts().adminLogin();
 
         mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments")
@@ -210,6 +227,18 @@ class AttachmentFlowIT extends IntegrationTestBase {
                 .andExpect(status().isOk());
         String objectKey = taskAttachmentRepository.findByTaskNumOrderByCreateTimeAsc(currentTask.getTaskNum())
                 .get(0).getObjectKey();
+
+        mockMvc.perform(get("/tasks/" + currentTask.getTaskNum() + "/attachments")
+                        .header("Authorization", owner.authorization()))
+                .andExpect(jsonPath("$.data").isEmpty());
+        mockMvc.perform(post("/tasks/" + currentTask.getTaskNum() + "/attachments/confirm-upload")
+                        .param("objectKey", objectKey).header("Authorization", rider.authorization()))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.when(storage.isValidObject(objectKey, 1024L)).thenReturn(true);
+        mockMvc.perform(post("/tasks/" + currentTask.getTaskNum() + "/attachments/confirm-upload")
+                        .param("objectKey", objectKey).header("Authorization", rider.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.uploadStatus").value("UPLOADED"));
 
         List<TestAccounts.Account> viewers = List.of(owner, rider);
         for (TestAccounts.Account viewer : viewers) {

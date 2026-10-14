@@ -4,9 +4,12 @@ import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
 import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
+import io.minio.StatObjectArgs;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +24,8 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
-public class MinioStorageService {
+@ConditionalOnProperty(name = "attachment.storage.provider", havingValue = "minio", matchIfMissing = true)
+public class MinioStorageService implements AttachmentObjectStorage {
 
     /** presigned URL 有效期（秒） */
     public static final int PRESIGN_EXPIRY_SECONDS = (int) TimeUnit.MINUTES.toSeconds(15);
@@ -65,6 +69,11 @@ public class MinioStorageService {
         return minioClient;
     }
 
+    @Override
+    public String presignedPut(String objectKey, int expirySeconds, String contentType) {
+        return presignedPut(objectKey, expirySeconds);
+    }
+
     /** 生成上传用 presigned PUT URL。 */
     public String presignedPut(String objectKey, int expirySeconds) {
         try {
@@ -98,6 +107,28 @@ public class MinioStorageService {
             log.error("[MINIO] 生成下载 URL 失败: {}", e.getMessage(), e);
             throw new BusinessException(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
                     "生成下载凭证失败");
+        }
+    }
+
+    /** Missing objects and size mismatches are invalid; infrastructure failures fail closed. */
+    public boolean isValidObject(String objectKey, Long expectedSize) {
+        if (expectedSize == null || expectedSize <= 0) return false;
+        try {
+            long actualSize = requireClient().statObject(StatObjectArgs.builder()
+                    .bucket(bucket).object(objectKey).build()).size();
+            return actualSize == expectedSize;
+        } catch (ErrorResponseException e) {
+            String code = e.errorResponse().code();
+            if ("NoSuchKey".equals(code) || "NoSuchObject".equals(code)) return false;
+            log.error("[MINIO] Object verification failed: key={}, code={}", objectKey, code);
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, ApiErrorCode.INTERNAL_ERROR,
+                    "对象存储校验失败，请稍后重试");
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[MINIO] Object verification failed: key={}, exception={}", objectKey, e.getClass().getName());
+            throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, ApiErrorCode.INTERNAL_ERROR,
+                    "对象存储校验失败，请稍后重试");
         }
     }
 

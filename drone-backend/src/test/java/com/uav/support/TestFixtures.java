@@ -341,8 +341,9 @@ public class TestFixtures {
         return orderRepository.findById(order.getId()).orElseThrow();
     }
 
-    /** 插入一条履约证据（task_attachment），供「无证据拒绝确认」与完成链路测试造数。 */
-    public TaskAttachment evidence(String taskNum, long uploaderId) {
+    /** REQ-BACKEND-001: 已确认且存储有效的测试证据；仅隔离外部存储边界，业务断言照常执行。 */
+    public TaskAttachment evidence(String taskNum, long uploaderId,
+                                   com.uav.attachment.service.AttachmentObjectStorage storage) {
         TaskAttachment attachment = new TaskAttachment();
         attachment.setTaskNum(taskNum);
         attachment.setUploaderId(uploaderId);
@@ -350,6 +351,9 @@ public class TestFixtures {
         attachment.setFileName("evidence.jpg");
         attachment.setContentType("image/jpeg");
         attachment.setSizeBytes(1024L);
+        attachment.setUploadStatus("UPLOADED");
+        org.mockito.Mockito.when(storage.isValidObject(attachment.getObjectKey(), attachment.getSizeBytes()))
+                .thenReturn(true);
         return taskAttachmentRepository.save(attachment);
     }
 

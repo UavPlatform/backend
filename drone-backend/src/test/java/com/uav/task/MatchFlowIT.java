@@ -58,6 +58,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class MatchFlowIT extends IntegrationTestBase {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.uav.attachment.service.AttachmentObjectStorage evidenceStorage;
+
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
@@ -415,7 +419,7 @@ class MatchFlowIT extends IntegrationTestBase {
                         .equals(ApiErrorCode.DELIVERY_EVIDENCE_REQUIRED.getCode()));
 
         // 上传证据 → 交付 → 待验收 → 用户确认 → 结案
-        fixtures.evidence(task.getTaskNum(), rider.id());
+        fixtures.evidence(task.getTaskNum(), rider.id(), evidenceStorage);
         taskService.riderCompleteTask(task.getTaskNum(), rider.id(), "吊运完成");
         Task delivered = taskRepository.findByTaskNum(task.getTaskNum()).orElseThrow();
         assertThat(delivered.getTaskStatus()).isEqualTo(TaskStatus.COMPLETED);

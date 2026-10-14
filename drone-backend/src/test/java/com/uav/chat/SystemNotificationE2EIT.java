@@ -68,6 +68,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SystemNotificationE2EIT extends RealProtocolTestBase {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.uav.attachment.service.AttachmentObjectStorage evidenceStorage;
+
+
     @Autowired
     private TaskService taskService;
 
@@ -147,7 +151,7 @@ class SystemNotificationE2EIT extends RealProtocolTestBase {
         long riderId = fixtures.rider().getId();
         fixtures.awaitingRiderConfirm(task, riderId);
         taskService.riderConfirmOrder(task.getTaskNum(), riderId);
-        fixtures.evidence(task.getTaskNum(), riderId);
+        fixtures.evidence(task.getTaskNum(), riderId, evidenceStorage);
         taskService.riderCompleteTask(task.getTaskNum(), riderId, null);
 
         List<ChatEnvelope> unread = messageService.getUnreadMessages(owner.id());
@@ -163,7 +167,7 @@ class SystemNotificationE2EIT extends RealProtocolTestBase {
         long riderId = fixtures.rider().getId();
         fixtures.awaitingRiderConfirm(task, riderId);
         taskService.riderConfirmOrder(task.getTaskNum(), riderId);
-        fixtures.evidence(task.getTaskNum(), riderId);
+        fixtures.evidence(task.getTaskNum(), riderId, evidenceStorage);
         taskService.riderCompleteTask(task.getTaskNum(), riderId, null);
         taskService.userConfirmTask(task.getTaskNum(), owner.id());
 

@@ -2,8 +2,12 @@ package com.uav.admin;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.uav.order.mapper.OrderComplaintRepository;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
+import com.uav.order.pojo.entity.OrderComplaint;
+import com.uav.server.enums.ComplaintReason;
+import com.uav.server.enums.ComplaintStatus;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
@@ -61,6 +65,9 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
     @Autowired
     private OrderRepository orderRepository;
 
+    @Autowired
+    private OrderComplaintRepository complaintRepository;
+
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -83,6 +90,8 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         assertThat(row.path("userName").asText()).isEqualTo(owner.userName());
         assertThat(row.path("status").asInt()).isEqualTo(1);
         assertThat(row.path("orderCount").asLong()).isEqualTo(1);
+        assertThat(row.path("disputeCount").asLong()).isZero();
+        assertThat(row.path("registerTime").asText(null)).isNotBlank();
 
         // 飞手不在注册用户列表
         JsonNode pilotHit = adminGet(get("/admin/users").param("keyword", rider.userName()), admin);
@@ -101,6 +110,40 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         assertThat(paged.path("content").size()).isEqualTo(1);
         assertThat(paged.path("totalElements").asLong()).isEqualTo(1);
         assertThat(paged.path("totalPages").asInt()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("用户列表/详情：争议数聚合、名下投诉列表、注册时间")
+    void userListAndDetailExposeDisputesAndRegisterTime() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        Task task = fixtures.task(TaskStatus.IDLE, 100.0, owner.id());
+        MissionOrder order = fixtures.order(owner.id(), task, OrderStatus.DISPUTED, "99.00");
+
+        OrderComplaint complaint = new OrderComplaint();
+        complaint.setOrderNum(order.getOrderNum());
+        complaint.setUserId(owner.id());
+        complaint.setReason(ComplaintReason.QUALITY_ISSUE);
+        complaint.setDescription("吊运质量不符合约定");
+        complaint.setStatus(ComplaintStatus.PENDING);
+        complaint.setRefundAmount(order.getTotalAmount());
+        complaintRepository.save(complaint);
+
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+
+        JsonNode listRow = adminGet(get("/admin/users")
+                .param("keyword", owner.userName()).param("page", "0").param("size", "10"), admin)
+                .path("content").get(0);
+        assertThat(listRow.path("disputeCount").asLong()).isEqualTo(1);
+        assertThat(listRow.path("registerTime").asText(null)).isNotBlank();
+
+        JsonNode detail = adminGet(get("/admin/users/" + owner.id()), admin);
+        assertThat(detail.path("registerTime").asText(null)).isNotBlank();
+        assertThat(detail.path("complaints").size()).isEqualTo(1);
+        JsonNode c = detail.path("complaints").get(0);
+        assertThat(c.path("orderNum").asText()).isEqualTo(order.getOrderNum());
+        assertThat(c.path("reason").asText()).isEqualTo("QUALITY_ISSUE");
+        assertThat(c.path("status").asText()).isEqualTo("PENDING");
+        assertThat(c.path("description").asText()).contains("吊运质量");
     }
 
     @Test
@@ -315,6 +358,8 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         assertThat(user.path("orders").isArray()).isTrue();
         assertThat(user.path("orders").size())
                 .as("新注册用户无订单 → 空数组而非 null/缺字段").isZero();
+        assertThat(user.path("complaints").isArray()).isTrue();
+        assertThat(user.path("complaints").size()).isZero();
 
         JsonNode page = adminGet(get("/admin/users")
                 .param("keyword", fresh.userName()).param("page", "5").param("size", "10"), admin);

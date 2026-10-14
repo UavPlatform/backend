@@ -3,6 +3,8 @@ package com.uav.user.pojo.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "user")
 @Data
@@ -21,4 +23,14 @@ public class User {
 
     @Column(nullable = false)
     private Integer role = 0;
+
+    @Column(name = "create_time")
+    private LocalDateTime createTime;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createTime == null) {
+            this.createTime = LocalDateTime.now();
+        }
+    }
 }

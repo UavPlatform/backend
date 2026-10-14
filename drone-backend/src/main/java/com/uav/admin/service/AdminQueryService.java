@@ -6,10 +6,12 @@ import com.uav.admin.pojo.vo.AdminPilotDroneVo;
 import com.uav.admin.pojo.vo.AdminPilotDetailVo;
 import com.uav.admin.pojo.vo.AdminPilotVo;
 import com.uav.admin.pojo.vo.AdminTaskVo;
+import com.uav.admin.pojo.vo.AdminUserComplaintVo;
 import com.uav.admin.pojo.vo.AdminUserDetailVo;
 import com.uav.admin.pojo.vo.AdminUserVo;
 import com.uav.aircraft.pojo.entity.AircraftModel;
 import com.uav.live.service.impl.LiveDeviceResolver;
+import com.uav.order.pojo.entity.OrderComplaint;
 import com.uav.pay.mapper.PayRecordRepository;
 import com.uav.pay.pojo.entity.PayRecord;
 import com.uav.rider.pojo.vo.RiderInfoVO;
@@ -221,9 +223,14 @@ public class AdminQueryService {
         Map<Long, Long> orderCounts = groupCount(
                 "SELECT o.userId, COUNT(o.id) FROM MissionOrder o WHERE o.userId IN :ids GROUP BY o.userId",
                 userIds(users), Map.of());
+        Map<Long, Long> disputeCounts = groupCount(
+                "SELECT c.userId, COUNT(c.id) FROM OrderComplaint c WHERE c.userId IN :ids GROUP BY c.userId",
+                userIds(users), Map.of());
         List<AdminUserVo> content = users.stream()
                 .map(u -> new AdminUserVo(u.getId(), u.getUserName(), u.getStatus(),
-                        orderCounts.getOrDefault(u.getId(), 0L)))
+                        orderCounts.getOrDefault(u.getId(), 0L),
+                        disputeCounts.getOrDefault(u.getId(), 0L),
+                        u.getCreateTime()))
                 .collect(Collectors.toList());
         return AdminPageVo.of(content, ps[0], ps[1], total);
     }
@@ -240,8 +247,13 @@ public class AdminQueryService {
                 com.uav.order.pojo.entity.MissionOrder.class)
                 .setParameter("userId", userId)
                 .getResultList();
+        List<OrderComplaint> complaints = em.createQuery(
+                "SELECT c FROM OrderComplaint c WHERE c.userId = :userId ORDER BY c.createTime DESC",
+                OrderComplaint.class)
+                .setParameter("userId", userId)
+                .getResultList();
         return new AdminUserDetailVo(user.getId(), user.getUserName(), user.getStatus(), user.getRole(),
-                toOrderVos(orders));
+                user.getCreateTime(), toOrderVos(orders), toComplaintVos(complaints));
     }
 
     /**
@@ -434,6 +446,20 @@ public class AdminQueryService {
                     uav == null ? null
                             : uav.getIsAvailable() != null && uav.getIsAvailable() == FLAG_ON);
         }).collect(Collectors.toList());
+    }
+
+    private List<AdminUserComplaintVo> toComplaintVos(List<OrderComplaint> complaints) {
+        return complaints.stream()
+                .map(c -> new AdminUserComplaintVo(
+                        c.getId(),
+                        c.getOrderNum(),
+                        c.getReason() != null ? c.getReason().name() : null,
+                        c.getStatus() != null ? c.getStatus().name() : null,
+                        c.getDescription(),
+                        c.getCreateTime(),
+                        c.getResolveTime(),
+                        c.getAdminNote()))
+                .collect(Collectors.toList());
     }
 
     /** 订单 → 摘要 VO 列表（属主名与任务名逐条补齐，与订单列表同构）。 */

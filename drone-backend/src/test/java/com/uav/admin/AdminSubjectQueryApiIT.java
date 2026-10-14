@@ -351,7 +351,7 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
 
     /** 按 djiId 造/改设备档案（绑机路径可能已自动补档，此处 upsert 避免重复行）。 */
     private void saveUav(String djiId, char online, char available) {
-        Uav uav = uavRepository.findByDjiId(djiId).orElseGet(() -> {
+        Uav uav = uavRepository.findPrimaryByDjiId(djiId).orElseGet(() -> {
             Uav newUav = new Uav();
             newUav.setDjiId(djiId);
             newUav.setUavName(UniqueNames.unique("uv"));

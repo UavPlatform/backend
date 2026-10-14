@@ -108,7 +108,7 @@ class LeaveEndpointIT extends IntegrationTestBase {
     // ---------- helpers ----------
 
     private void registerUav(String deviceId) {
-        Uav uav = new Uav();
+        Uav uav = uavRepository.findPrimaryByDjiId(deviceId).orElseGet(Uav::new);
         uav.setUavName("lv-" + deviceId);
         uav.setDjiId(deviceId);
         uav.setOnlineStatus('1');

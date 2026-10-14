@@ -27,7 +27,7 @@ public class UavDeviceArchiveService {
         if (djiId == null || djiId.isBlank()) {
             return;
         }
-        if (uavRepository.findByDjiId(djiId).isPresent()) {
+        if (uavRepository.findPrimaryByDjiId(djiId).isPresent()) {
             return;
         }
         Uav uav = new Uav();

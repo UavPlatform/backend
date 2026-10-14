@@ -34,7 +34,7 @@ public class AppUavServiceImpl implements AppUavService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
                     "无人机名称、在线状态、DjiId或控制器型号为空");
         }
-        if (uavRepository.findByDjiId(djiId).isPresent()) {
+        if (uavRepository.findPrimaryByDjiId(djiId).isPresent()) {
             throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.INVALID_PARAM,
                     "无人机DjiId已注册");
         }
@@ -62,7 +62,7 @@ public class AppUavServiceImpl implements AppUavService {
     @Override
     @Transactional
     public void updateUav(UavDto uavDto) {
-        Uav uav = uavRepository.findByDjiId(uavDto.getDjiId())
+        Uav uav = uavRepository.findPrimaryByDjiId(uavDto.getDjiId())
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
 
         if (uavDto.getUavName() != null && !uavDto.getUavName().isBlank()

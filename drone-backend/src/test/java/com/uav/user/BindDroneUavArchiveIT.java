@@ -30,11 +30,11 @@ class BindDroneUavArchiveIT extends IntegrationTestBase {
     void bindDroneCreatesUavArchiveWhenMissing() {
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("bd"), null);
         String djiId = UniqueNames.djiId();
-        assertThat(uavRepository.findByDjiId(djiId)).isEmpty();
+        assertThat(uavRepository.findPrimaryByDjiId(djiId)).isEmpty();
 
         fixtures.bindDrone(rider.id(), djiId);
 
-        Uav uav = uavRepository.findByDjiId(djiId).orElseThrow();
+        Uav uav = uavRepository.findPrimaryByDjiId(djiId).orElseThrow();
         assertThat(uav.getOnlineStatus()).isEqualTo('0');
         assertThat(uav.getIsAvailable()).isEqualTo('1');
         assertThat(uav.getUavName()).isEqualTo(djiId);
@@ -55,7 +55,7 @@ class BindDroneUavArchiveIT extends IntegrationTestBase {
 
         fixtures.bindDrone(rider.id(), djiId);
 
-        Uav uav = uavRepository.findByDjiId(djiId).orElseThrow();
+        Uav uav = uavRepository.findPrimaryByDjiId(djiId).orElseThrow();
         assertThat(uav.getUavName()).isEqualTo("pre-registered");
         assertThat(uav.getOnlineStatus()).isEqualTo('1');
         assertThat(uav.getIsAvailable()).isEqualTo('0');

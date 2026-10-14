@@ -22,7 +22,13 @@ public interface UavRepository extends JpaRepository<Uav, Long> {
     @Query("SELECT new com.uav.uav.pojo.vo.UavVo(u.id, u.uavName, u.djiId, u.controllerModel, u.isAvailable) FROM Uav u WHERE u.onlineStatus = :status")
     List<UavVo> findUavByOnlineStatus(@Param("status") Character status);
 
-    Optional<Uav> findByDjiId(@Param("djiId") String djiId);
+    List<Uav> findByDjiIdOrderByIdAsc(String djiId);
+
+    /** 同一 {@code dji_id} 历史上可能有多行，取最早一条作为设备档案主记录。 */
+    default Optional<Uav> findPrimaryByDjiId(String djiId) {
+        List<Uav> rows = findByDjiIdOrderByIdAsc(djiId);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
 
     @Modifying
     @Query("UPDATE Uav u SET u.onlineStatus = :status WHERE u.id = :id")

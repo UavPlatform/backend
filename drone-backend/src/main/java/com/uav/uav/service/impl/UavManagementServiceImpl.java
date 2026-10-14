@@ -56,7 +56,7 @@ public class UavManagementServiceImpl implements UavManagementService {
         List<LiveUavVO> result = new ArrayList<>();
 
         for (LiveSessionSnapshot session : runningSessions) {
-            var uavOpt = uavRepository.findByDjiId(session.getDeviceId());
+            var uavOpt = uavRepository.findPrimaryByDjiId(session.getDeviceId());
             if (uavOpt.isEmpty()) {
                 continue;
             }
@@ -80,7 +80,7 @@ public class UavManagementServiceImpl implements UavManagementService {
         if (deviceId == null || deviceId.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "设备ID不能为空");
         }
-        return uavRepository.findByDjiId(deviceId)
+        return uavRepository.findPrimaryByDjiId(deviceId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
     }
 

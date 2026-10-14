@@ -84,7 +84,7 @@ public class WebUavServiceImpl implements WebUavService {
         if (deviceId == null || deviceId.isBlank()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "deviceId 不能为空");
         }
-        return uavRepository.findByDjiId(deviceId)
+        return uavRepository.findPrimaryByDjiId(deviceId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.UAV_NOT_FOUND));
     }
 

@@ -209,7 +209,7 @@ class LiveStopProtocolE2EIT extends RealProtocolTestBase {
     }
 
     private void registerUav(String deviceId) {
-        Uav uav = new Uav();
+        Uav uav = uavRepository.findPrimaryByDjiId(deviceId).orElseGet(Uav::new);
         uav.setUavName("ln-" + deviceId);
         uav.setDjiId(deviceId);
         uav.setOnlineStatus('1');

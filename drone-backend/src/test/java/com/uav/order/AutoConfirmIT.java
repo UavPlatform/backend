@@ -32,6 +32,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AutoConfirmIT extends IntegrationTestBase {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.uav.attachment.service.AttachmentService attachmentService;
+
     @Autowired
     private OrderRepository orderRepository;
 
@@ -79,6 +82,7 @@ class AutoConfirmIT extends IntegrationTestBase {
         MissionOrder expired = seedWaitingConfirmOrder(LocalDateTime.now().minusHours(73));
         MissionOrder fresh = seedWaitingConfirmOrder(LocalDateTime.now());
 
+        org.mockito.Mockito.when(attachmentService.hasVerifiedEvidence(expired.getTask().getTaskNum())).thenReturn(true);
         int changed = autoConfirmService.autoConfirmExpiredOrders(true, 72);
 
         assertThat(changed).isEqualTo(1);
@@ -91,6 +95,15 @@ class AutoConfirmIT extends IntegrationTestBase {
         assertThat(afterFresh.getOrderStatus()).isEqualTo(OrderStatus.WAITING_CONFIRM);
         // 未过期订单对应任务：撮合状态保持待验收
         assertThat(afterFresh.getTask().getMatchStatus()).isEqualTo(MatchStatus.PENDING_ACCEPTANCE);
+    }
+
+    @Test
+    void enabledSkipsExpiredOrderWithoutVerifiedEvidence() {
+        MissionOrder expired = seedWaitingConfirmOrder(LocalDateTime.now().minusHours(73));
+        int changed = autoConfirmService.autoConfirmExpiredOrders(true, 72);
+        assertThat(changed).isZero();
+        assertThat(expired.getOrderStatus()).isEqualTo(OrderStatus.WAITING_CONFIRM);
+        assertThat(expired.getTask().getMatchStatus()).isEqualTo(MatchStatus.PENDING_ACCEPTANCE);
     }
 
     @Test

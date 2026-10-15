@@ -40,6 +40,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class CompletionSemanticsIT extends IntegrationTestBase {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.uav.attachment.service.AttachmentObjectStorage evidenceStorage;
+
+
     @Autowired
     private TaskAssignmentRepository taskAssignmentRepository;
 
@@ -61,7 +65,7 @@ class CompletionSemanticsIT extends IntegrationTestBase {
         TestAccounts.Account owner = accounts().registerUser();
         TestAccounts.Account rider = accounts().registerRider();
         Task task = confirmedTask(owner, rider);
-        fixtures.evidence(task.getTaskNum(), rider.id());
+        fixtures.evidence(task.getTaskNum(), rider.id(), evidenceStorage);
         taskService.riderCompleteTask(task.getTaskNum(), rider.id(), "巡检完成，正射影像已生成");
 
         var assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElseThrow();
@@ -87,7 +91,7 @@ class CompletionSemanticsIT extends IntegrationTestBase {
         TestAccounts.Account owner = accounts().registerUser();
         TestAccounts.Account rider = accounts().registerRider();
         Task task = confirmedTask(owner, rider);
-        fixtures.evidence(task.getTaskNum(), rider.id());
+        fixtures.evidence(task.getTaskNum(), rider.id(), evidenceStorage);
         taskService.riderCompleteTask(task.getTaskNum(), rider.id(), null);
 
         var assignment = taskAssignmentRepository.findByTaskId(task.getId()).orElseThrow();

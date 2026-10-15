@@ -16,6 +16,8 @@ public class OssClientConfig {
     public OSS ossClient(UploadStorageConfig config) {
         UploadStorageConfig.Oss oss = config.getOss();
         log.info("OSS client Bean 创建，endpoint: {}, bucket: {}", oss.getEndpoint(), oss.getBucket());
-        return new OSSClientBuilder().build(oss.getEndpoint(), oss.getAccessKeyId(), oss.getAccessKeySecret());
+        String endpoint = oss.getEndpoint();
+        if (endpoint != null && !endpoint.contains("://")) endpoint = "https://" + endpoint;
+        return new OSSClientBuilder().build(endpoint, oss.getAccessKeyId(), oss.getAccessKeySecret());
     }
 }

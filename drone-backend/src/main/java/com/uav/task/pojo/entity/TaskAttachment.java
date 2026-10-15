@@ -48,6 +48,10 @@ public class TaskAttachment {
     @Column(name = "create_time", nullable = false, updatable = false)
     private LocalDateTime createTime;
 
+    /** PENDING: awaiting confirmation; LEGACY: must be checked against storage. */
+    @Column(name = "upload_status", nullable = false, length = 16)
+    private String uploadStatus = "PENDING";
+
     @PrePersist
     protected void onCreate() {
         this.createTime = LocalDateTime.now();

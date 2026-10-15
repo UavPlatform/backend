@@ -6372,7 +6372,7 @@
     },
     "/tasks/{taskNum}/attachments" : {
       "get" : {
-        "description" : "任务所有者、接单飞手与管理员（role=2，监管端只读）可看；逐条附 presigned 下载 URL（15 分钟有效）",
+        "description" : "任务所有者、接单飞手与管理员（role=2，监管端只读）可看；仅返回已确认或核验通过的历史附件（uploadStatus=UPLOADED），校验对象存在且大小一致后附下载 URL",
         "operationId" : "list",
         "parameters" : [ {
           "description" : "任务编号",
@@ -6396,6 +6396,41 @@
           }
         },
         "summary" : "附件列表",
+        "tags" : [ "Task Attachment API" ]
+      }
+    },
+    "/tasks/{taskNum}/attachments/confirm-upload" : {
+      "post" : {
+        "description" : "仅原上传者可确认；验证对象存在且大小一致后置为 UPLOADED，重复确认幂等",
+        "operationId" : "confirmAttachmentUpload",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "taskNum",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "objectKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapStringObject"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "确认附件上传完成",
         "tags" : [ "Task Attachment API" ]
       }
     },
@@ -6438,7 +6473,7 @@
     },
     "/tasks/{taskNum}/attachments/upload-url" : {
       "post" : {
-        "description" : "仅任务的接单飞手可调用；校验类型（图片 jpeg/png/webp ≤20MB，视频 mp4/mov ≤500MB）后返回 presigned PUT URL（15 分钟有效），客户端直传 MinIO",
+        "description" : "任务所有者或接单飞手可调用；校验类型（图片 jpeg/png/webp ≤20MB，视频 mp4/mov ≤500MB）后返回 presigned PUT URL（15 分钟有效）并登记 PENDING；直传后须调用 confirm-upload",
         "operationId" : "uploadUrl",
         "parameters" : [ {
           "description" : "任务编号",

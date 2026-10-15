@@ -3,6 +3,7 @@ package com.uav.e2e;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.support.OpenApiContract;
+import com.uav.support.HttpAttachmentStorageFixture;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.pay.mapper.PayRecordRepository;
@@ -15,6 +16,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -111,12 +116,23 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "drone.amap.key=t4-e2e-placeholder-amap-key",
                 "drone.amap.security-key=t4-e2e-placeholder-amap-security-key"
         })
+@Import(OrderDeliveryE2EIT.EvidenceStorageConfiguration.class)
 @EnabledIfEnvironmentVariable(named = "T4_DB_HOST", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_PORT", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_NAME", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_USER", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "T4_DB_PASSWORD", matches = ".+")
 class OrderDeliveryE2EIT extends RealProtocolTestBase {
+
+    // Only the external object store is replaced. HTTP, authentication, services and MySQL remain real.
+    @TestConfiguration(proxyBeanMethods = false)
+    static class EvidenceStorageConfiguration {
+        @Bean(destroyMethod = "close")
+        @Primary
+        HttpAttachmentStorageFixture evidenceStorage() throws java.io.IOException {
+            return new HttpAttachmentStorageFixture();
+        }
+    }
 
     private static final String RUN_ID = UniqueNames.unique("e2e");
     private static final String PASSWORD = "E2e!pw123456";
@@ -346,12 +362,12 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
                 .as("双确认后才允许 IN_PROGRESS（验收 4）").isEqualTo("IN_PROGRESS");
         assertThat(confirmedTask.getMatchStatus().name()).isEqualTo("CONFIRMED");
 
-        // ── 9. 交付门禁：无履约证据 → 拒绝（验收 5）；插入证据后方可交付 ──
+        // ── 9. 交付门禁：无凭证/未确认 → 拒绝；真实 PUT + 上传确认后方可交付（REQ-BACKEND-001） ──
         JsonNode noEvidence = sendExpecting(postReq(
                 "/rider/complete?taskNum=" + taskNum + "&note=no-evidence", riderAToken, null), 400);
         assertThat(noEvidence.path("errorCode").asText()).isEqualTo("DELIVERY_EVIDENCE_REQUIRED");
 
-        insertEvidence(taskNum, riderAId);
+        uploadAndConfirmEvidence(taskNum, riderAToken, userToken);
 
         JsonNode done = post("/rider/complete?taskNum=" + taskNum + "&note=t4-e2e-delivered",
                 riderAToken, null);
@@ -537,17 +553,37 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         return new ObjectMapper().readTree(payload).path("userId").asLong();
     }
 
-    /**
-     * 直插一条履约证据（task_attachment）。交付门禁只认证据行是否存在，
-     * presigned 上传依赖 MinIO（E2E 环境不保证），故用 SQL 造证据行，同样经真实库。
-     */
-    private void insertEvidence(String taskNum, long uploaderId) throws Exception {
-        try (Connection c = dataSource.getConnection();
-             java.sql.Statement st = c.createStatement()) {
-            st.executeUpdate("INSERT INTO task_attachment (task_num, uploader_id, object_key,"
-                    + " file_name, content_type, size_bytes, create_time) VALUES ('" + taskNum + "', "
-                    + uploaderId + ", 'task-attachments/" + taskNum + "/e2e-evidence', 'evidence.jpg',"
-                    + " 'image/jpeg', 1024, NOW())");
-        }
+    /** Exercise the attachment API and storage bytes; never manufacture an uploaded database row. */
+    private void uploadAndConfirmEvidence(String taskNum, String riderToken, String ownerToken) throws Exception {
+        byte[] photo = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xd9};
+        String attachments = "/tasks/" + taskNum + "/attachments";
+        JsonNode ticket = post(attachments + "/upload-url?fileName=evidence.jpg&contentType=image%2Fjpeg&sizeBytes="
+                + photo.length, riderToken, null).path("data");
+        String objectKey = ticket.path("objectKey").asText();
+        assertThat(objectKey).isNotBlank();
+        assertThat(get(attachments, ownerToken).path("data").size()).isZero();
+
+        String confirmation = attachments + "/confirm-upload?objectKey="
+                + java.net.URLEncoder.encode(objectKey, java.nio.charset.StandardCharsets.UTF_8);
+        // An issued ticket does not prove the object exists.
+        sendExpecting(postReq(confirmation, riderToken, null), 400);
+        HttpResponse<byte[]> uploaded = http.send(HttpRequest.newBuilder(URI.create(ticket.path("uploadUrl").asText()))
+                .timeout(Duration.ofSeconds(30)).header("Content-Type", "image/jpeg")
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(photo)).build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(uploaded.statusCode()).as("external storage PUT").isEqualTo(200);
+        assertThat(get(attachments, ownerToken).path("data").size()).as("PUT alone is not confirmed evidence").isZero();
+        JsonNode pending = sendExpecting(postReq("/rider/complete?taskNum=" + taskNum, riderToken, null), 400);
+        assertThat(pending.path("errorCode").asText()).isEqualTo("DELIVERY_EVIDENCE_REQUIRED");
+
+        JsonNode confirmed = post(confirmation, riderToken, null).path("data");
+        assertThat(confirmed.path("uploadStatus").asText()).isEqualTo("UPLOADED");
+        assertThat(confirmed.path("objectKey").asText()).isEqualTo(objectKey);
+        JsonNode visible = get(attachments, ownerToken).path("data");
+        assertThat(visible.size()).isEqualTo(1);
+        assertThat(visible.get(0).path("uploadStatus").asText()).isEqualTo("UPLOADED");
+        HttpResponse<byte[]> downloaded = http.send(HttpRequest.newBuilder(
+                URI.create(visible.get(0).path("downloadUrl").asText())).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertThat(downloaded.statusCode()).isEqualTo(200);
+        assertThat(downloaded.body()).isEqualTo(photo);
     }
 }

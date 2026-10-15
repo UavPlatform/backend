@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 交付物附件业务（1B-9b）：授权、类型/大小限制、presigned URL、附件列表。
+ * 履约证据业务（REQ-BACKEND-001；TASK-PLATFORM-002）：授权、直传确认、有效对象核验。
  *
  * <p>授权口径（裁决 Q8=B，TASK-BACKEND-007 只读放行）：上传=任务的接单飞手或任务所有者（写路径不变）；
  * 查看/下载=任务所有者、接单飞手与管理员（role=2，监管端只读）。objectKey 全局唯一（task-attachments/{taskNum}/{uuid}）。
@@ -42,19 +42,19 @@ public class AttachmentService {
 
     private final com.uav.task.mapper.TaskAssignmentRepository taskAssignmentRepository;
 
-    private final MinioStorageService minioStorageService;
+    private final AttachmentObjectStorage objectStorage;
 
     private final com.uav.task.service.TaskReadAccess taskReadAccess;
 
     public AttachmentService(TaskRepository taskRepository,
                              TaskAttachmentRepository taskAttachmentRepository,
                              com.uav.task.mapper.TaskAssignmentRepository taskAssignmentRepository,
-                             MinioStorageService minioStorageService,
+                             AttachmentObjectStorage objectStorage,
                              com.uav.task.service.TaskReadAccess taskReadAccess) {
         this.taskRepository = taskRepository;
         this.taskAttachmentRepository = taskAttachmentRepository;
         this.taskAssignmentRepository = taskAssignmentRepository;
-        this.minioStorageService = minioStorageService;
+        this.objectStorage = objectStorage;
         this.taskReadAccess = taskReadAccess;
     }
 
@@ -79,18 +79,20 @@ public class AttachmentService {
         attachment.setFileName(fileName.trim());
         attachment.setContentType(contentType);
         attachment.setSizeBytes(sizeBytes);
+        attachment.setUploadStatus("PENDING");
         taskAttachmentRepository.save(attachment);
 
-        String uploadUrl = minioStorageService.presignedPut(objectKey,
-                com.uav.attachment.service.MinioStorageService.PRESIGN_EXPIRY_SECONDS);
+        String uploadUrl = objectStorage.presignedPut(objectKey,
+                AttachmentObjectStorage.PRESIGN_EXPIRY_SECONDS, contentType);
         log.info("交付物上传凭证已签发: taskNum={}, uploader={}, objectKey={}, fileName={}, size={}",
                 taskNum, callerId, objectKey, fileName, sizeBytes);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("objectKey", objectKey);
         result.put("uploadUrl", uploadUrl);
-        result.put("expireSeconds", com.uav.attachment.service.MinioStorageService.PRESIGN_EXPIRY_SECONDS);
+        result.put("expireSeconds", AttachmentObjectStorage.PRESIGN_EXPIRY_SECONDS);
         result.put("method", "PUT");
+        result.put("contentType", contentType);
         return result;
     }
 
@@ -104,16 +106,18 @@ public class AttachmentService {
         requireReadAccess(task, callerId, role);
 
         return taskAttachmentRepository.findByTaskNumOrderByCreateTimeAsc(taskNum).stream()
+                .filter(this::isVerifiedEvidence)
                 .map(a -> {
                     Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("uploadStatus", "UPLOADED");
                     item.put("objectKey", a.getObjectKey());
                     item.put("fileName", a.getFileName());
                     item.put("contentType", a.getContentType());
                     item.put("sizeBytes", a.getSizeBytes());
                     item.put("uploaderId", a.getUploaderId());
                     item.put("createTime", a.getCreateTime());
-                    item.put("downloadUrl", minioStorageService.presignedGet(a.getObjectKey(),
-                            com.uav.attachment.service.MinioStorageService.PRESIGN_EXPIRY_SECONDS));
+                    item.put("downloadUrl", objectStorage.presignedGet(a.getObjectKey(),
+                            AttachmentObjectStorage.PRESIGN_EXPIRY_SECONDS));
                     return item;
                 })
                 .collect(java.util.stream.Collectors.toList());
@@ -131,22 +135,57 @@ public class AttachmentService {
                 .findByTaskNumAndObjectKey(taskNum, objectKey)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM,
                         "附件不存在"));
-        String downloadUrl = minioStorageService.presignedGet(attachment.getObjectKey(),
-                com.uav.attachment.service.MinioStorageService.PRESIGN_EXPIRY_SECONDS);
+        if (!isVerifiedEvidence(attachment)) {
+            throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "附件尚未上传完成或文件已失效");
+        }
+        String downloadUrl = objectStorage.presignedGet(attachment.getObjectKey(),
+                AttachmentObjectStorage.PRESIGN_EXPIRY_SECONDS);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("objectKey", attachment.getObjectKey());
         result.put("fileName", attachment.getFileName());
         result.put("contentType", attachment.getContentType());
         result.put("sizeBytes", attachment.getSizeBytes());
         result.put("downloadUrl", downloadUrl);
-        result.put("expireSeconds", com.uav.attachment.service.MinioStorageService.PRESIGN_EXPIRY_SECONDS);
+        result.put("expireSeconds", AttachmentObjectStorage.PRESIGN_EXPIRY_SECONDS);
         return result;
+    }
+
+    /** Idempotent confirmation, restricted to the caller who requested this ticket. */
+    @Transactional
+    public Map<String, Object> confirmUpload(Long callerId, String taskNum, String objectKey) {
+        requireConfigured();
+        Task task = requireTask(taskNum);
+        requireOwnerOrRider(task, callerId);
+        TaskAttachment attachment = taskAttachmentRepository.findByTaskNumAndObjectKey(taskNum, objectKey)
+                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "附件不存在"));
+        if (!callerId.equals(attachment.getUploaderId())) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "无权确认此附件");
+        }
+        if (!objectStorage.isValidObject(objectKey, attachment.getSizeBytes())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "文件不存在或大小不符，请重新上传");
+        }
+        attachment.setUploadStatus("UPLOADED");
+        taskAttachmentRepository.save(attachment);
+        log.info("交付物上传已确认: taskNum={}, objectKey={}, size={}", taskNum, objectKey, attachment.getSizeBytes());
+        return Map.of("objectKey", objectKey, "uploadStatus", "UPLOADED");
+    }
+
+    public boolean isVerifiedEvidence(TaskAttachment attachment) {
+        return ("UPLOADED".equals(attachment.getUploadStatus()) || "LEGACY".equals(attachment.getUploadStatus()))
+                && objectStorage.isValidObject(attachment.getObjectKey(), attachment.getSizeBytes());
+    }
+
+    public boolean hasVerifiedEvidence(String taskNum) {
+        // REQ-BACKEND-001: no attachment is missing evidence, not a storage configuration error.
+        // Eligible rows still invoke storage verification, which fails closed on storage errors.
+        return taskAttachmentRepository.findByTaskNumOrderByCreateTimeAsc(taskNum).stream()
+                .anyMatch(this::isVerifiedEvidence);
     }
 
     // ---------- 校验 ----------
 
     private void requireConfigured() {
-        if (!minioStorageService.isConfigured()) {
+        if (!objectStorage.isConfigured()) {
             throw new BusinessException(HttpStatus.SERVICE_UNAVAILABLE, ApiErrorCode.INTERNAL_ERROR,
                     "对象存储未配置，请联系管理员");
         }

@@ -1,0 +1,6 @@
+{
+  "type": "event",
+  "name": "LIVE_STOPPED",
+  "deviceId": "DJI-001",
+  "timestamp": 1760000000000
+}

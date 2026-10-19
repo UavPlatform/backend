@@ -3,16 +3,19 @@ package com.uav.attachment;
 import com.uav.attachment.service.AttachmentService;
 import com.uav.attachment.service.MinioStorageService;
 import com.uav.order.mapper.OrderRepository;
+import com.uav.order.service.OrderService;
 import com.uav.server.enums.MatchStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.task.mapper.*;
 import com.uav.task.pojo.entity.*;
 import com.uav.task.service.TaskReadAccess;
+import com.uav.task.service.impl.TaskLifecycleService;
+import com.uav.task.service.impl.TaskQueryService;
 import com.uav.task.service.impl.TaskServiceImpl;
+import com.uav.user.mapper.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
@@ -22,10 +25,11 @@ class TaskEvidenceGateTest {
     TaskRepository tasks = mock(TaskRepository.class);
     TaskAssignmentRepository assignments = mock(TaskAssignmentRepository.class);
     TaskAttachmentRepository attachments = mock(TaskAttachmentRepository.class);
+    TaskApplicationRepository applications = mock(TaskApplicationRepository.class);
     OrderRepository orders = mock(OrderRepository.class);
     MinioStorageService storage = mock(MinioStorageService.class);
     Task task = new Task(); TaskAttachment evidence = new TaskAttachment();
-    TaskServiceImpl service = new TaskServiceImpl();
+    TaskServiceImpl service;
 
     @BeforeEach void setup() {
         task.setId(1L); task.setUserId(7L); task.setTaskStatus(TaskStatus.IN_PROGRESS);
@@ -38,11 +42,13 @@ class TaskEvidenceGateTest {
         when(storage.isConfigured()).thenReturn(true);
         evidence.setObjectKey("key"); evidence.setSizeBytes(3L);
         when(attachments.findByTaskNumOrderByCreateTimeAsc("T1")).thenReturn(List.of(evidence));
-        ReflectionTestUtils.setField(service, "taskRepository", tasks);
-        ReflectionTestUtils.setField(service, "taskAssignmentRepository", assignments);
-        ReflectionTestUtils.setField(service, "orderRepository", orders);
-        ReflectionTestUtils.setField(service, "attachmentService", new AttachmentService(
-                tasks, attachments, assignments, storage, mock(TaskReadAccess.class)));
+        AttachmentService attachmentService = new AttachmentService(
+                tasks, attachments, assignments, storage, mock(TaskReadAccess.class));
+        TaskLifecycleService lifecycle = new TaskLifecycleService(
+                tasks, assignments, applications, attachmentService, orders, mock(OrderService.class));
+        TaskQueryService query = new TaskQueryService(
+                tasks, applications, assignments, mock(UserRepository.class));
+        service = new TaskServiceImpl(lifecycle, query);
     }
 
     @Test void pendingEvidenceBlocksDeliveryAndAcceptanceEvenIfObjectExists() {

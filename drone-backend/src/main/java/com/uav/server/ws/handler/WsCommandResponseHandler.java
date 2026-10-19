@@ -2,6 +2,7 @@ package com.uav.server.ws.handler;
 
 import com.alibaba.fastjson.JSONObject;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.service.WsMessageService;
 import com.uav.live.service.LiveSessionService;
 import lombok.Getter;
@@ -28,7 +29,7 @@ public class WsCommandResponseHandler implements WsMessageHandler {
 
     @Override
     public String getType() {
-        return "response";
+        return WsMessageNames.TYPE_RESPONSE;
     }
 
     @Override
@@ -38,7 +39,8 @@ public class WsCommandResponseHandler implements WsMessageHandler {
 
     @Override
     public boolean supports(String type, String name) {
-        return "response".equalsIgnoreCase(type) || "error".equalsIgnoreCase(type);
+        return WsMessageNames.TYPE_RESPONSE.equalsIgnoreCase(type)
+                || WsMessageNames.TYPE_ERROR.equalsIgnoreCase(type);
     }
 
     @Override
@@ -106,7 +108,7 @@ public class WsCommandResponseHandler implements WsMessageHandler {
         if (success != null) {
             return success;
         }
-        return !"error".equalsIgnoreCase(json.getString("type"));
+        return !WsMessageNames.TYPE_ERROR.equalsIgnoreCase(json.getString("type"));
     }
 
     private String firstNonBlank(String... candidates) {

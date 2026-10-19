@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PONG",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "PONG" },
+    "replyTo": { "type": "string" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "success": { "type": "boolean" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -2,6 +2,7 @@ package com.uav.server.ws.handler;
 
 import com.alibaba.fastjson.JSONObject;
 import com.uav.live.pojo.dto.WsEnvelope;
+import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.service.WsMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,20 +18,20 @@ public class PingHandler implements WsMessageHandler {
 
     @Override
     public String getType() {
-        return "event";
+        return WsMessageNames.TYPE_EVENT;
     }
 
     @Override
     public String getName() {
-        return "PING";
+        return WsMessageNames.PING;
     }
 
     @Override
     public void handle(JSONObject json, WebSocketSession session) {
         String deviceId = WsSessionDeviceIdResolver.resolve(session, json);
         WsEnvelope pong = new WsEnvelope();
-        pong.setType("event");
-        pong.setName("PONG");
+        pong.setType(WsMessageNames.TYPE_EVENT);
+        pong.setName(WsMessageNames.PONG);
         pong.setReplyTo(json.getString("id"));
         pong.setDeviceId(deviceId);
         pong.setTimestamp(System.currentTimeMillis());

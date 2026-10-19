@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UAV status update forwarded to web",
+  "type": "object",
+  "required": ["type", "name", "deviceId", "data"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "UAV_STATUS_UPDATE" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": true
+}

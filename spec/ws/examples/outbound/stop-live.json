@@ -1,0 +1,8 @@
+{
+  "id": "req-2",
+  "type": "command",
+  "name": "STOP_LIVE",
+  "deviceId": "DJI-001",
+  "timestamp": 1760000000000,
+  "data": {}
+}

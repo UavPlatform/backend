@@ -3,6 +3,7 @@ package com.uav.server.ws.service;
 import com.alibaba.fastjson.JSON;
 import com.uav.live.pojo.dto.WsEnvelope;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.ws.WsMessageNames;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
@@ -32,8 +33,8 @@ public class WsMessageService {
             return;
         }
         WsEnvelope error = new WsEnvelope();
-        error.setType("error");
-        error.setName("ERROR");
+        error.setType(WsMessageNames.TYPE_ERROR);
+        error.setName(WsMessageNames.ERROR);
         error.setTimestamp(System.currentTimeMillis());
         error.setSuccess(false);
         error.setCode(errorCode.getCode());

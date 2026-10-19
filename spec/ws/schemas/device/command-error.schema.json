@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device command error response",
+  "type": "object",
+  "required": ["type", "replyTo"],
+  "properties": {
+    "type": { "const": "error" },
+    "name": { "type": ["string", "null"] },
+    "replyTo": { "type": "string" },
+    "requestId": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

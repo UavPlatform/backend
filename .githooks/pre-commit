@@ -1,0 +1,3 @@
+#!/bin/sh
+# DRONE_GATE_HOOK
+exec python "D:/2024_code/drone-project/backend/tools/gate.py" hook pre-commit

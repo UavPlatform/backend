@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./drone-backend/src/main/resources/application-dev.yml)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import pathlib,subprocess,sys; p=pathlib.Path.cwd(); root=next((q for q in [p,*p.parents] if (q/'docs'/'tools'/'gate_hook.py').is_file()), None); sys.exit(subprocess.call([sys.executable,str(root/'docs'/'tools'/'gate_hook.py')]) if root else 0)\"",
+            "timeout": 30,
+            "statusMessage": "Checking workspace sync gate"
+          }
+        ]
+      }
+    ]
+  }
+}

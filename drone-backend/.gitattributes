@@ -1,2 +1,4 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+src/test/resources/archunit_store/** text eol=lf
+src/test/resources/archunit.properties text eol=lf

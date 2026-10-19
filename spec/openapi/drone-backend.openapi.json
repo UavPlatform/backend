@@ -4852,7 +4852,7 @@
     },
     "/live/close" : {
       "post" : {
-        "description" : "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话并补齐该设备全体观众的观看记录；设备离线则直接补终态。协议详见 DroneWebSocketHandler#sendStopLiveCommand javadoc。",
+        "description" : "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话并补齐该设备全体观众的观看记录；设备离线则直接补终态。协议详见 DroneCommandService#sendStopLiveCommand javadoc。",
         "operationId" : "closeLive",
         "parameters" : [ {
           "description" : "无人机设备ID",

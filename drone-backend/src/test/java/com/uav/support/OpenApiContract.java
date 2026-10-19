@@ -1,5 +1,7 @@
 package com.uav.support;
 
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -103,7 +105,12 @@ public final class OpenApiContract {
     }
 
     public static String pretty(JsonNode node) throws IOException {
-        return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node) + System.lineSeparator();
+        // Contract files must hash identically on Windows and Linux: force LF,
+        // including the indenter's line separator (Jackson defaults to the OS value).
+        // Keep Jackson's default array layout (inline); only the object newline is OS-dependent.
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
+        printer.indentObjectsWith(new DefaultIndenter("  ", "\n"));
+        return MAPPER.writer(printer).writeValueAsString(node) + "\n";
     }
 
     public static String sha256(String content) {

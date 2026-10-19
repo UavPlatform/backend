@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device live stopped",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "LIVE_STOPPED" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" }
+  },
+  "additionalProperties": true
+}

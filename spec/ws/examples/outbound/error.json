@@ -1,0 +1,8 @@
+{
+  "type": "error",
+  "name": "ERROR",
+  "timestamp": 1760000000000,
+  "success": false,
+  "code": "400",
+  "message": "消息体不能为空"
+}

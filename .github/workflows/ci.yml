@@ -26,8 +26,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  sync-gate:
+    name: sync-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require the branch to include origin/main
+        run: |
+          git fetch origin main
+          python3 tools/gate.py check-ci --base origin/main
+
   test:
     name: backend-tests
+    needs: sync-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -61,7 +75,7 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Run unit + integration + E2E tests (mvnw verify)
+      - name: Run unit + integration + E2E tests (mvnw clean verify)
         working-directory: ./drone-backend
         env:
           T4_DB_HOST: 127.0.0.1
@@ -69,7 +83,7 @@ jobs:
           T4_DB_NAME: drone_ci
           T4_DB_USER: drone_ci
           T4_DB_PASSWORD: ci-only-password
-        run: sh mvnw -B verify
+        run: sh mvnw -B clean verify
 
       - name: Assert tests actually ran (no zero-run, no skips)
         working-directory: ./drone-backend
@@ -104,6 +118,20 @@ jobs:
           [ "$u_skip" -eq 0 ] && [ "$i_skip" -eq 0 ] || {
             echo "::error::存在 skipped 用例（CI 已提供 MySQL，真库用例不应被跳过）"; exit 1; }
 
+      - name: Check gate copies are identical
+        run: python3 tools/check_gate_copy.py
+
+      - name: Coverage ratchet
+        run: |
+          if [ -f tools/coverage-baseline.json ]; then
+            python3 tools/check_coverage.py --baseline tools/coverage-baseline.json --require-no-skips
+          else
+            echo "::warning::coverage baseline not committed yet; skipping ratchet"
+          fi
+
+      - name: File-size ratchet
+        run: python3 tools/check_file_size.py --baseline tools/file-size-baseline.json
+
       - name: Check test layers and execution-layer naming
         run: bash tools/check-test-layers.sh --selftest
 
@@ -122,5 +150,7 @@ jobs:
           path: |
             drone-backend/target/surefire-reports/
             drone-backend/target/failsafe-reports/
+            drone-backend/target/site/jacoco/
+            drone-backend/target/cpd.xml
           if-no-files-found: ignore
           retention-days: 7

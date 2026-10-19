@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Server error",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "error" },
+    "name": { "const": "ERROR" },
+    "timestamp": { "type": "integer" },
+    "success": { "type": "boolean" },
+    "code": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

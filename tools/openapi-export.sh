@@ -53,7 +53,7 @@ case "$MODE" in
   --check|check)
     echo "[openapi] 校验模式：冻结规格 vs 运行中实现（不写 spec/）"
     rm -f "$GATE_REPORT" "$FAILSAFE_SUMMARY"
-    mvn -B -q test-compile failsafe:integration-test failsafe:verify \
+    sh "$ROOT/tools/hooks/mvn21.sh" -B -q test-compile failsafe:integration-test failsafe:verify \
       -Dfailsafe.failIfNoSpecifiedTests=true \
       -Dit.test='OpenApiContractGateE2EIT#frozenSpecMatchesRunningImplementation'
     require_gate_executed
@@ -62,7 +62,7 @@ case "$MODE" in
   export|--export)
     echo "[openapi] 导出模式：profile=test(H2) 启动上下文，拉取 /v3/api-docs 并归一化"
     rm -f "$GATE_REPORT" "$FAILSAFE_SUMMARY"
-    mvn -B -q test-compile failsafe:integration-test failsafe:verify \
+    sh "$ROOT/tools/hooks/mvn21.sh" -B -q test-compile failsafe:integration-test failsafe:verify \
       -Dfailsafe.failIfNoSpecifiedTests=true \
       -Dit.test='OpenApiContractGateE2EIT#exportContract' \
       -Dopenapi.export=true

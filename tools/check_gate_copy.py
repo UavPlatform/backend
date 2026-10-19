@@ -18,11 +18,13 @@ def digest(path: Path) -> str:
 
 
 def main() -> int:
-    missing = [path for path in (CANONICAL, COPY) if not path.is_file()]
-    if missing:
-        for path in missing:
-            print(f"[gate-copy] missing: {path}", file=sys.stderr)
+    if not COPY.is_file():
+        print(f"[gate-copy] missing: {COPY}", file=sys.stderr)
         return 1
+    if not CANONICAL.is_file():
+        # Standalone backend checkout in CI: there is no sibling docs repo to compare.
+        print("[gate-copy] standalone checkout; skipping cross-repo comparison")
+        return 0
     canonical = digest(CANONICAL)
     copy = digest(COPY)
     if canonical != copy:

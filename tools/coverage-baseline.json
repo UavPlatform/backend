@@ -1,0 +1,659 @@
+{
+  "schema": 1,
+  "updated": "2026-10-19T03:22:03+00:00",
+  "reason": "initial baseline from full no-skip verify (MySQL 8.0 on 13306)",
+  "environment": {
+    "jacoco": "0.8.15",
+    "require_no_skips": false
+  },
+  "overall": {
+    "covered": 3546,
+    "missed": 1463,
+    "total": 5009,
+    "ratio": 0.7079257336793772
+  },
+  "packages": {
+    "com/uav/task/pojo/entity": {
+      "covered": 15,
+      "missed": 0,
+      "total": 15,
+      "ratio": 1.0
+    },
+    "com/uav/chat/pojo/entity": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/aircraft/pojo/entity": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/order/pojo/entity": {
+      "covered": 19,
+      "missed": 2,
+      "total": 21,
+      "ratio": 0.9047619047619048
+    },
+    "com/uav/order/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/aircraft/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/chat/pojo/vo": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/chat/pojo/enums": {
+      "covered": 13,
+      "missed": 5,
+      "total": 18,
+      "ratio": 0.7222222222222222
+    },
+    "com/uav/user/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/upload/vo": {
+      "covered": 0,
+      "missed": 14,
+      "total": 14,
+      "ratio": 0.0
+    },
+    "com/uav/server/aspect": {
+      "covered": 42,
+      "missed": 3,
+      "total": 45,
+      "ratio": 0.9333333333333333
+    },
+    "com/uav/log/service/impl": {
+      "covered": 34,
+      "missed": 25,
+      "total": 59,
+      "ratio": 0.576271186440678
+    },
+    "com/uav/server/util": {
+      "covered": 66,
+      "missed": 39,
+      "total": 105,
+      "ratio": 0.6285714285714286
+    },
+    "com/uav/server/interceptor": {
+      "covered": 62,
+      "missed": 7,
+      "total": 69,
+      "ratio": 0.8985507246376812
+    },
+    "com/uav/upload/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/rider/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/uav/pojo/vo": {
+      "covered": 8,
+      "missed": 27,
+      "total": 35,
+      "ratio": 0.22857142857142856
+    },
+    "com/uav/chat/notify": {
+      "covered": 88,
+      "missed": 7,
+      "total": 95,
+      "ratio": 0.9263157894736842
+    },
+    "com/uav/upload/controller": {
+      "covered": 2,
+      "missed": 37,
+      "total": 39,
+      "ratio": 0.05128205128205128
+    },
+    "com/uav/uav/pojo/entity": {
+      "covered": 8,
+      "missed": 1,
+      "total": 9,
+      "ratio": 0.8888888888888888
+    },
+    "com/uav/pay/pojo/entity": {
+      "covered": 4,
+      "missed": 0,
+      "total": 4,
+      "ratio": 1.0
+    },
+    "com/uav/admin/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/server/notify": {
+      "covered": 98,
+      "missed": 9,
+      "total": 107,
+      "ratio": 0.9158878504672897
+    },
+    "com/uav/log/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/pay/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/rider/service/impl": {
+      "covered": 103,
+      "missed": 0,
+      "total": 103,
+      "ratio": 1.0
+    },
+    "com/uav/rider/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/order/config": {
+      "covered": 1,
+      "missed": 0,
+      "total": 1,
+      "ratio": 1.0
+    },
+    "com/uav/log/controller": {
+      "covered": 3,
+      "missed": 6,
+      "total": 9,
+      "ratio": 0.3333333333333333
+    },
+    "com/uav/live/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/task/service": {
+      "covered": 105,
+      "missed": 2,
+      "total": 107,
+      "ratio": 0.9813084112149533
+    },
+    "com/uav/server/config": {
+      "covered": 40,
+      "missed": 0,
+      "total": 40,
+      "ratio": 1.0
+    },
+    "com/uav/chat/controller/webController": {
+      "covered": 19,
+      "missed": 6,
+      "total": 25,
+      "ratio": 0.76
+    },
+    "com/uav/uav/service": {
+      "covered": 13,
+      "missed": 1,
+      "total": 14,
+      "ratio": 0.9285714285714286
+    },
+    "com/uav/admin/config": {
+      "covered": 22,
+      "missed": 4,
+      "total": 26,
+      "ratio": 0.8461538461538461
+    },
+    "com/uav/live/controller": {
+      "covered": 112,
+      "missed": 27,
+      "total": 139,
+      "ratio": 0.8057553956834532
+    },
+    "com/uav/log/pojo/vo": {
+      "covered": 1,
+      "missed": 1,
+      "total": 2,
+      "ratio": 0.5
+    },
+    "com/uav": {
+      "covered": 1,
+      "missed": 2,
+      "total": 3,
+      "ratio": 0.3333333333333333
+    },
+    "com/uav/rider/controller": {
+      "covered": 4,
+      "missed": 1,
+      "total": 5,
+      "ratio": 0.8
+    },
+    "com/uav/server/exception": {
+      "covered": 8,
+      "missed": 4,
+      "total": 12,
+      "ratio": 0.6666666666666666
+    },
+    "com/uav/server/ws/handler": {
+      "covered": 99,
+      "missed": 107,
+      "total": 206,
+      "ratio": 0.48058252427184467
+    },
+    "com/uav/pay/pojo/vo": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/uav/controller": {
+      "covered": 21,
+      "missed": 24,
+      "total": 45,
+      "ratio": 0.4666666666666667
+    },
+    "com/uav/aircraft/controller": {
+      "covered": 4,
+      "missed": 0,
+      "total": 4,
+      "ratio": 1.0
+    },
+    "com/uav/user/service/impl": {
+      "covered": 64,
+      "missed": 15,
+      "total": 79,
+      "ratio": 0.810126582278481
+    },
+    "com/uav/admin/pojo/entity": {
+      "covered": 5,
+      "missed": 0,
+      "total": 5,
+      "ratio": 1.0
+    },
+    "com/uav/attachment/controller": {
+      "covered": 13,
+      "missed": 0,
+      "total": 13,
+      "ratio": 1.0
+    },
+    "com/uav/uav/service/impl": {
+      "covered": 104,
+      "missed": 109,
+      "total": 213,
+      "ratio": 0.48826291079812206
+    },
+    "com/uav/server/enums": {
+      "covered": 166,
+      "missed": 3,
+      "total": 169,
+      "ratio": 0.9822485207100592
+    },
+    "com/uav/rider/pojo/vo": {
+      "covered": 7,
+      "missed": 0,
+      "total": 7,
+      "ratio": 1.0
+    },
+    "com/uav/server/filter": {
+      "covered": 21,
+      "missed": 0,
+      "total": 21,
+      "ratio": 1.0
+    },
+    "com/uav/rider/support": {
+      "covered": 16,
+      "missed": 0,
+      "total": 16,
+      "ratio": 1.0
+    },
+    "com/uav/server/annotation": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/user/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/live/service/impl": {
+      "covered": 82,
+      "missed": 12,
+      "total": 94,
+      "ratio": 0.8723404255319149
+    },
+    "com/uav/upload/service": {
+      "covered": 7,
+      "missed": 151,
+      "total": 158,
+      "ratio": 0.04430379746835443
+    },
+    "com/uav/user/pojo/vo": {
+      "covered": 2,
+      "missed": 1,
+      "total": 3,
+      "ratio": 0.6666666666666666
+    },
+    "com/uav/pay/util": {
+      "covered": 0,
+      "missed": 61,
+      "total": 61,
+      "ratio": 0.0
+    },
+    "com/uav/server/calculator": {
+      "covered": 74,
+      "missed": 3,
+      "total": 77,
+      "ratio": 0.961038961038961
+    },
+    "com/uav/chat/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/server/result": {
+      "covered": 5,
+      "missed": 2,
+      "total": 7,
+      "ratio": 0.7142857142857143
+    },
+    "com/uav/order/pojo/dto": {
+      "covered": 0,
+      "missed": 5,
+      "total": 5,
+      "ratio": 0.0
+    },
+    "com/uav/admin/service/impl": {
+      "covered": 9,
+      "missed": 1,
+      "total": 10,
+      "ratio": 0.9
+    },
+    "com/uav/pay/controller": {
+      "covered": 6,
+      "missed": 10,
+      "total": 16,
+      "ratio": 0.375
+    },
+    "com/uav/user/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/upload/config": {
+      "covered": 13,
+      "missed": 4,
+      "total": 17,
+      "ratio": 0.7647058823529411
+    },
+    "com/uav/admin/controller": {
+      "covered": 23,
+      "missed": 12,
+      "total": 35,
+      "ratio": 0.6571428571428571
+    },
+    "com/uav/upload/entity": {
+      "covered": 4,
+      "missed": 3,
+      "total": 7,
+      "ratio": 0.5714285714285714
+    },
+    "com/uav/live/pojo/vo": {
+      "covered": 1,
+      "missed": 0,
+      "total": 1,
+      "ratio": 1.0
+    },
+    "com/uav/order/controller": {
+      "covered": 50,
+      "missed": 30,
+      "total": 80,
+      "ratio": 0.625
+    },
+    "com/uav/uav/pojo/dto": {
+      "covered": 0,
+      "missed": 1,
+      "total": 1,
+      "ratio": 0.0
+    },
+    "com/uav/server/handler": {
+      "covered": 76,
+      "missed": 41,
+      "total": 117,
+      "ratio": 0.6495726495726496
+    },
+    "com/uav/task/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/aircraft/pojo/vo": {
+      "covered": 8,
+      "missed": 0,
+      "total": 8,
+      "ratio": 1.0
+    },
+    "com/uav/order/service/impl": {
+      "covered": 96,
+      "missed": 123,
+      "total": 219,
+      "ratio": 0.4383561643835616
+    },
+    "com/uav/upload/repository": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/pay/service/impl": {
+      "covered": 86,
+      "missed": 47,
+      "total": 133,
+      "ratio": 0.6466165413533834
+    },
+    "com/uav/admin/pojo/vo": {
+      "covered": 44,
+      "missed": 0,
+      "total": 44,
+      "ratio": 1.0
+    },
+    "com/uav/server/ws/auth": {
+      "covered": 49,
+      "missed": 11,
+      "total": 60,
+      "ratio": 0.8166666666666667
+    },
+    "com/uav/chat/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/chat/repository": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/order/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/rider/pojo/entity": {
+      "covered": 10,
+      "missed": 0,
+      "total": 10,
+      "ratio": 1.0
+    },
+    "com/uav/user/controller": {
+      "covered": 43,
+      "missed": 2,
+      "total": 45,
+      "ratio": 0.9555555555555556
+    },
+    "com/uav/pay/config": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/rider/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/chat/service/Impl": {
+      "covered": 256,
+      "missed": 88,
+      "total": 344,
+      "ratio": 0.7441860465116279
+    },
+    "com/uav/order/pojo/vo": {
+      "covered": 14,
+      "missed": 0,
+      "total": 14,
+      "ratio": 1.0
+    },
+    "com/uav/server/ws": {
+      "covered": 92,
+      "missed": 71,
+      "total": 163,
+      "ratio": 0.5644171779141104
+    },
+    "com/uav/server/service": {
+      "covered": 4,
+      "missed": 26,
+      "total": 30,
+      "ratio": 0.13333333333333333
+    },
+    "com/uav/user/pojo/entity": {
+      "covered": 5,
+      "missed": 0,
+      "total": 5,
+      "ratio": 1.0
+    },
+    "com/uav/admin/pojo/dto": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/aircraft/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/attachment/service": {
+      "covered": 173,
+      "missed": 40,
+      "total": 213,
+      "ratio": 0.812206572769953
+    },
+    "com/uav/chat/websocket": {
+      "covered": 50,
+      "missed": 38,
+      "total": 88,
+      "ratio": 0.5681818181818182
+    },
+    "com/uav/uav/mapper": {
+      "covered": 2,
+      "missed": 0,
+      "total": 2,
+      "ratio": 1.0
+    },
+    "com/uav/live/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/task/mapper": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/pay": {
+      "covered": 19,
+      "missed": 0,
+      "total": 19,
+      "ratio": 1.0
+    },
+    "com/uav/upload/service/impl": {
+      "covered": 22,
+      "missed": 70,
+      "total": 92,
+      "ratio": 0.2391304347826087
+    },
+    "com/uav/task/pojo/vo": {
+      "covered": 52,
+      "missed": 9,
+      "total": 61,
+      "ratio": 0.8524590163934426
+    },
+    "com/uav/pay/service": {
+      "covered": 0,
+      "missed": 0,
+      "total": 0,
+      "ratio": 0.0
+    },
+    "com/uav/task/controller": {
+      "covered": 51,
+      "missed": 9,
+      "total": 60,
+      "ratio": 0.85
+    },
+    "com/uav/aircraft/service/impl": {
+      "covered": 15,
+      "missed": 1,
+      "total": 16,
+      "ratio": 0.9375
+    },
+    "com/uav/admin/service": {
+      "covered": 261,
+      "missed": 34,
+      "total": 295,
+      "ratio": 0.8847457627118644
+    },
+    "com/uav/task/service/impl": {
+      "covered": 413,
+      "missed": 40,
+      "total": 453,
+      "ratio": 0.9116997792494481
+    },
+    "com/uav/server/ws/service": {
+      "covered": 18,
+      "missed": 29,
+      "total": 47,
+      "ratio": 0.3829787234042553
+    }
+  }
+}

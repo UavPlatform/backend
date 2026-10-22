@@ -1,6 +1,7 @@
 package com.uav.server.ws.handler;
 
 import com.alibaba.fastjson.JSONObject;
+import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.service.WsMessageService;
 import com.uav.live.service.LiveSessionService;
 import com.uav.user.mapper.UserRecordRepository;
@@ -28,7 +29,7 @@ public class LiveEventHandler implements WsMessageHandler {
 
     @Override
     public String getType() {
-        return "event";
+        return WsMessageNames.TYPE_EVENT;
     }
 
     @Override
@@ -38,8 +39,8 @@ public class LiveEventHandler implements WsMessageHandler {
 
     @Override
     public boolean supports(String type, String name) {
-        return "event".equalsIgnoreCase(type) &&
-               ("LIVE_STARTED".equalsIgnoreCase(name) || "LIVE_STOPPED".equalsIgnoreCase(name));
+        return WsMessageNames.TYPE_EVENT.equalsIgnoreCase(type) &&
+               (WsMessageNames.LIVE_STARTED.equalsIgnoreCase(name) || WsMessageNames.LIVE_STOPPED.equalsIgnoreCase(name));
     }
 
     @Override
@@ -55,9 +56,9 @@ public class LiveEventHandler implements WsMessageHandler {
             return;
         }
 
-        if ("LIVE_STARTED".equalsIgnoreCase(eventName)) {
+        if (WsMessageNames.LIVE_STARTED.equalsIgnoreCase(eventName)) {
             handleLiveStarted(json, deviceId);
-        } else if ("LIVE_STOPPED".equalsIgnoreCase(eventName)) {
+        } else if (WsMessageNames.LIVE_STOPPED.equalsIgnoreCase(eventName)) {
             handleLiveStopped(deviceId);
         }
     }

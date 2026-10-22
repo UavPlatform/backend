@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device command response",
+  "type": "object",
+  "required": ["type", "replyTo"],
+  "properties": {
+    "type": { "const": "response" },
+    "name": { "type": ["string", "null"] },
+    "replyTo": { "type": "string" },
+    "requestId": { "type": "string" },
+    "success": { "type": "boolean" },
+    "code": { "type": "string" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

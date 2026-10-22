@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device UAV status",
+  "type": "object",
+  "required": ["type", "name", "data"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "UAV_STATUS" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": true
+}

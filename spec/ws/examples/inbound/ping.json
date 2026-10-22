@@ -1,0 +1,7 @@
+{
+  "type": "event",
+  "name": "PING",
+  "id": "req-1",
+  "deviceId": "DJI-001",
+  "timestamp": 1760000000000
+}

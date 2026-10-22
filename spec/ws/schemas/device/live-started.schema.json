@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device live started",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "LIVE_STARTED" },
+    "deviceId": { "type": "string" },
+    "replyTo": { "type": "string" },
+    "requestId": { "type": "string" },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": true
+}

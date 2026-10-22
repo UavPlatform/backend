@@ -15,16 +15,13 @@ import com.uav.server.ws.service.LiveWebSessionService;
 public class WebWebSocketHandler extends TextWebSocketHandler {
 
     @Autowired
-    private DroneWebSocketHandler droneWebSocketHandler;
-
-    @Autowired
     private LiveWebSessionService liveWebSessionService;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         String deviceId = getDeviceId(session);
         if (deviceId != null && !deviceId.isBlank()) {
-            droneWebSocketHandler.registerLiveWebSession(deviceId, session);
+            liveWebSessionService.registerSession(deviceId, session);
         } else {
             liveWebSessionService.registerDashboardSession(session);
         }
@@ -35,7 +32,7 @@ public class WebWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String deviceId = getDeviceId(session);
         if (deviceId != null && !deviceId.isBlank()) {
-            droneWebSocketHandler.removeLiveWebSession(deviceId);
+            liveWebSessionService.removeSession(deviceId);
         } else {
             liveWebSessionService.removeDashboardSession(session);
         }

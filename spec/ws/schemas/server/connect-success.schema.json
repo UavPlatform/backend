@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Connect success",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "CONNECT_SUCCESS" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "success": { "type": "boolean" },
+    "message": { "type": "string" }
+  },
+  "additionalProperties": true
+}

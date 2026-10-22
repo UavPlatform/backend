@@ -1,3 +1,6 @@
 drone-backend/application.yml
 drone-backend/src/main/resources/application.properties
 drone-backend/.localdb/
+__pycache__/
+*.pyc
+.claude/settings.local.json

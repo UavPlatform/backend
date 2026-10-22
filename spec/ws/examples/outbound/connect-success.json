@@ -1,0 +1,8 @@
+{
+  "type": "event",
+  "name": "CONNECT_SUCCESS",
+  "deviceId": "DJI-001",
+  "timestamp": 1760000000000,
+  "success": true,
+  "message": "连接成功"
+}

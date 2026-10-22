@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Device PING",
+  "type": "object",
+  "required": ["type", "name"],
+  "properties": {
+    "type": { "const": "event" },
+    "name": { "const": "PING" },
+    "id": { "type": "string" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" }
+  },
+  "additionalProperties": true
+}

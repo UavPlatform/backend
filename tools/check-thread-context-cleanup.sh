@@ -52,8 +52,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+resolve_python() {
+  local candidate
+  for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  echo "[threadctx] no working Python 3 interpreter (tried python3, python)" >&2
+  return 127
+}
+
+PYTHON="$(resolve_python)" || exit $?
+
 run_checks() {
-  python3 - "$1" "$VARIANT" <<'PY'
+  "$PYTHON" - "$1" "$VARIANT" <<'PY'
 import os, re, sys
 
 ROOT = sys.argv[1]

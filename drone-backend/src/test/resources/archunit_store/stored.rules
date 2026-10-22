@@ -1,0 +1,6 @@
+#
+#Mon Oct 19 10:27:21 CST 2026
+controllers\ must\ use\ services,\ not\ repositories=411e7517-475d-42b5-a817-cec8eef2fe24
+no\ @Autowired\ field\ injection=59a0a049-c3bd-4f91-b1bd-3819f3d5c7ca
+use\ DTO\ suffix,\ not\ Dto=497fee33-f599-40d5-af49-432467ca4639
+use\ VO\ suffix,\ not\ Vo=571e1f40-94c0-4f06-821d-a35e14ee9bc9

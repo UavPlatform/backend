@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "STOP_LIVE command",
+  "type": "object",
+  "required": ["id", "type", "name", "deviceId", "data"],
+  "properties": {
+    "id": { "type": "string" },
+    "type": { "const": "command" },
+    "name": { "const": "STOP_LIVE" },
+    "deviceId": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "data": { "type": "object" }
+  },
+  "additionalProperties": true
+}

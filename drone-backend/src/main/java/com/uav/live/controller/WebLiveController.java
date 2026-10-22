@@ -13,7 +13,7 @@ import com.uav.server.annotation.RateLimiter;
 import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.exception.BusinessException;
-import com.uav.server.handler.DroneWebSocketHandler;
+import com.uav.server.ws.DroneCommandService;
 import com.uav.server.ws.handler.WsCommandAckResult;
 import com.uav.server.util.LogMaskUtil;
 import com.uav.server.util.UserContext;
@@ -46,7 +46,7 @@ public class WebLiveController {
     @Autowired
     private TRTCService trtcService;
     @Autowired
-    private DroneWebSocketHandler webSocketHandler;
+    private DroneCommandService commandService;
     @Autowired
     private UserRecordRepository userRecordRepository;
     @Autowired
@@ -135,7 +135,7 @@ public class WebLiveController {
 
         String roomId = trtcService.generateRoomId(deviceId);
         String userSig = trtcService.generateUserSig(deviceId);
-        WsCommandAckResult ackResult = webSocketHandler.sendStartLiveCommand(
+        WsCommandAckResult ackResult = commandService.sendStartLiveCommand(
                 deviceId, roomId, deviceId, userSig,
                 ackTimeoutMillis, startingTtlMillis
         );
@@ -207,7 +207,7 @@ public class WebLiveController {
             description = "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，"
                     + "则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话"
                     + "并补齐该设备全体观众的观看记录；设备离线则直接补终态。"
-                    + "协议详见 DroneWebSocketHandler#sendStopLiveCommand javadoc。",
+                    + "协议详见 DroneCommandService#sendStopLiveCommand javadoc。",
             parameters = {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
@@ -239,7 +239,7 @@ public class WebLiveController {
             return Result.success("直播未在运行，观看记录已结束");
         }
 
-        WsCommandAckResult ack = webSocketHandler.sendStopLiveCommand(deviceId, LIVE_ACK_TIMEOUT_MILLIS);
+        WsCommandAckResult ack = commandService.sendStopLiveCommand(deviceId, LIVE_ACK_TIMEOUT_MILLIS);
         if (ack.isSuccess()) {
             liveSessionService.markStopped(deviceId);
             closeAllViewerRecords(deviceId, "设备确认停止");

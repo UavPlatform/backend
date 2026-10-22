@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.uav.uav.pojo.dto.UavStatusDto;
 import com.uav.live.pojo.dto.WsEnvelope;
 import com.uav.server.enums.ApiErrorCode;
+import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.service.WsMessageService;
 import com.uav.server.ws.service.LiveWebSessionProvider;
 import com.uav.server.ws.service.LiveWebSessionService;
@@ -31,12 +32,12 @@ public class UavStatusHandler implements WsMessageHandler {
 
     @Override
     public String getType() {
-        return "event";
+        return WsMessageNames.TYPE_EVENT;
     }
 
     @Override
     public String getName() {
-        return "UAV_STATUS";
+        return WsMessageNames.UAV_STATUS;
     }
 
     @Override
@@ -71,8 +72,8 @@ public class UavStatusHandler implements WsMessageHandler {
         WebSocketSession webSession = liveWebSessionProvider.getSession(deviceId);
         if (webSession != null && webSession.isOpen()) {
             WsEnvelope envelope = new WsEnvelope();
-            envelope.setType("event");
-            envelope.setName("UAV_STATUS_UPDATE");
+            envelope.setType(WsMessageNames.TYPE_EVENT);
+            envelope.setName(WsMessageNames.UAV_STATUS_UPDATE);
             envelope.setDeviceId(deviceId);
             envelope.setTimestamp(System.currentTimeMillis());
             envelope.setData(status);
@@ -82,8 +83,8 @@ public class UavStatusHandler implements WsMessageHandler {
         for (WebSocketSession dashboardSession : liveWebSessionService.getDashboardSessions()) {
             if (dashboardSession.isOpen()) {
                 WsEnvelope envelope = new WsEnvelope();
-                envelope.setType("event");
-                envelope.setName("UAV_STATUS_UPDATE");
+                envelope.setType(WsMessageNames.TYPE_EVENT);
+                envelope.setName(WsMessageNames.UAV_STATUS_UPDATE);
                 envelope.setDeviceId(deviceId);
                 envelope.setTimestamp(System.currentTimeMillis());
                 envelope.setData(status);

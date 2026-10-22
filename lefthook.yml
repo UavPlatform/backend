@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://lefthook.dev/schema.json
+# Local, fast checkpoints. CI owns the complete gate matrix.
+min_version: 2.2.2
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: whitespace
+      run: git diff --cached --check
+    - name: file-size
+      glob: "drone-backend/src/main/**/*.java"
+      run: sh tools/py.sh tools/check_file_size.py --quiet
+    - name: test-layers
+      glob: "drone-backend/src/test/**/*.java"
+      run: sh tools/check-test-layers.sh --quiet
+    - name: thread-context
+      glob: "drone-backend/src/test/**/*.java"
+      run: sh tools/check-thread-context-cleanup.sh --quiet
+
+pre-push:
+  jobs:
+    - name: compile
+      glob: "drone-backend/**"
+      run: cd drone-backend && sh mvnw -B -q -DskipTests compile
+    - name: openapi-contract
+      glob: "{drone-backend/src/main/**,spec/openapi/**,drone-backend/src/test/**/OpenApi*}"
+      run: sh tools/openapi-export.sh --check

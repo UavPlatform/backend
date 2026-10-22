@@ -1,0 +1,12 @@
+{
+  "type": "event",
+  "name": "UAV_STATUS",
+  "deviceId": "DJI-001",
+  "timestamp": 1760000000000,
+  "data": {
+    "latitude": 30.2741,
+    "longitude": 120.1551,
+    "altitude": 120.5,
+    "operation": "FLYING"
+  }
+}

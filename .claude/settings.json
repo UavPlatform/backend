@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./drone-backend/src/main/resources/application-dev.yml)"
+    ]
+  }
+}

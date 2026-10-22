@@ -1,34 +1,37 @@
 package com.uav.server.handler;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.uav.server.ws.service.LiveWebSessionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.util.UriComponentsBuilder;
-import lombok.extern.slf4j.Slf4j;
 
 @Component
 @Slf4j
 public class WebSocketHandler extends TextWebSocketHandler {
 
-    @Autowired
-    private DroneWebSocketHandler droneWebSocketHandler;
+    private final LiveWebSessionService liveWebSessionService;
+
+    public WebSocketHandler(LiveWebSessionService liveWebSessionService) {
+        this.liveWebSessionService = liveWebSessionService;
+    }
 
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+    public void afterConnectionEstablished(WebSocketSession session) {
         String deviceId = getDeviceId(session);
         if (deviceId != null && !deviceId.isBlank()) {
-            droneWebSocketHandler.registerLiveWebSession(deviceId, session);
+            liveWebSessionService.registerSession(deviceId, session);
         }
         log.info("Web端连接已建立");
     }
 
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         String deviceId = getDeviceId(session);
         if (deviceId != null && !deviceId.isBlank()) {
-            droneWebSocketHandler.removeLiveWebSession(deviceId);
+            liveWebSessionService.removeSession(deviceId);
         }
         log.info("Web端连接已关闭");
     }

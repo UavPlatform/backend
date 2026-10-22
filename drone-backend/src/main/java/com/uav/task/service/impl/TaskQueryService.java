@@ -77,6 +77,7 @@ public class TaskQueryService {
 
     @Transactional(readOnly = true)
     public List<Task> getAvailableTasks() {
+        // ADR-0003 闲鱼式撮合：大厅 = 待撮合的空闲任务（招募中/洽谈中），不再要求订单已支付
         return taskRepository.findMatchingTasks(TaskStatus.IDLE,
                 List.of(MatchStatus.SEEKING_RIDER, MatchStatus.NEGOTIATING));
     }

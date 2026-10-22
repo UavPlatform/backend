@@ -106,11 +106,11 @@ jobs:
 
       - name: Coverage ratchet
         run: |
-          if [ -f tools/coverage-baseline.json ]; then
-            python3 tools/check_coverage.py --baseline tools/coverage-baseline.json --require-no-skips
-          else
-            echo "::warning::coverage baseline not committed yet; skipping ratchet"
+          if [ ! -f tools/coverage-baseline.json ]; then
+            echo "::error::tools/coverage-baseline.json is missing; the coverage ratchet cannot be skipped"
+            exit 1
           fi
+          python3 tools/check_coverage.py --baseline tools/coverage-baseline.json --require-no-skips
 
       - name: File-size ratchet
         run: python3 tools/check_file_size.py --baseline tools/file-size-baseline.json

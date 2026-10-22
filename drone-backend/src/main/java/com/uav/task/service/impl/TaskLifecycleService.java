@@ -1,6 +1,5 @@
 package com.uav.task.service.impl;
 
-import com.uav.attachment.service.AttachmentService;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.order.service.OrderService;
@@ -45,20 +44,17 @@ public class TaskLifecycleService {
     private final TaskRepository taskRepository;
     private final TaskAssignmentRepository taskAssignmentRepository;
     private final TaskApplicationRepository taskApplicationRepository;
-    private final AttachmentService attachmentService;
     private final OrderRepository orderRepository;
     private final OrderService orderService;
 
     public TaskLifecycleService(TaskRepository taskRepository,
                                 TaskAssignmentRepository taskAssignmentRepository,
                                 TaskApplicationRepository taskApplicationRepository,
-                                AttachmentService attachmentService,
                                 OrderRepository orderRepository,
                                 OrderService orderService) {
         this.taskRepository = taskRepository;
         this.taskAssignmentRepository = taskAssignmentRepository;
         this.taskApplicationRepository = taskApplicationRepository;
-        this.attachmentService = attachmentService;
         this.orderRepository = orderRepository;
         this.orderService = orderService;
     }
@@ -84,10 +80,13 @@ public class TaskLifecycleService {
         task.setTaskName(dto.getTaskName());
         task.setTaskType(dto.getType());
         task.setTaskStatus(TaskStatus.IDLE);
+        // ADR-0003 决定 3：发单进入招募阶段，创建草稿订单（MATCHING），不强制支付
         task.setMatchStatus(MatchStatus.SEEKING_RIDER);
         task.setUserId(userId);
         task.setDescription(dto.getDescription());
         task.setTaskTime(dto.getTaskTime());
+        // reward 语义（TASK-BACKEND-004 实现说明）：客户端 reward 仅作参考值原样保存；
+        // 成交价在「用户选定应征」时由 selectRider 回写为 quotedAmount，发单时不再以订单金额覆盖。
         task.setReward(dto.getReward());
         if (dto.getCargoWeightKg() != null && dto.getCargoWeightKg().signum() <= 0) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
@@ -110,6 +109,7 @@ public class TaskLifecycleService {
 
         task.setWaypoints(waypoints);
         Task saved = taskRepository.save(task);
+        // 发单即建待撮合订单（MATCHING 草稿态，金额未锁定；不占用 pending_key 单例约束）
         MissionOrder order = orderService.createOrder(userId, saved.getTaskNum());
         log.info("任务创建成功（撮合态 {}），编号: {}, 用户ID: {}, 类型: {}, 草稿订单: {}",
                 saved.getMatchStatus(), saved.getTaskNum(), userId, dto.getType(), order.getOrderNum());
@@ -127,6 +127,8 @@ public class TaskLifecycleService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务执行中，无法删除");
         }
 
+        // P0-8：已支付/已完成/待确认/争议的订单属于财务记录，禁止随任务物理删除。
+        // MATCHING（草稿待撮合）/ PENDING（选定未支付）/ CANCELLED 不构成财务记录，允许删除。
         orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
             OrderStatus status = order.getOrderStatus();
             if (status == OrderStatus.PAID || status == OrderStatus.WAITING_CONFIRM
@@ -197,6 +199,7 @@ public class TaskLifecycleService {
                     "当前订单状态不允许选定下单: " + order.getOrderStatus().getDesc());
         }
         MatchStatus target = alreadyPaid ? MatchStatus.AWAITING_RIDER_CONFIRM : MatchStatus.AWAITING_PAYMENT;
+        // 撮合状态机守卫：非法迁移（如验收中/已结案重新下单）→ MATCH_STATUS_INVALID
         MatchStatus.requireTransition(task.getMatchStatus(), target);
 
         if (!alreadyPaid) {
@@ -221,6 +224,7 @@ public class TaskLifecycleService {
             taskApplicationRepository.save(item);
         }
 
+        // ADR-0003 决定 2/3：金额锁定点 = 用户选定应征，totalAmount 严格等于 quotedAmount（禁止改价）
         order.setSelectedApplicationId(application.getId());
         order.setScheduledTime(scheduledTime);
         order.setUserConfirmedAt(LocalDateTime.now());
@@ -231,6 +235,7 @@ public class TaskLifecycleService {
         }
         orderRepository.save(order);
 
+        // 成交价回写 task.reward（TASK-BACKEND-004：reward 语义 = 最终成交价，仅在选定时刻写入）
         task.setReward(quotedAmount.doubleValue());
         task.setMatchStatus(target);
         Task saved = taskRepository.save(task);
@@ -244,6 +249,7 @@ public class TaskLifecycleService {
     public Task riderConfirmOrder(String taskNum, Long riderId) {
         Task task = taskRepository.findByTaskNumForUpdate(taskNum)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
+        // 撮合状态门禁：仅「待飞手确认」阶段可确认（未支付/未选定/已确认均拒绝）
         MatchStatus.requireTransition(task.getMatchStatus(), MatchStatus.CONFIRMED);
 
         MissionOrder order = orderRepository.findByTaskId(task.getId())
@@ -299,6 +305,7 @@ public class TaskLifecycleService {
         if (task.getTaskStatus() == TaskStatus.IN_PROGRESS) {
             return task;
         }
+        // 双确认门禁（ADR-0003 决定 4）：三项全部满足才允许 TaskStatus → IN_PROGRESS
         if (task.getMatchStatus() != MatchStatus.CONFIRMED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.DOUBLE_CONFIRM_REQUIRED,
                     "双方尚未确认，当前撮合状态: " + task.getMatchStatus());
@@ -316,105 +323,5 @@ public class TaskLifecycleService {
         Task saved = taskRepository.save(task);
         log.info("双确认门禁放行，任务进入执行: taskNum={}", taskNum);
         return saved;
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void riderCancelTask(String taskNum, Long riderId) {
-        Task task = taskRepository.findByTaskNumForUpdate(taskNum)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
-
-        TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId())
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "接单记录不存在"));
-        if (!assignment.getRiderId().equals(riderId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.INVALID_PARAM, "无权取消此任务");
-        }
-        if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务状态不允许取消");
-        }
-
-        MatchStatus.requireTransition(task.getMatchStatus(), MatchStatus.NEGOTIATING);
-        task.setTaskStatus(TaskStatus.IDLE);
-        task.setMatchStatus(MatchStatus.NEGOTIATING);
-        taskRepository.save(task);
-        taskAssignmentRepository.delete(assignment);
-
-        log.info("骑手ID {} 取消任务 {}, 任务重新开放撮合", riderId, taskNum);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void riderCompleteTask(String taskNum, Long riderId, String note) {
-        Task task = taskRepository.findByTaskNumForUpdate(taskNum)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
-
-        TaskAssignment assignment = taskAssignmentRepository.findByTaskId(task.getId())
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.INVALID_PARAM, "接单记录不存在"));
-        if (!assignment.getRiderId().equals(riderId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.INVALID_PARAM, "无权完成此任务");
-        }
-        if (task.getTaskStatus() != TaskStatus.IN_PROGRESS) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务状态不允许完成");
-        }
-        String completeNote = null;
-        if (note != null && !note.isBlank()) {
-            String trimmed = note.trim();
-            if (trimmed.length() > 500) {
-                throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "完成说明不能超过 500 字");
-            }
-            completeNote = trimmed;
-        }
-        requireEvidence(taskNum);
-
-        MatchStatus.requireTransition(task.getMatchStatus(), MatchStatus.PENDING_ACCEPTANCE);
-        task.setTaskStatus(TaskStatus.COMPLETED);
-        task.setMatchStatus(MatchStatus.PENDING_ACCEPTANCE);
-        taskRepository.save(task);
-
-        assignment.setCompleteTime(LocalDateTime.now());
-        assignment.setCompleteNote(completeNote);
-        taskAssignmentRepository.save(assignment);
-
-        orderRepository.findByTaskId(task.getId()).ifPresent(order -> {
-            order.setExecutedAt(LocalDateTime.now());
-            order.setOrderStatus(OrderStatus.WAITING_CONFIRM);
-            orderRepository.save(order);
-        });
-
-        log.info("任务 {} 已交付（履约证据齐备），等待用户ID {} 确认", taskNum, task.getUserId());
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public void userConfirmTask(String taskNum, Long userId) {
-        Task task = taskRepository.findByTaskNum(taskNum)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND));
-        if (!task.getUserId().equals(userId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.ROUTE_NOT_FOUND, "无权确认此任务");
-        }
-        if (task.getTaskStatus() != TaskStatus.COMPLETED) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM, "任务尚未完成，无法确认");
-        }
-        requireEvidence(taskNum);
-
-        orderRepository.findByTaskId(task.getId()).ifPresentOrElse(
-                order -> {
-                    if (order.getOrderStatus() != OrderStatus.WAITING_CONFIRM) {
-                        throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.ORDER_STATUS_INVALID,
-                                "订单状态不允许确认");
-                    }
-                    MatchStatus.requireTransition(task.getMatchStatus(), MatchStatus.CLOSED);
-                    task.setMatchStatus(MatchStatus.CLOSED);
-                    taskRepository.save(task);
-                    order.setOrderStatus(OrderStatus.COMPLETED);
-                    orderRepository.save(order);
-                    log.info("用户ID {} 确认收货，订单 {} 已完成并结案", userId, order.getOrderNum());
-                },
-                () -> log.warn("任务 {} 未找到关联订单，跳过确认", taskNum)
-        );
-    }
-
-    private void requireEvidence(String taskNum) {
-        if (!attachmentService.hasVerifiedEvidence(taskNum)) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.DELIVERY_EVIDENCE_REQUIRED,
-                    "尚未上传履约证据（照片/视频等），不能推进完成确认");
-        }
     }
 }

@@ -2,7 +2,5 @@
   "schema": 1,
   "limit": 400,
   "hard_limit": 800,
-  "files": {
-    "src/main/java/com/uav/task/service/impl/TaskLifecycleService.java": 420
-  }
+  "files": {}
 }

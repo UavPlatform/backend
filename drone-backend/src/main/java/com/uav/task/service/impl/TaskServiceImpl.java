@@ -12,17 +12,20 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Facade for the task domain: delegates writes to {@link TaskLifecycleService}
- * and reads to {@link TaskQueryService}. Controllers keep a single entry point.
+ * Facade for the task domain: delegates matching writes to {@link TaskLifecycleService},
+ * execution/delivery/acceptance to {@link TaskDeliveryService} and reads to {@link TaskQueryService}. Controllers keep a single entry point.
  */
 @Service
 public class TaskServiceImpl implements TaskService {
 
     private final TaskLifecycleService lifecycleService;
+    private final TaskDeliveryService deliveryService;
     private final TaskQueryService queryService;
 
-    public TaskServiceImpl(TaskLifecycleService lifecycleService, TaskQueryService queryService) {
+    public TaskServiceImpl(TaskLifecycleService lifecycleService, TaskDeliveryService deliveryService,
+                           TaskQueryService queryService) {
         this.lifecycleService = lifecycleService;
+        this.deliveryService = deliveryService;
         this.queryService = queryService;
     }
 
@@ -95,19 +98,19 @@ public class TaskServiceImpl implements TaskService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void riderCancelTask(String taskNum, Long riderId) {
-        lifecycleService.riderCancelTask(taskNum, riderId);
+        deliveryService.riderCancelTask(taskNum, riderId);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void riderCompleteTask(String taskNum, Long riderId, String note) {
-        lifecycleService.riderCompleteTask(taskNum, riderId, note);
+        deliveryService.riderCompleteTask(taskNum, riderId, note);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void userConfirmTask(String taskNum, Long userId) {
-        lifecycleService.userConfirmTask(taskNum, userId);
+        deliveryService.userConfirmTask(taskNum, userId);
     }
 
     @Override

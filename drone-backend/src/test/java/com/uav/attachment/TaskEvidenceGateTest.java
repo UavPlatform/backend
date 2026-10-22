@@ -10,6 +10,7 @@ import com.uav.server.exception.BusinessException;
 import com.uav.task.mapper.*;
 import com.uav.task.pojo.entity.*;
 import com.uav.task.service.TaskReadAccess;
+import com.uav.task.service.impl.TaskDeliveryService;
 import com.uav.task.service.impl.TaskLifecycleService;
 import com.uav.task.service.impl.TaskQueryService;
 import com.uav.task.service.impl.TaskServiceImpl;
@@ -45,10 +46,11 @@ class TaskEvidenceGateTest {
         AttachmentService attachmentService = new AttachmentService(
                 tasks, attachments, assignments, storage, mock(TaskReadAccess.class));
         TaskLifecycleService lifecycle = new TaskLifecycleService(
-                tasks, assignments, applications, attachmentService, orders, mock(OrderService.class));
+                tasks, assignments, applications, orders, mock(OrderService.class));
+        TaskDeliveryService delivery = new TaskDeliveryService(tasks, assignments, attachmentService, orders);
         TaskQueryService query = new TaskQueryService(
                 tasks, applications, assignments, mock(UserRepository.class));
-        service = new TaskServiceImpl(lifecycle, query);
+        service = new TaskServiceImpl(lifecycle, delivery, query);
     }
 
     @Test void pendingEvidenceBlocksDeliveryAndAcceptanceEvenIfObjectExists() {

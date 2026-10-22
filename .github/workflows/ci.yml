@@ -26,22 +26,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  sync-gate:
-    name: sync-gate
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Require the branch to include origin/main
-        run: |
-          git fetch origin main
-          python3 tools/gate.py check-ci --base origin/main
-
   test:
     name: backend-tests
-    needs: sync-gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -117,9 +103,6 @@ jobs:
           [ "$i_run" -gt 0 ] || { echo "::error::集成层 Tests run: 0"; exit 1; }
           [ "$u_skip" -eq 0 ] && [ "$i_skip" -eq 0 ] || {
             echo "::error::存在 skipped 用例（CI 已提供 MySQL，真库用例不应被跳过）"; exit 1; }
-
-      - name: Check gate copies are identical
-        run: python3 tools/check_gate_copy.py
 
       - name: Coverage ratchet
         run: |

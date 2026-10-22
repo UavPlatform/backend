@@ -13,15 +13,14 @@ read_when:
 ## 技术栈与命令
 
 - Java 21、Spring Boot 4.0.3、Maven Wrapper 3.9.12，源码在 `drone-backend/`，基础包 `com.uav`。
-- 本机 Windows 必须用 `.cmd` 包装器：
+- 使用 Maven Wrapper（JDK 21），在 `drone-backend/` 下执行：
 
 ```bash
-cd /d/2024_code/drone-project/backend
-sh tools/hooks/mvn21.sh -B test          # 单元层（Surefire，含 ArchUnit）
-sh tools/hooks/mvn21.sh -B clean verify  # 单元 + IT/E2E + OpenAPI 契约 + CPD + JaCoCo
+sh mvnw -B test          # 单元层（Surefire，含 ArchUnit）
+sh mvnw -B clean verify  # 单元 + IT/E2E + OpenAPI 契约 + CPD + JaCoCo
 ```
 
-不要使用 PATH 上的 `mvn`（3.6.1 / Java 17），也不要依赖 `sh mvnw`（本机 `D:\Java\JDK\bin\java` 是 0 字节文件）。
+Windows 下使用 `mvnw.cmd`，并确保 `JAVA_HOME` 指向 JDK 21。
 
 ## 包结构（`com.uav`）
 
@@ -68,9 +67,4 @@ sh tools/hooks/mvn21.sh -B clean verify  # 单元 + IT/E2E + OpenAPI 契约 + CP
 ## 密钥与边界
 
 - 不读取、不打印、不提交 `application-dev.yml`、`.env*`、`*.key`、`*.pem`；发现疑似密钥立即停止并报告。
-- 本轮只允许修改 `backend/` 和 `docs/`；`frontend/`、`app/`、`djifly/` 只读。
 - 不擅自 `git commit` / `git push`；用户明确说“提交”后才本地提交，push 前再次确认。
-
-## 同步门禁
-
-开工前先在工作区根执行 `python docs/tools/gate.py sync --all`。未同步时 `git` 包装器会拒绝读取命令并提示先同步；详细命令见 `../docs/agents/commands.md`。

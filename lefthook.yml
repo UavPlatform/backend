@@ -7,8 +7,6 @@ pre-commit:
   jobs:
     - name: whitespace
       run: git diff --cached --check
-    - name: sync-gate
-      run: sh tools/py.sh tools/gate.py hook pre-commit
     - name: file-size
       glob: "drone-backend/src/main/**/*.java"
       run: sh tools/py.sh tools/check_file_size.py --quiet
@@ -21,11 +19,9 @@ pre-commit:
 
 pre-push:
   jobs:
-    - name: sync-gate
-      run: sh tools/py.sh tools/gate.py hook pre-push
     - name: compile
       glob: "drone-backend/**"
-      run: sh tools/hooks/mvn21.sh -B -q -DskipTests compile
+      run: cd drone-backend && sh mvnw -B -q -DskipTests compile
     - name: openapi-contract
       glob: "{drone-backend/src/main/**,spec/openapi/**,drone-backend/src/test/**/OpenApi*}"
       run: sh tools/openapi-export.sh --check

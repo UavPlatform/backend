@@ -1,0 +1,336 @@
+# OpenAPI 契约发布：契约变更后自动创建 GitHub Release 并通知客户端仓库
+#
+# 触发时机：
+#   1. push 到 main 且 spec/openapi/** 有变化（随契约提交自动发布）
+#   2. workflow_dispatch 手动触发（用于重发当前契约或紧急补发）
+#
+# 发布流程：
+#   1. 计算契约 sha256，创建 GitHub Release `contract-<shortsha>`（已存在则跳过）
+#   2. 附件包含 drone-backend.openapi.json 和 sha256 校验文件
+#   3. 可选：用 oasdiff 对比上一个 contract-* Release，把 breaking 摘要写入 Release 正文
+#   4. 向客户端仓库（frontend/app/djifly）发送 repository_dispatch 事件
+#
+# 所需配置（组织管理员配置）：
+#   - GitHub App：需在 UavPlatform 组织创建，具备 contents:write + metadata:read 权限
+#   - Secrets（Repository 级别）：
+#     * CONTRACT_BOT_APP_ID: GitHub App ID
+#     * CONTRACT_BOT_PRIVATE_KEY: GitHub App 私钥（PEM 格式）
+#   - 客户端仓库需授权该 App 接收 repository_dispatch 事件
+#
+# 兜底机制：
+#   - 若 Secrets 未配置，跳过 dispatch 步骤并在 Job Summary 警告（客户端定时同步会兜底）
+#   - 若 Release 已存在，复用现有 tag 并跳过创建（幂等）
+
+name: Contract Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spec/openapi/**'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: '强制重新创建 Release（已存在时）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: contract-publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: 发布契约并通知客户端
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 计算契约 sha256
+        id: contract
+        run: |
+          set -euo pipefail
+          CONTRACT_FILE="spec/openapi/drone-backend.openapi.json"
+          
+          if [[ ! -f "$CONTRACT_FILE" ]]; then
+            echo "::error::契约文件不存在：$CONTRACT_FILE"
+            exit 1
+          fi
+          
+          SHA256_FULL=$(sha256sum "$CONTRACT_FILE" | awk '{print $1}')
+          SHA256_SHORT=${SHA256_FULL:0:8}
+          TAG="contract-$SHA256_SHORT"
+          
+          echo "sha256_full=$SHA256_FULL" >> "$GITHUB_OUTPUT"
+          echo "sha256_short=$SHA256_SHORT" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "contract_file=$CONTRACT_FILE" >> "$GITHUB_OUTPUT"
+          
+          # 生成 sha256 校验文件
+          echo "$SHA256_FULL  drone-backend.openapi.json" > "$CONTRACT_FILE.sha256"
+          echo "sha256_file=$CONTRACT_FILE.sha256" >> "$GITHUB_OUTPUT"
+          
+          echo "### 契约信息" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag**: \`$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **SHA256**: \`$SHA256_FULL\`" >> "$GITHUB_STEP_SUMMARY"
+          SIZE=$(wc -c < "$CONTRACT_FILE")
+          OPS=$(grep -cE '^ +"(get|post|put|delete|patch)" *: \{' "$CONTRACT_FILE" || echo 0)
+          echo "- **大小**: $SIZE bytes" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **操作数**: $OPS" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 检查 Release 是否已存在
+        id: check_release
+        continue-on-error: true
+        run: |
+          set +e
+          gh release view "${{ steps.contract.outputs.tag }}" --json url,tagName > /dev/null 2>&1
+          EXISTS=$?
+          set -e
+          
+          if [[ $EXISTS -eq 0 ]]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            RELEASE_URL=$(gh release view "${{ steps.contract.outputs.tag }}" --json url --jq .url)
+            echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+            echo "### ℹ️ Release 已存在" >> "$GITHUB_STEP_SUMMARY"
+            echo "复用现有 Release：[${{ steps.contract.outputs.tag }}]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: 对比前序契约（breaking changes 检测）
+        id: breaking
+        if: steps.check_release.outputs.exists != 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          
+          # 查找上一个 contract-* Release
+          PREV_TAG=$(gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^contract-' | head -n 1 || echo "")
+          
+          if [[ -z "$PREV_TAG" ]]; then
+            echo "no_previous=true" >> "$GITHUB_OUTPUT"
+            echo "### 🆕 首次契约发布" >> "$GITHUB_STEP_SUMMARY"
+            echo "无前序契约，跳过 breaking changes 检测" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          
+          echo "previous_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "no_previous=false" >> "$GITHUB_OUTPUT"
+          
+          # 下载前序契约
+          mkdir -p /tmp/contract-diff
+          gh release download "$PREV_TAG" -p "drone-backend.openapi.json" -D /tmp/contract-diff || {
+            echo "::warning::无法下载前序契约 $PREV_TAG，跳过 diff"
+            echo "no_previous=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+          
+          # 安装 oasdiff
+          curl -sSL https://github.com/Tufin/oasdiff/releases/download/v1.10.22/oasdiff_1.10.22_linux_amd64.tar.gz | tar xz -C /tmp
+          
+          # 对比契约（breaking changes）
+          DIFF_OUTPUT="/tmp/contract-diff/breaking.md"
+          /tmp/oasdiff breaking /tmp/contract-diff/drone-backend.openapi.json spec/openapi/drone-backend.openapi.json \
+            --format markdown --lang zh-CN > "$DIFF_OUTPUT" || {
+            # oasdiff 检测到 breaking changes 时返回非零，这是预期的
+            echo "has_breaking=true" >> "$GITHUB_OUTPUT"
+          }
+          
+          if [[ -s "$DIFF_OUTPUT" ]]; then
+            {
+              echo "### 🔴 Breaking Changes 检测"
+              echo ""
+              echo "对比前序契约 \`$PREV_TAG\`："
+              echo ""
+              cat "$DIFF_OUTPUT"
+            } >> /tmp/release-notes.md
+            echo "diff_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+            
+            {
+              echo "### ⚠️ Breaking Changes 检测" 
+              echo "对比 \`$PREV_TAG\`，检测到以下变更：" 
+              head -n 20 "$DIFF_OUTPUT"
+              echo ""
+              echo "<details><summary>完整 diff 见 Release 正文</summary></details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ✅ 无 Breaking Changes" >> "$GITHUB_STEP_SUMMARY"
+            echo "对比 \`$PREV_TAG\`，契约向后兼容" >> "$GITHUB_STEP_SUMMARY"
+            echo "diff_file=" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: 创建 GitHub Release
+        id: create_release
+        if: steps.check_release.outputs.exists != 'true' || github.event.inputs.force_release == 'true'
+        run: |
+          set -euo pipefail
+          
+          TAG="${{ steps.contract.outputs.tag }}"
+          CONTRACT_FILE="${{ steps.contract.outputs.contract_file }}"
+          SHA256_FILE="${{ steps.contract.outputs.sha256_file }}"
+          
+          # 准备 Release 正文
+          NOTES_FILE="/tmp/full-release-notes.md"
+          {
+            echo "## OpenAPI 契约发布"
+            echo ""
+            echo "- **版本**: \`$TAG\`"
+            echo "- **SHA256**: \`${{ steps.contract.outputs.sha256_full }}\`"
+            echo "- **提交**: \`${{ github.sha }}\`"
+            echo ""
+            echo "### 📦 附件"
+            echo "- \`drone-backend.openapi.json\` - OpenAPI 3.0 契约文件"
+            echo "- \`drone-backend.openapi.json.sha256\` - SHA256 校验文件"
+            echo ""
+            echo "### 🔄 客户端同步"
+            echo "客户端仓库（frontend/app/djifly）将自动收到 \`openapi-updated\` 事件通知。"
+            echo ""
+          } > "$NOTES_FILE"
+          
+          # 追加 breaking changes diff（如有）
+          if [[ -f "${{ steps.breaking.outputs.diff_file }}" ]]; then
+            cat "${{ steps.breaking.outputs.diff_file }}" >> "$NOTES_FILE"
+          fi
+          
+          # 创建 Release
+          if [[ "${{ github.event.inputs.force_release }}" == "true" ]] && gh release view "$TAG" > /dev/null 2>&1; then
+            echo "::notice::强制模式：删除现有 Release $TAG"
+            gh release delete "$TAG" --yes || true
+            git push origin ":refs/tags/$TAG" || true
+          fi
+          
+          gh release create "$TAG" \
+            "$CONTRACT_FILE#drone-backend.openapi.json" \
+            "$SHA256_FILE#drone-backend.openapi.json.sha256" \
+            --title "契约发布 $TAG" \
+            --notes-file "$NOTES_FILE" \
+            --target "${{ github.sha }}"
+          
+          RELEASE_URL=$(gh release view "$TAG" --json url --jq .url)
+          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+          
+          echo "### ✅ Release 创建成功" >> "$GITHUB_STEP_SUMMARY"
+          echo "[$TAG]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: 获取客户端仓库 GitHub App Token
+        id: app_token
+        continue-on-error: true
+        run: |
+          set +e
+          
+          # 检查 Secrets 是否配置
+          if [[ -z "${{ secrets.CONTRACT_BOT_APP_ID }}" ]] || [[ -z "${{ secrets.CONTRACT_BOT_PRIVATE_KEY }}" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CONTRACT_BOT_APP_ID 或 CONTRACT_BOT_PRIVATE_KEY 未配置"
+            {
+              echo "### ⚠️ 跳过客户端通知" 
+              echo "" 
+              echo "**原因**: GitHub App Secrets 未配置"
+              echo ""
+              echo "**兜底机制**: 客户端定时同步任务会自动拉取最新契约"
+              echo ""
+              echo "**如需启用自动通知**，请组织管理员配置："
+              echo "1. 创建 GitHub App（需 \`contents:write\` + \`metadata:read\` 权限）"
+              echo "2. 在本仓库添加 Secrets："
+              echo "   - \`CONTRACT_BOT_APP_ID\`"
+              echo "   - \`CONTRACT_BOT_PRIVATE_KEY\`"
+              echo "3. 客户端仓库（frontend/app/djifly）授权该 App"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: 生成 GitHub App Token
+        id: generate_token
+        if: steps.app_token.outputs.configured == 'true'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CONTRACT_BOT_APP_ID }}
+          private-key: ${{ secrets.CONTRACT_BOT_PRIVATE_KEY }}
+          owner: UavPlatform
+          repositories: frontend,app,djifly
+
+      - name: 通知客户端仓库
+        if: steps.app_token.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          
+          TAG="${{ steps.contract.outputs.tag }}"
+          SHA256="${{ steps.contract.outputs.sha256_full }}"
+          
+          # 获取 Release 的 asset URL
+          RELEASE_URL="${{ steps.create_release.outputs.release_url || steps.check_release.outputs.release_url }}"
+          ASSET_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/drone-backend.openapi.json"
+          
+          # 构造 payload
+          PAYLOAD=$(cat <<EOF
+          {
+            "tag": "$TAG",
+            "sha256": "$SHA256",
+            "asset_url": "$ASSET_URL",
+            "release_url": "$RELEASE_URL",
+            "commit": "${{ github.sha }}",
+            "triggered_by": "${{ github.event_name }}"
+          }
+          EOF
+          )
+          
+          echo "### 📤 通知客户端仓库" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          
+          # 向各客户端仓库发送 repository_dispatch
+          for REPO in frontend app djifly; do
+            FULL_REPO="UavPlatform/$REPO"
+            echo "正在通知 $FULL_REPO ..." 
+            
+            STATUS=$(curl -s -o /tmp/dispatch-response.json -w "%{http_code}" \
+              -X POST \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token ${{ steps.generate_token.outputs.token }}" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/$FULL_REPO/dispatches" \
+              -d "{\"event_type\":\"openapi-updated\",\"client_payload\":$PAYLOAD}")
+            
+            if [[ "$STATUS" == "204" ]]; then
+              echo "  ✅ $FULL_REPO 通知成功"
+              echo "- ✅ \`$FULL_REPO\`" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "  ⚠️ $FULL_REPO 通知失败 (HTTP $STATUS)"
+              echo "::warning::向 $FULL_REPO 发送 repository_dispatch 失败 (HTTP $STATUS)"
+              echo "- ⚠️ \`$FULL_REPO\` - HTTP $STATUS" >> "$GITHUB_STEP_SUMMARY"
+              if [[ -f /tmp/dispatch-response.json ]]; then
+                cat /tmp/dispatch-response.json
+              fi
+            fi
+          done
+          
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Event Type**: \`openapi-updated\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Payload**: \`tag=$TAG, sha256=${SHA256:0:16}...\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 发布完成
+        run: |
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "### 🎉 契约发布流程完成"
+            echo ""
+            echo "**下一步**："
+            echo "- 客户端将自动收到通知并创建 PR（或手动运行同步任务）"
+            echo "- 评审客户端 PR，确认类型生成无误"
+            echo "- 合并后客户端即可使用最新契约"
+          } >> "$GITHUB_STEP_SUMMARY"

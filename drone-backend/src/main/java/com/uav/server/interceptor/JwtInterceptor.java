@@ -38,6 +38,22 @@ public class JwtInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, @Nullable Object handler) throws Exception {
+        UserContext.clear();
+        MDC.remove("userId");
+        boolean accepted = false;
+        try {
+            accepted = authenticate(request, response, handler);
+            return accepted;
+        } finally {
+            // Spring skips afterCompletion when preHandle rejects or throws.
+            if (!accepted) {
+                UserContext.clear();
+                MDC.remove("userId");
+            }
+        }
+    }
+
+    private boolean authenticate(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         MDC.put("traceId", traceId);
         response.setHeader("X-Trace-Id", traceId);

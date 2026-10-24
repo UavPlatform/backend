@@ -742,6 +742,59 @@
         },
         "type" : "object"
       },
+      "DispatchNotificationPageVO" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DispatchNotificationVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "unreadCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DispatchNotificationVO" : {
+        "properties" : {
+          "audience" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "notificationId" : {
+            "type" : "string"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "readAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "DroneBorrowDTO" : {
         "properties" : {
           "droneId" : {
@@ -1706,6 +1759,33 @@
         },
         "type" : "object"
       },
+      "ResultDispatchNotificationPageVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchNotificationPageVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultDroneBorrowPageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2156,6 +2236,34 @@
           "data" : {
             "$ref" : "#/components/schemas/LogVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultLong" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "format" : "int64",
+            "type" : "integer"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -5432,6 +5540,110 @@
         "tags" : [ "Dispatch Draft API" ]
       }
     },
+    "/dispatch/events" : {
+      "get" : {
+        "description" : "Bearer头鉴权；ready/change/resync事件触发客户端重新读取有权限的数据，heartbeat仅保活。不携带订单内容或凭证，不接受URL令牌。重连ready完整同步，无历史事件重放。单连接最多60秒且不超过JWT有效期。",
+        "operationId" : "dispatchEventStream",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/event-stream" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "本人订单变更实时信号",
+        "tags" : [ "dispatch-event-stream-controller" ]
+      }
+    },
+    "/dispatch/notifications" : {
+      "get" : {
+        "description" : "时间倒序每页20条，包含订单ID、收件人角色和已读状态；只读不自动清空未读，点击后打开订单当前阶段",
+        "operationId" : "dispatchNotifications",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : "0",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchNotificationPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "分页读取本人派单通知",
+        "tags" : [ "Dispatch Notification API" ]
+      }
+    },
+    "/dispatch/notifications/unread-count" : {
+      "get" : {
+        "operationId" : "dispatchNotificationUnreadCount",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultLong"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取本人派单通知未读数",
+        "tags" : [ "Dispatch Notification API" ]
+      }
+    },
+    "/dispatch/notifications/{notificationId}/read" : {
+      "post" : {
+        "description" : "只作用于所选通知，重复调用幂等，不会误清除其他或稍后收到的通知",
+        "operationId" : "readDispatchNotification",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "notificationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "标记一条本人通知已读",
+        "tags" : [ "Dispatch Notification API" ]
+      }
+    },
     "/dispatch/waybill-draft" : {
       "get" : {
         "description" : "仅需求方本人；无草稿时 success=true,data=null；照片仍只保存在本机，不包含于账号草稿",
@@ -8297,6 +8509,9 @@
   }, {
     "description" : "聊天消息接口",
     "name" : "chat message API"
+  }, {
+    "description" : "订单事件站内通知，按收件人隔离；不声称已送达手机系统推送",
+    "name" : "Dispatch Notification API"
   }, {
     "description" : "订单投诉",
     "name" : "Complaint API"

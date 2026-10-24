@@ -12,14 +12,17 @@ import java.util.List;
 public class UserSessionServiceImpl implements UserSessionService {
 
     private final ChatUserSessionRepository chatUserSessionRepository;
+    private final com.uav.chat.service.DispatchChatAccess dispatchAccess;
 
-    public UserSessionServiceImpl(ChatUserSessionRepository chatUserSessionRepository) {
+    public UserSessionServiceImpl(ChatUserSessionRepository chatUserSessionRepository, com.uav.chat.service.DispatchChatAccess dispatchAccess) {
         this.chatUserSessionRepository = chatUserSessionRepository;
+        this.dispatchAccess = dispatchAccess;
     }
 
     @Override
     public List<ChatUserSession> findByUserId(Long userId) {
-        return chatUserSessionRepository.findByUserId(userId);
+        return chatUserSessionRepository.findByUserId(userId).stream()
+                .filter(s -> dispatchAccess.readable(s.getSessionId(), userId)).toList();
     }
 
     @Override
@@ -34,7 +37,7 @@ public class UserSessionServiceImpl implements UserSessionService {
 
     @Override
     public long countBySessionIdAndUserId(Long sessionId, Long userId) {
-        return chatUserSessionRepository.countBySessionIdAndUserId(sessionId, userId);
+        return dispatchAccess.readable(sessionId, userId) ? chatUserSessionRepository.countBySessionIdAndUserId(sessionId, userId) : 0;
     }
 
     @Override

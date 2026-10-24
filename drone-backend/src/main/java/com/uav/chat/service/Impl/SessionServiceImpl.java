@@ -73,7 +73,8 @@ public class SessionServiceImpl implements SessionService {
             List<SessionVO> existing = listSession();
             for (SessionVO s : existing) {
                 // 任务会话不参与通用去重：任务绑定会话只由任务链路按 task+rider 复用
-                if (s.getType() != null && s.getType() == 0 && s.getTaskNum() == null) {
+                if (s.getType() != null && s.getType() == 0 && s.getTaskNum() == null
+                        && chatSessionRepository.findById(s.getId()).filter(c -> c.getDispatchOrderId() != null).isEmpty()) {
                     List<Long> sIds = getUserIdsBySessionId(s.getId());
                     if (sIds != null && sIds.size() == 2
                             && sIds.containsAll(distinctIds)) {
@@ -288,6 +289,7 @@ public class SessionServiceImpl implements SessionService {
         if (session == null) {
             return "会话不存在";
         }
+        if (session.getDispatchOrderId() != null) return "订单会话不能通过群聊接口删除";
         Long ownerId = session.getOwnerId();
         Long userId = UserContext.getUserId();
         if (ownerId != null && Objects.equals(ownerId, userId)) {

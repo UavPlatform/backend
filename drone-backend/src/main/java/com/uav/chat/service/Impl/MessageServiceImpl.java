@@ -41,26 +41,30 @@ public class MessageServiceImpl implements MessageService {
     private final UserSessionService userSessionService;
     private final UserService userService;
     private final ChatSessionRepository chatSessionRepository;
+    private final com.uav.chat.service.DispatchChatAccess dispatchAccess;
 
     public MessageServiceImpl(ChatMessageRepository chatMessageRepository,
                               ChatWebSocketHandler chatWebSocketHandler,
                               UserSessionService userSessionService,
                               UserService userService,
-                              ChatSessionRepository chatSessionRepository) {
+                              ChatSessionRepository chatSessionRepository, com.uav.chat.service.DispatchChatAccess dispatchAccess) {
         this.chatMessageRepository = chatMessageRepository;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.userSessionService = userSessionService;
         this.userService = userService;
         this.chatSessionRepository = chatSessionRepository;
+        this.dispatchAccess = dispatchAccess;
     }
 
     @Override
+    @Transactional
     public void sendMessage(@Valid MessageDTO dto) {
         Long userId = UserContext.getUserId();
         // 任务会话（task_num 非空）补成员校验：只有任务属主与应征/选定飞手（建会话时落的成员）可发言；
         // 非任务会话的存量 sendMessage 缺口不在本任务扩（见 TASK-BACKEND-005 汇报）
         ChatSession session = chatSessionRepository.findById(dto.getSessionId()).orElse(null);
-        if (session != null && session.getTaskNum() != null
+        dispatchAccess.requireSending(session, userId);
+        if (session != null && (session.getTaskNum() != null || session.getDispatchOrderId() != null)
                 && userSessionService.countBySessionIdAndUserId(session.getId(), userId) == 0) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "无权向该任务会话发送消息");
         }
@@ -88,6 +92,7 @@ public class MessageServiceImpl implements MessageService {
         Long userId = UserContext.getUserId();
         ChatMessage message = chatMessageRepository.findByMsgId(messageId)
                 .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.MESSAGE_NOT_FOUND));
+        requireDispatchMutation(message, userId);
         if (!Objects.equals(message.getFromUserId(), userId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "只能撤回自己发送的消息");
         }
@@ -107,6 +112,7 @@ public class MessageServiceImpl implements MessageService {
         if (message == null) {
             return;
         }
+        requireDispatchMutation(message, userId);
 
         List<Long> deletedByUserIds = message.getDeletedByUserIds();
         if (deletedByUserIds == null) {
@@ -117,6 +123,14 @@ public class MessageServiceImpl implements MessageService {
             deletedByUserIds.add(userId);
         }
         chatMessageRepository.save(message);
+    }
+
+    private void requireDispatchMutation(ChatMessage message, Long userId) {
+        var session = chatSessionRepository.findById(message.getSessionId()).orElse(null);
+        dispatchAccess.requireSending(session, userId);
+        if (session != null && session.getDispatchOrderId() != null
+                && userSessionService.countBySessionIdAndUserId(session.getId(), userId) == 0)
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION);
     }
 
     @Override

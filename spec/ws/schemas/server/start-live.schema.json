@@ -15,7 +15,9 @@
       "properties": {
         "roomId": { "type": "string" },
         "userId": { "type": "string" },
-        "userSig": { "type": "string" }
+        "userSig": { "type": "string" },
+        "sdkAppId": { "type": "integer" },
+        "privateMapKey": { "type": "string" }
       },
       "additionalProperties": true
     }

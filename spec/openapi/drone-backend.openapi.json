@@ -742,6 +742,87 @@
         },
         "type" : "object"
       },
+      "DispatchLiveCredentialsVO" : {
+        "properties" : {
+          "connectionId" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "leaseExpiresAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "liveId" : {
+            "type" : "string"
+          },
+          "privateMapKey" : {
+            "type" : "string"
+          },
+          "publisherUserId" : {
+            "type" : "string"
+          },
+          "roomId" : {
+            "type" : "string"
+          },
+          "sdkAppId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userId" : {
+            "type" : "string"
+          },
+          "userSig" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DispatchLiveHeartbeatDTO" : {
+        "properties" : {
+          "state" : {
+            "minLength" : 1,
+            "pattern" : "STARTING|RUNNING",
+            "type" : "string"
+          }
+        },
+        "required" : [ "state" ],
+        "type" : "object"
+      },
+      "DispatchLiveStartDTO" : {
+        "properties" : {
+          "requestKey" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "requestKey" ],
+        "type" : "object"
+      },
+      "DispatchLiveStatusVO" : {
+        "properties" : {
+          "configured" : {
+            "type" : "boolean"
+          },
+          "connectionId" : {
+            "type" : "string"
+          },
+          "leaseExpiresAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "liveId" : {
+            "type" : "string"
+          },
+          "state" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "DispatchNotificationPageVO" : {
         "properties" : {
           "hasNext" : {
@@ -859,6 +940,215 @@
           }
         },
         "required" : [ "enabled" ],
+        "type" : "object"
+      },
+      "FlightConnectDTO" : {
+        "properties" : {
+          "assignmentVersion" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelCode" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "modelName" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "requestKey" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "serialNumber" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "modelCode", "modelName", "requestKey", "serialNumber" ],
+        "type" : "object"
+      },
+      "FlightConnectionVO" : {
+        "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "assignmentVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "connectionId" : {
+            "type" : "string"
+          },
+          "endReason" : {
+            "type" : "string"
+          },
+          "endedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "maxPayloadKg" : {
+            "type" : "number"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
+          "modelName" : {
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "overweight" : {
+            "type" : "boolean"
+          },
+          "serialNumber" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FlightSampleDTO" : {
+        "properties" : {
+          "altitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "battery" : {
+            "format" : "int32",
+            "maximum" : 100,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "capturedAt" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "flying" : {
+            "type" : "boolean"
+          },
+          "latitude" : {
+            "format" : "double",
+            "maximum" : 90,
+            "minimum" : -90,
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "maximum" : 180,
+            "minimum" : -180,
+            "type" : "number"
+          },
+          "sequence" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "speed" : {
+            "format" : "double",
+            "minimum" : 0,
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "FlightSampleVO" : {
+        "properties" : {
+          "altitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "battery" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "capturedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "connectionId" : {
+            "type" : "string"
+          },
+          "flying" : {
+            "type" : "boolean"
+          },
+          "latitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "receivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "sampleId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sequence" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "speed" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "FlightTrackVO" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlightSampleVO"
+            },
+            "type" : "array"
+          },
+          "nextAfter" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FlightViewVO" : {
+        "properties" : {
+          "connection" : {
+            "$ref" : "#/components/schemas/FlightConnectionVO"
+          },
+          "connectionHistory" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlightConnectionVO"
+            },
+            "type" : "array"
+          },
+          "lastPosition" : {
+            "$ref" : "#/components/schemas/FlightSampleVO"
+          },
+          "latest" : {
+            "$ref" : "#/components/schemas/FlightSampleVO"
+          },
+          "stale" : {
+            "type" : "boolean"
+          }
+        },
         "type" : "object"
       },
       "GpsPointVO" : {
@@ -1347,6 +1637,10 @@
             "enum" : [ "IDLE", "RUNNING", "STARTING" ],
             "type" : "string"
           },
+          "privateMapKey" : {
+            "description" : "绑定当前设备房间的接收权限票据，兼容高级房间权限",
+            "type" : "string"
+          },
           "roomId" : {
             "description" : "TRTC 房间号",
             "type" : "string"
@@ -1759,6 +2053,60 @@
         },
         "type" : "object"
       },
+      "ResultDispatchLiveCredentialsVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchLiveCredentialsVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultDispatchLiveStatusVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchLiveStatusVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultDispatchNotificationPageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -1823,6 +2171,114 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/DroneBorrowVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultFlightConnectionVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/FlightConnectionVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultFlightSampleVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/FlightSampleVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultFlightTrackVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/FlightTrackVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultFlightViewVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/FlightViewVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -5642,6 +6098,392 @@
         },
         "summary" : "标记一条本人通知已读",
         "tags" : [ "Dispatch Notification API" ]
+      }
+    },
+    "/dispatch/orders/{orderId}/flight" : {
+      "get" : {
+        "description" : "仅货主、当前飞手或管理员。无采样字段为null；30秒未收到数据或连接结束标记stale。最后位置保留接收时间。非官方飞行安全或空域判定。",
+        "operationId" : "current_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultFlightViewVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取实际飞行状态",
+        "tags" : [ "flight-record-controller" ]
+      }
+    },
+    "/dispatch/orders/{orderId}/flight/track" : {
+      "get" : {
+        "description" : "同飞行状态权限，after为上页nextAfter；每页200条，保持服务端保存顺序；不插值补点。",
+        "operationId" : "track",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultFlightTrackVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取本单实际采样轨迹",
+        "tags" : [ "flight-record-controller" ]
+      }
+    },
+    "/dispatch/orders/{orderId}/live" : {
+      "get" : {
+        "description" : "货主/当前飞手/管理员只读，不启动直播；未配置或心跳过期不可观看。此接口没有凭证和副作用。",
+        "operationId" : "current",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchLiveStatusVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "本单直播状态",
+        "tags" : [ "dispatch-live-controller" ]
+      }
+    },
+    "/dispatch/orders/{orderId}/live/{liveId}/watch" : {
+      "post" : {
+        "description" : "运输中的当前连接且实际首帧已上报、心跳有效；返回绑定本次房间的120秒进房票据，仅接收视频，无发流或开关权限。观看退出不影响飞手。",
+        "operationId" : "watch",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "liveId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchLiveCredentialsVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "本单只读观看凭证",
+        "tags" : [ "dispatch-live-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections" : {
+      "post" : {
+        "description" : "当前到场或运输飞手及接单轮次；同请求幂等，换机结束旧连接。设备序列号同时只属于一个活动运单。未知机型不推测载重，不改变计价。",
+        "operationId" : "connect",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FlightConnectDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultFlightConnectionVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "登记本次实际设备连接",
+        "tags" : [ "flight-record-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/close" : {
+      "post" : {
+        "description" : "原飞手可幂等结束自己的连接；历史请求不能结束新连接；不控制物理飞行，成功data=null。",
+        "operationId" : "close",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "结束本人设备连接",
+        "tags" : [ "flight-record-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live" : {
+      "post" : {
+        "description" : "当前飞手和接单轮次，到场/运输阶段；同requestKey幂等。新派单复用既有TRTC应用配置且需确认已启用房间权限，未配置503。此调用不代表首帧成功。",
+        "operationId" : "start",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DispatchLiveStartDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchLiveCredentialsVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手主动开启本次连接直播",
+        "tags" : [ "dispatch-live-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/heartbeat" : {
+      "post" : {
+        "description" : "SDK发出首帧且继续发送实际图传才报RUNNING，否则STARTING；有效期20秒，过期不允许续活旧房间。",
+        "operationId" : "heartbeat",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "liveId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DispatchLiveHeartbeatDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchLiveStatusVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "上报本单真实推流状态",
+        "tags" : [ "dispatch-live-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/stop" : {
+      "post" : {
+        "description" : "本人历史房间可幂等关闭，不能关闭新房间；客户端同步停止实际推流，成功data=null。",
+        "operationId" : "stop",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "liveId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "飞手关闭本次直播记录",
+        "tags" : [ "dispatch-live-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/samples" : {
+      "post" : {
+        "description" : "仅当前活动连接；未知值为null，禁止合成遥测；同序号同内容幂等，冲突409。乱序保存但不回退当前状态。capturedAt为设备毫秒时间，receivedAt为服务端时间。",
+        "operationId" : "sample",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FlightSampleDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultFlightSampleVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "保存实际SDK采样",
+        "tags" : [ "flight-record-controller" ]
       }
     },
     "/dispatch/waybill-draft" : {

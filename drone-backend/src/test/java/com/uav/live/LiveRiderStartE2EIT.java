@@ -52,6 +52,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class LiveRiderStartE2EIT extends RealProtocolTestBase {
 
+    @Autowired private com.uav.live.service.TRTCService trtcService;
+
     @Autowired
     private UavRepository uavRepository;
 
@@ -81,6 +83,8 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
         assertThat(startCmd.getString("deviceId")).isEqualTo(deviceId);
         assertThat(startCmd.getJSONObject("data").getString("roomId")).isEqualTo("drone_" + deviceId);
         assertThat(startCmd.getJSONObject("data").getString("userSig")).isNotBlank();
+        assertThat(startCmd.getJSONObject("data").getString("privateMapKey")).isNotBlank();
+        assertThat(startCmd.getJSONObject("data").getLongValue("sdkAppId")).isEqualTo(trtcService.getSdkAppId());
 
         // 设备 ack 成功 → 会话 RUNNING
         assertThat(liveSessionService.isRunning(deviceId)).isTrue();

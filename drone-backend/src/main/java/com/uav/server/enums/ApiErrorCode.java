@@ -5,6 +5,12 @@ import lombok.Getter;
 @Getter
 public enum ApiErrorCode {
     INVALID_PARAM("INVALID_PARAM", "请求参数不合法"),
+    WAYBILL_DRAFT_CONFLICT("WAYBILL_DRAFT_CONFLICT", "账号草稿已更新，请先恢复最新草稿再保存"),
+    DISPATCH_UNAVAILABLE("DISPATCH_UNAVAILABLE", "派单下单条件尚未就绪"),
+    ASSESSMENT_INVALID("ASSESSMENT_INVALID", "评估已失效，请重新评估运单"),
+    AIRSPACE_PROHIBITED("AIRSPACE_PROHIBITED", "所选航线禁飞，不能下单"),
+    IDEMPOTENCY_CONFLICT("IDEMPOTENCY_CONFLICT", "请求标识已用于不同运单，请先查询原订单"),
+    DISPATCH_ASSIGNMENT_CHANGED("DISPATCH_ASSIGNMENT_CHANGED", "订单已被接走、已取消或接单状态已变化，请刷新"),
     UAV_NOT_FOUND("UAV_NOT_FOUND", "无人机不存在"),
     UAV_NOT_CONNECTED("UAV_NOT_CONNECTED", "无人机未建立 WebSocket 连接"),
     UAV_STATUS_NOT_FOUND("UAV_STATUS_NOT_FOUND", "无人机暂未上报状态"),

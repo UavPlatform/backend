@@ -56,11 +56,18 @@ public class DroneCommandService {
 
     public WsCommandAckResult sendStartLiveCommand(String deviceId, String roomId, String userId,
                                                    String userSig, long ackTimeoutMillis, long startingTtlMillis) {
+        return sendStartLiveCommand(deviceId, roomId, userId, userSig, null, null, ackTimeoutMillis, startingTtlMillis);
+    }
+
+    public WsCommandAckResult sendStartLiveCommand(String deviceId, String roomId, String userId,
+            String userSig, Long sdkAppId, String privateMapKey, long ackTimeoutMillis, long startingTtlMillis) {
         String requestId = UUID.randomUUID().toString();
         Map<String, Object> data = new ConcurrentHashMap<>();
         data.put("roomId", roomId);
         data.put("userId", userId);
         data.put("userSig", userSig);
+        if (sdkAppId != null) data.put("sdkAppId", sdkAppId);
+        if (privateMapKey != null && !privateMapKey.isBlank()) data.put("privateMapKey", privateMapKey);
         WsEnvelope payload = commandEnvelope(requestId, WsMessageNames.START_LIVE, deviceId, data);
 
         CompletableFuture<WsCommandAckResult> future = new CompletableFuture<>();

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface ChatSessionRepository extends JpaRepository<ChatSession, Long> {
+    java.util.Optional<ChatSession> findByDispatchOrderIdAndDispatchAssignmentVersion(String orderId, Long version);
 
     List<ChatSession> findByTypeAndOwnerIdOrderByIdAsc(Integer type, Long ownerId);
 

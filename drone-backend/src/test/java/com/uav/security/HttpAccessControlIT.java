@@ -289,7 +289,9 @@ class HttpAccessControlIT extends IntegrationTestBase {
                         .header("Authorization", user.authorization()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(String.valueOf(user.id())))
-                .andExpect(jsonPath("$.data.userSig").isNotEmpty());
+                .andExpect(jsonPath("$.data.userSig").isNotEmpty())
+                .andExpect(jsonPath("$.data.privateMapKey").isNotEmpty())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"));
     }
 
     // ---------- /api/ws/request 需登录 + 设备归属 ----------

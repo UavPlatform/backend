@@ -1029,6 +1029,7 @@
           },
           "liveState" : {
             "description" : "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
+            "enum" : [ "IDLE", "RUNNING", "STARTING" ],
             "type" : "string"
           },
           "roomId" : {
@@ -6993,7 +6994,7 @@
     },
     "/webUav/position" : {
       "get" : {
-        "description" : "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录",
+        "description" : "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录；无位置数据时 data 为 null",
         "operationId" : "getPosition",
         "parameters" : [ {
           "description" : "无人机 ID（与 deviceId 二选一）",
@@ -7022,7 +7023,7 @@
                 }
               }
             },
-            "description" : "OK"
+            "description" : "成功；无位置数据时 data 为 null（不报错）"
           }
         },
         "summary" : "查询无人机实时位置",

@@ -14,7 +14,8 @@ public record PullCredentialsVO(
     long sdkAppId,
     @Schema(description = "设备 WebSocket 连接地址")
     String wsUrl,
-    @Schema(description = "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）")
+    @Schema(description = "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
+            allowableValues = {"IDLE", "STARTING", "RUNNING"})
     String liveState,
     @Schema(description = "设备图传是否已在运行（true 表示可直接拉流）")
     boolean ackConfirmed

@@ -105,6 +105,28 @@ class LeaveEndpointIT extends IntegrationTestBase {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    @DisplayName("leave 在直播 RUNNING 时调用：直播仍为 RUNNING（不停推流）")
+    void leaveKeepsRunningLive() throws Exception {
+        TestAccounts.Account viewer = accounts().registerUser();
+        String deviceId = UniqueNames.unique("leave-run");
+        registerUav(deviceId);
+        UserRecord record = openRecord(viewer.userName(), deviceId);
+        // LiveSession 是内存态，不随事务回滚：用例结束显式复位
+        liveSessionService.markRunning(deviceId, "room-" + deviceId, "req-" + deviceId);
+        try {
+            mockMvc.perform(post("/live/leave?deviceId=" + deviceId)
+                            .header("Authorization", viewer.authorization()))
+                    .andExpect(status().isOk());
+
+            assertThat(userRecordRepository.findById(record.getId()).orElseThrow().getEnd_time()).isNotNull();
+            assertThat(liveSessionService.isRunning(deviceId)).isTrue();
+            assertThat(liveSessionService.getSnapshot(deviceId).getState().name()).isEqualTo("RUNNING");
+        } finally {
+            liveSessionService.markStopped(deviceId);
+        }
+    }
+
     // ---------- helpers ----------
 
     private void registerUav(String deviceId) {

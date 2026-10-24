@@ -49,6 +49,13 @@ public class ChatSession {
     @Column(name = "application_id")
     private Long applicationId;
 
+    /** REQ-SHIP-EXEC-002 / REQ-PILOT-EXEC-006: independent dispatch assignment scope. */
+    @Column(name = "dispatch_order_id", length = 36)
+    private String dispatchOrderId;
+
+    @Column(name = "dispatch_assignment_version")
+    private Long dispatchAssignmentVersion;
+
     @Column(name = "avatar", length = 500)
     private String avatar;
 

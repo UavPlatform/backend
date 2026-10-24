@@ -764,6 +764,22 @@
         },
         "type" : "object"
       },
+      "DispatchChatVO" : {
+        "properties" : {
+          "assignmentVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "sessionId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "DispatchClaimDTO" : {
         "properties" : {
           "offerRevision" : {
@@ -2546,6 +2562,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/ComplaintListVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultDispatchChatVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchChatVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -7120,6 +7163,44 @@
         },
         "summary" : "取消派单运单",
         "tags" : [ "Dispatch Order API" ]
+      }
+    },
+    "/dispatch/orders/{orderId}/chat" : {
+      "post" : {
+        "description" : "REQ-SHIP-EXEC-002 / REQ-PILOT-EXEC-006；仅货主与当前飞手，服务端选择成员，按订单及指派轮次幂等；退出或重新派单后旧会话不可访问；结单只读已有会话",
+        "operationId" : "openDispatchChat",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DispatchAssignmentDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchChatVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "打开本次接单的订单聊天",
+        "tags" : [ "dispatch-chat-controller" ]
       }
     },
     "/dispatch/orders/{orderId}/deliver" : {

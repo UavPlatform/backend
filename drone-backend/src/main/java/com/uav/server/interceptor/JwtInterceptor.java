@@ -16,7 +16,7 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
-import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.AsyncHandlerInterceptor;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,7 +26,7 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-public class JwtInterceptor implements HandlerInterceptor {
+public class JwtInterceptor implements AsyncHandlerInterceptor {
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -99,6 +99,12 @@ public class JwtInterceptor implements HandlerInterceptor {
             if (requireRole == null) {
                 requireRole = handlerMethod.getBeanType().getAnnotation(RequireRole.class);
             }
+            // Provider IDs belong to a separate table: never treat them as legacy user/admin IDs.
+            if (Integer.valueOf(3).equals(UserContext.getRole()) && (requireRole == null ||
+                    java.util.Arrays.stream(requireRole.value()).noneMatch(r -> r == 3))) {
+                sendForbidden(response, "服务商仅可访问服务商工作台");
+                return false;
+            }
             if (requireRole != null && requireRole.value().length > 0) {
                 Integer userRole = UserContext.getRole();
                 boolean allowed = java.util.Arrays.stream(requireRole.value())
@@ -131,6 +137,12 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         UserContext.clear();
+    }
+
+    @Override
+    public void afterConcurrentHandlingStarted(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        UserContext.clear();
+        MDC.clear();
     }
 
     private void sendUnauthorized(HttpServletResponse response, String message) throws IOException {

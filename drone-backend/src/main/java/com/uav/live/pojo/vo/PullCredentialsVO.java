@@ -18,5 +18,7 @@ public record PullCredentialsVO(
             allowableValues = {"IDLE", "STARTING", "RUNNING"})
     String liveState,
     @Schema(description = "设备图传是否已在运行（true 表示可直接拉流）")
-    boolean ackConfirmed
+    boolean ackConfirmed,
+    @Schema(description = "绑定当前设备房间的接收权限票据，兼容高级房间权限")
+    String privateMapKey
 ) {}

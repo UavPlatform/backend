@@ -30,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -136,8 +137,8 @@ public class WebLiveController {
         String roomId = trtcService.generateRoomId(deviceId);
         String userSig = trtcService.generateUserSig(deviceId);
         WsCommandAckResult ackResult = commandService.sendStartLiveCommand(
-                deviceId, roomId, deviceId, userSig,
-                ackTimeoutMillis, startingTtlMillis
+                deviceId, roomId, deviceId, userSig, trtcService.getSdkAppId(),
+                trtcService.generatePrivateMapKey(deviceId, roomId, true), ackTimeoutMillis, startingTtlMillis
         );
 
         LiveSessionSnapshot snapshot = liveSessionService.getSnapshot(deviceId);
@@ -170,7 +171,8 @@ public class WebLiveController {
     )
     @PostMapping("/get")
     public Result<PullCredentialsVO> getPullCredentials(@RequestParam String deviceId,
-                                                          HttpServletRequest request) {
+                                                          HttpServletRequest request, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
         webUavService.getRegisteredUav(deviceId);
 
         if (!appWebSocketService.isConnected(deviceId)) {
@@ -196,7 +198,8 @@ public class WebLiveController {
                 roomId, trtcUserId, userSig, trtcService.getSdkAppId(),
                 buildWebSocketUrl(request, deviceId),
                 liveSessionService.getSnapshot(deviceId).getState().name(),
-                liveSessionService.isRunning(deviceId)
+                liveSessionService.isRunning(deviceId),
+                trtcService.generatePrivateMapKey(trtcUserId, roomId, false)
         );
         return Result.success(vo);
     }

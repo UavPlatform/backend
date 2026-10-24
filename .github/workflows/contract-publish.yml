@@ -20,6 +20,9 @@
 # 兜底机制：
 #   - 若 Secrets 未配置，跳过 dispatch 步骤并在 Job Summary 警告（客户端定时同步会兜底）
 #   - 若 Release 已存在，复用现有 tag 并跳过创建（幂等）
+#   - 只有契约内容（sha256）真的变了才通知客户端：push 触发时若同 sha 的
+#     contract-* Release 已存在（说明契约内容没变，例如只改了实现、格式或 sha 文件），
+#     直接跳过 Release 和 dispatch；手动 workflow_dispatch 仍会重发通知
 
 name: Contract Publish
 
@@ -95,6 +98,11 @@ jobs:
           
           if [[ $EXISTS -eq 0 ]]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
+            if [[ "${{ github.event_name }}" == "push" ]]; then
+              echo "skip_notify=true" >> "$GITHUB_OUTPUT"
+              echo "### ⏭️ 契约内容未变化，跳过通知" >> "$GITHUB_STEP_SUMMARY"
+              echo "sha256 与已发布的 \`${{ steps.contract.outputs.tag }}\` 相同，不向客户端发送 openapi-updated。" >> "$GITHUB_STEP_SUMMARY"
+            fi
             RELEASE_URL=$(gh release view "${{ steps.contract.outputs.tag }}" --json url --jq .url)
             echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
             echo "### ℹ️ Release 已存在" >> "$GITHUB_STEP_SUMMARY"
@@ -226,6 +234,7 @@ jobs:
 
       - name: 获取客户端仓库 GitHub App Token
         id: app_token
+        if: steps.check_release.outputs.skip_notify != 'true'
         continue-on-error: true
         run: |
           set +e

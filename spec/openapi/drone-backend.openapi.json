@@ -1002,6 +1002,84 @@
         },
         "type" : "object"
       },
+      "DispatchNearbyHallVO" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DispatchNearbyOfferVO"
+            },
+            "type" : "array"
+          },
+          "locationExpiresAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "locationState" : {
+            "type" : "string"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "radiusKm" : {
+            "format" : "double",
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "DispatchNearbyOfferVO" : {
+        "properties" : {
+          "distanceMeters" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "offer" : {
+            "$ref" : "#/components/schemas/DispatchOfferVO"
+          }
+        },
+        "type" : "object"
+      },
+      "DispatchNearbyStatusVO" : {
+        "properties" : {
+          "assignmentVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notifiedPilotCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "radiusKm" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "reminderAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reminderSent" : {
+            "type" : "boolean"
+          },
+          "state" : {
+            "type" : "string"
+          },
+          "systemPushEnabled" : {
+            "type" : "boolean"
+          },
+          "waitingSince" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "DispatchNotificationPageVO" : {
         "properties" : {
           "hasNext" : {
@@ -1167,6 +1245,66 @@
           "updatedAt" : {
             "format" : "date-time",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "DispatchPositionDTO" : {
+        "properties" : {
+          "accuracyMeters" : {
+            "format" : "double",
+            "minimum" : 0,
+            "type" : "number"
+          },
+          "capturedAt" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "coordinateSystem" : {
+            "pattern" : "GCJ02",
+            "type" : "string"
+          },
+          "latitude" : {
+            "format" : "double",
+            "maximum" : 90,
+            "minimum" : -90,
+            "type" : "number"
+          },
+          "longitude" : {
+            "format" : "double",
+            "maximum" : 180,
+            "minimum" : -180,
+            "type" : "number"
+          },
+          "mocked" : {
+            "type" : "boolean"
+          },
+          "sessionKey" : {
+            "maxLength" : 36,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "accuracyMeters", "capturedAt", "coordinateSystem", "latitude", "longitude", "mocked", "sessionKey" ],
+        "type" : "object"
+      },
+      "DispatchPositionVO" : {
+        "properties" : {
+          "accuracyMeters" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "coordinateSystem" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "receivedAt" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -2560,6 +2698,60 @@
         },
         "type" : "object"
       },
+      "ResultDispatchNearbyHallVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchNearbyHallVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultDispatchNearbyStatusVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchNearbyStatusVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultDispatchNotificationPageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2597,6 +2789,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/DispatchOrderVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultDispatchPositionVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchPositionVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -3804,6 +4023,33 @@
           "data" : {
             "$ref" : "#/components/schemas/SessionVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultString" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "type" : "string"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -7144,6 +7390,34 @@
         "tags" : [ "Dispatch Fulfillment API" ]
       }
     },
+    "/dispatch/orders/{orderId}/nearby-dispatch" : {
+      "get" : {
+        "description" : "当前轮次实际生成站内派单通知的去重人数；不是手机推送或已读人数；等待十分钟后提醒，保持原半径，不自动取消",
+        "operationId" : "nearbyDispatchStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchNearbyStatusVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "本人运单的附近派单进度",
+        "tags" : [ "dispatch-nearby-controller" ]
+      }
+    },
     "/dispatch/orders/{orderId}/receipt" : {
       "post" : {
         "description" : "需求方提交本人SHIPPER_RECEIPT材料，重新核验双方对象存在及大小后结单；按下单距离快照结算；差额为负则全额模拟退差，不额外收定金",
@@ -7343,6 +7617,38 @@
         },
         "summary" : "派单大厅",
         "tags" : [ "Dispatch Pilot API" ]
+      }
+    },
+    "/dispatch/pilot/nearby-hall" : {
+      "get" : {
+        "description" : "按起点直线距离筛选后分页，缺位置或位置过期返回LOCATION_REQUIRED，不降级为全部；不返回联系人或其他飞手坐标",
+        "operationId" : "nearbyDispatchHall",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "maximum" : 1000000,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchNearbyHallVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "按有效位置筛选附近订单",
+        "tags" : [ "dispatch-nearby-controller" ]
       }
     },
     "/dispatch/pilot/orders" : {
@@ -7762,6 +8068,81 @@
         },
         "summary" : "取消接单并重新派单",
         "tags" : [ "Dispatch Pilot API" ]
+      }
+    },
+    "/dispatch/pilot/position" : {
+      "delete" : {
+        "operationId" : "clearDispatchPosition",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "sessionKey",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "停止附近匹配并清除本人最新位置",
+        "tags" : [ "dispatch-nearby-controller" ]
+      },
+      "put" : {
+        "description" : "仅当前飞手；GCJ02真实SDK采样，拒绝模拟、过期与非有限值；只保留最新位置，不接受客户端用户ID；重放旧采样不续期",
+        "operationId" : "updateDispatchPosition",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DispatchPositionDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchPositionVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "更新本人附近派单位置",
+        "tags" : [ "dispatch-nearby-controller" ]
+      }
+    },
+    "/dispatch/pilot/position-session" : {
+      "post" : {
+        "description" : "仅当前飞手；立即使旧会话失效并清除旧坐标；不取得定位，不算已匹配；迟到的旧上报不能恢复已关闭会话",
+        "operationId" : "beginDispatchPositionSession",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultString"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "开启新的附近位置会话",
+        "tags" : [ "dispatch-nearby-controller" ]
       }
     },
     "/dispatch/readiness" : {

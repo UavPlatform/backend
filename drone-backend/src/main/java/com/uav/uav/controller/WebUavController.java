@@ -99,10 +99,14 @@ public class WebUavController {
     @OperationLog("查询无人机位置")
     @Operation(
             summary = "查询无人机实时位置",
-            description = "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录",
+            description = "优先内存实时数据，内存无数据时降级为 DB 最近 2 分钟内的记录；无位置数据时 data 为 null",
             parameters = {
                     @Parameter(name = "uavId", description = "无人机 ID（与 deviceId 二选一）"),
                     @Parameter(name = "deviceId", description = "设备 ID（与 uavId 二选一）")
+            },
+            responses = {
+                    @ApiResponse(responseCode = "200",
+                            description = "成功；无位置数据时 data 为 null（不报错）")
             })
     @GetMapping("/position")
     public Result<GpsPointVO> getPosition(@RequestParam(required = false) Long uavId,

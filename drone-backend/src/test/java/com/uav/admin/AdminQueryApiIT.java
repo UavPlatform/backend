@@ -8,6 +8,8 @@ import com.uav.server.util.UserContext;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
+import com.uav.server.enums.OrderStatus;
+import com.uav.server.enums.TaskStatus;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.service.TaskService;
 import org.junit.jupiter.api.DisplayName;
@@ -236,5 +238,71 @@ class AdminQueryApiIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.userConfirmedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.riderConfirmedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.paidAt").value(expectedPaidAt));
+    }
+
+    // ---------- frontend#12：编号精确过滤 ----------
+
+    @Test
+    @DisplayName("订单列表 orderNum 精确过滤：只返回该订单，分页字段语义不变")
+    void adminFilterOrdersByOrderNum() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        MissionOrder target = fixtures.order(owner.id(), fixtures.task(TaskStatus.IDLE, 10, owner.id()),
+                OrderStatus.PAID, "10.00");
+        fixtures.order(owner.id(), fixtures.task(TaskStatus.IDLE, 10, owner.id()), OrderStatus.PAID, "10.00");
+
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/admin/orders")
+                        .param("orderNum", " " + target.getOrderNum() + " ")
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].orderNum").value(target.getOrderNum()))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1));
+    }
+
+    @Test
+    @DisplayName("订单列表 taskNum 精确过滤：只返回该任务的订单")
+    void adminFilterOrdersByTaskNum() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        Task task = fixtures.task(TaskStatus.IDLE, 10, owner.id());
+        MissionOrder target = fixtures.order(owner.id(), task, OrderStatus.PAID, "10.00");
+        fixtures.order(owner.id(), fixtures.task(TaskStatus.IDLE, 10, owner.id()), OrderStatus.PAID, "10.00");
+
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/admin/orders")
+                        .param("taskNum", task.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].orderNum").value(target.getOrderNum()))
+                .andExpect(jsonPath("$.data.content[0].taskNum").value(task.getTaskNum()))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("任务列表 status=IN_PROGRESS 与 taskNum 组合过滤（AND）")
+    void adminFilterTasksByStatusAndTaskNum() throws Exception {
+        TestAccounts.Account owner = accounts().registerUser();
+        Task inProgress = fixtures.task(TaskStatus.IN_PROGRESS, 10, owner.id());
+        Task idle = fixtures.task(TaskStatus.IDLE, 10, owner.id());
+
+        TestAccounts.AdminAccount admin = accounts().adminLogin();
+        mockMvc.perform(get("/admin/tasks")
+                        .param("status", "IN_PROGRESS").param("taskNum", inProgress.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].taskNum").value(inProgress.getTaskNum()))
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        // 状态不匹配 → 空页
+        mockMvc.perform(get("/admin/tasks")
+                        .param("status", "IN_PROGRESS").param("taskNum", idle.getTaskNum())
+                        .header("Authorization", admin.authorization()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(0))
+                .andExpect(jsonPath("$.data.totalElements").value(0));
     }
 }

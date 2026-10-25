@@ -18,7 +18,8 @@ public final class AdminDispatchOrderVO {
                       String executedModelName, LocalDateTime createdAt, LocalDateTime updatedAt) { }
 
     @Schema(name = "AdminDispatchOrderTimelineEvent", description = "状态时间线节点（按时间升序）")
-    public record TimelineEvent(String event, LocalDateTime at, Long actorUserId) { }
+    public record TimelineEvent(String event, LocalDateTime at, Long actorUserId,
+            @Schema(description = "结束原因，仅 ASSIGNMENT_ENDED 可能有值") String reason) { }
 
     @Schema(name = "AdminDispatchOrderAssignment", description = "派单（接单）记录，每次重新派单 assignmentVersion 递增")
     public record Assignment(long assignmentVersion, Party pilot, LocalDateTime acceptedAt, LocalDateTime arrivedAt,

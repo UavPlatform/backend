@@ -16,6 +16,14 @@ class AdminDispatchOrderServiceTest {
         assertThat(AdminDispatchOrderService.like(" a%b_c ")).isEqualTo("%a\\%b\\_c%");
     }
 
+    @Test void enumFilterRejectsUnknownValues() {
+        assertThat(AdminDispatchOrderService.enumFilter(" ", AdminDispatchOrderService.STAGES)).isNull();
+        assertThat(AdminDispatchOrderService.enumFilter("IN_TRANSIT", AdminDispatchOrderService.STAGES)).isEqualTo("IN_TRANSIT");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                AdminDispatchOrderService.enumFilter("NOPE", AdminDispatchOrderService.FUNDS_STATUSES))
+                .isInstanceOf(com.uav.server.exception.BusinessException.class);
+    }
+
     @Test void timelineIsChronologicalAndSkipsMissingSteps() {
         LocalDateTime t = LocalDateTime.of(2031, 1, 1, 0, 0);
         DispatchOrder o = new DispatchOrder();
@@ -38,7 +46,10 @@ class AdminDispatchOrderServiceTest {
         second.setEndedAt(t.plusMinutes(60));
         var events = AdminDispatchOrderService.timeline(o, List.of(first, second));
         assertThat(events).extracting(e -> e.event()).containsExactly("CREATED", "ACCEPTED",
-                "ASSIGNMENT_ENDED:PILOT_RELEASED", "ACCEPTED", "STARTED", "DELIVERED", "RECEIPT_CONFIRMED",
+                "ASSIGNMENT_ENDED", "ACCEPTED", "STARTED", "DELIVERED", "RECEIPT_CONFIRMED",
                 "COMPLETED", "SETTLED", "ASSIGNMENT_ENDED");
+        assertThat(events.get(2).reason()).isEqualTo("PILOT_RELEASED");
+        assertThat(events.get(9).reason()).isNull();
+        assertThat(events.get(0).reason()).isNull();
     }
 }

@@ -34,8 +34,8 @@ public class AdminDispatchOrderController {
     public Result<AdminPageVo<AdminDispatchOrderVO.Row>> list(
             @Parameter(description = "页码（从 0 起）") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页条数（默认 20，上限 100）") @RequestParam(defaultValue = "20") int size,
-            @Parameter(description = "订单阶段，如 AWAITING_DEPOSIT / WAITING_ACCEPTANCE / COMPLETED") @RequestParam(required = false) String stage,
-            @Parameter(description = "资金状态，如 UNPAID / PAID / REFUNDED") @RequestParam(required = false) String fundsStatus,
+            @Parameter(description = "订单阶段：AWAITING_DEPOSIT / WAITING_ACCEPTANCE / PILOT_PREPARING / PILOT_ARRIVED / IN_TRANSIT / DELIVERY_CONFIRMATION / COMPLETED / CANCELLED；未知值 400") @RequestParam(required = false) String stage,
+            @Parameter(description = "资金状态：UNPAID / PAID / BALANCE_DUE / SETTLED / REFUNDED；未知值 400") @RequestParam(required = false) String fundsStatus,
             @Parameter(description = "创建时间下限（含），ISO-8601") @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdFrom,
             @Parameter(description = "创建时间上限（不含），ISO-8601") @RequestParam(required = false)

@@ -37,6 +37,9 @@ import java.util.stream.Collectors;
 @Service
 public class AdminDispatchOrderService {
     static final int MAX_SIZE = 100;
+    static final Set<String> STAGES = Set.of("AWAITING_DEPOSIT", "WAITING_ACCEPTANCE", "PILOT_PREPARING",
+            "PILOT_ARRIVED", "IN_TRANSIT", "DELIVERY_CONFIRMATION", "COMPLETED", "CANCELLED");
+    static final Set<String> FUNDS_STATUSES = Set.of("UNPAID", "PAID", "BALANCE_DUE", "SETTLED", "REFUNDED");
 
     private final DispatchOrderRepository orders;
     private final DispatchAssignmentRepository assignments;
@@ -57,8 +60,10 @@ public class AdminDispatchOrderService {
         if (page < 0 || size < 1 || (from != null && to != null && !from.isBefore(to))) {
             throw new BusinessException(ApiErrorCode.INVALID_PARAM);
         }
+        String stageFilter = enumFilter(stage, STAGES);
+        String fundsFilter = enumFilter(fundsStatus, FUNDS_STATUSES);
         int pageSize = Math.min(size, MAX_SIZE);
-        Page<DispatchOrder> result = orders.adminSearch(blankToNull(stage), blankToNull(fundsStatus), from, to,
+        Page<DispatchOrder> result = orders.adminSearch(stageFilter, fundsFilter, from, to,
                 like(keyword), PageRequest.of(page, pageSize,
                         Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
         Set<Long> ids = new HashSet<>();
@@ -97,8 +102,7 @@ public class AdminDispatchOrderService {
         for (DispatchAssignment a : history) {
             add(events, "ACCEPTED", a.getAcceptedAt(), a.getPilotId());
             add(events, "ARRIVED", a.getArrivedAt(), a.getPilotId());
-            add(events, a.getEndReason() == null ? "ASSIGNMENT_ENDED" : "ASSIGNMENT_ENDED:" + a.getEndReason(),
-                    a.getEndedAt(), a.getPilotId());
+            add(events, "ASSIGNMENT_ENDED", a.getEndedAt(), a.getPilotId(), a.getEndReason());
         }
         add(events, "STARTED", o.getStartedAt(), o.getAssignedPilotId());
         add(events, "DELIVERED", o.getDeliveredAt(), o.getAssignedPilotId());
@@ -110,7 +114,11 @@ public class AdminDispatchOrderService {
     }
 
     private static void add(List<TimelineEvent> events, String name, LocalDateTime at, Long actor) {
-        if (at != null) events.add(new TimelineEvent(name, at, actor));
+        add(events, name, at, actor, null);
+    }
+
+    private static void add(List<TimelineEvent> events, String name, LocalDateTime at, Long actor, String reason) {
+        if (at != null) events.add(new TimelineEvent(name, at, actor, reason));
     }
 
     private Map<Long, User> names(Set<Long> ids) {
@@ -121,6 +129,12 @@ public class AdminDispatchOrderService {
         if (id == null) return null;
         User u = byId.get(id);
         return new Party(id, u == null ? null : u.getUserName());
+    }
+
+    static String enumFilter(String value, Set<String> allowed) {
+        String v = blankToNull(value);
+        if (v != null && !allowed.contains(v)) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        return v;
     }
 
     private static String blankToNull(String s) {

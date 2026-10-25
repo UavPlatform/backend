@@ -57,7 +57,7 @@ class AdminDispatchOrderIT extends IntegrationTestBase {
         var pilot = accounts().registerRider();
         LocalDateTime base = LocalDateTime.of(2031, 1, 1, 8, 0);
         DispatchOrder older = order(owner.id(), "WAITING_ACCEPTANCE", "PAID", base, null);
-        DispatchOrder newer = order(owner.id(), "IN_FLIGHT", "PAID", base.plusHours(1), pilot.id());
+        DispatchOrder newer = order(owner.id(), "IN_TRANSIT", "PAID", base.plusHours(1), pilot.id());
         order(owner.id(), "AWAITING_DEPOSIT", "UNPAID", base.plusHours(2), null);
         var admin = accounts().adminLogin();
 
@@ -71,7 +71,7 @@ class AdminDispatchOrderIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.content[1].orderId").value(older.getId()));
 
         mockMvc.perform(get("/admin/dispatch/orders").header("Authorization", admin.authorization())
-                        .param("keyword", pilot.userName()).param("stage", "IN_FLIGHT")
+                        .param("keyword", pilot.userName()).param("stage", "IN_TRANSIT")
                         .param("createdFrom", "2031-01-01T08:30:00").param("createdTo", "2031-01-01T10:00:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
@@ -86,13 +86,20 @@ class AdminDispatchOrderIT extends IntegrationTestBase {
         mockMvc.perform(get("/admin/dispatch/orders").header("Authorization", admin.authorization())
                         .param("createdFrom", "2031-01-02T00:00:00").param("createdTo", "2031-01-01T00:00:00"))
                 .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/admin/dispatch/orders").header("Authorization", admin.authorization())
+                        .param("stage", "IN_FLIGHT")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/admin/dispatch/orders").header("Authorization", admin.authorization())
+                        .param("fundsStatus", "BOGUS")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/admin/dispatch/orders").header("Authorization", admin.authorization())
+                        .param("keyword", "100%_")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
     }
 
     @Test void adminDetailHasTimelineAssignmentsAndConnections() throws Exception {
         var owner = accounts().registerUser();
         var pilot = accounts().registerRider();
         LocalDateTime base = LocalDateTime.of(2031, 2, 1, 8, 0);
-        DispatchOrder o = order(owner.id(), "IN_FLIGHT", "PAID", base, pilot.id());
+        DispatchOrder o = order(owner.id(), "IN_TRANSIT", "PAID", base, pilot.id());
         o.setStartedAt(base.plusMinutes(30));
         o.setExecutedSerialNumber("SN-ADMIN-1");
         o.setExecutedModelCode("M350RTK");

@@ -170,6 +170,10 @@
           },
           "event" : {
             "type" : "string"
+          },
+          "reason" : {
+            "description" : "结束原因，仅 ASSIGNMENT_ENDED 可能有值",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -6295,7 +6299,7 @@
             "type" : "integer"
           }
         }, {
-          "description" : "订单阶段，如 AWAITING_DEPOSIT / WAITING_ACCEPTANCE / COMPLETED",
+          "description" : "订单阶段：AWAITING_DEPOSIT / WAITING_ACCEPTANCE / PILOT_PREPARING / PILOT_ARRIVED / IN_TRANSIT / DELIVERY_CONFIRMATION / COMPLETED / CANCELLED；未知值 400",
           "in" : "query",
           "name" : "stage",
           "required" : false,
@@ -6303,7 +6307,7 @@
             "type" : "string"
           }
         }, {
-          "description" : "资金状态，如 UNPAID / PAID / REFUNDED",
+          "description" : "资金状态：UNPAID / PAID / BALANCE_DUE / SETTLED / REFUNDED；未知值 400",
           "in" : "query",
           "name" : "fundsStatus",
           "required" : false,

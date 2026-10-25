@@ -34,4 +34,7 @@ public interface TaskApplicationRepository extends JpaRepository<TaskApplication
 
     /** 列表批量装配用：某飞手在一批任务上的本人应征（每任务至多一条）。 */
     List<TaskApplication> findByTaskIdInAndRiderId(java.util.Collection<Long> taskIds, Long riderId);
+
+    /** REQ-SUP-GOV-006: block model delete while old applications still reference it. */
+    boolean existsByAircraftModelId(Long aircraftModelId);
 }

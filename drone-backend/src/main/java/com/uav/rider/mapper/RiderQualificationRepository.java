@@ -10,4 +10,6 @@ import java.util.List;
 public interface RiderQualificationRepository extends JpaRepository<RiderQualification, Long> {
 
     List<RiderQualification> findByUserIdOrderByIdAsc(Long userId);
+
+    boolean existsByAircraftModelId(Long aircraftModelId);
 }

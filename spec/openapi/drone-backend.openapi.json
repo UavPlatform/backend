@@ -1,6 +1,72 @@
 {
   "components" : {
     "schemas" : {
+      "AdminAircraftModelDTO" : {
+        "description" : "管理端机型写入",
+        "properties" : {
+          "displayName" : {
+            "description" : "显示名",
+            "example" : "DJI FlyCart 30",
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "maxPayloadKg" : {
+            "description" : "最大载重（kg）",
+            "example" : 30.0,
+            "minimum" : 0.01,
+            "type" : "number"
+          },
+          "modelCode" : {
+            "description" : "型号代码，须与 djifly 连机上报一致（如 FC30）",
+            "example" : "FC30",
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "transportEnabled" : {
+            "description" : "是否支持吊运",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "displayName", "maxPayloadKg", "modelCode", "transportEnabled" ],
+        "type" : "object"
+      },
+      "AdminAircraftModelVO" : {
+        "description" : "管理端机型",
+        "properties" : {
+          "coefficient" : {
+            "description" : "机型系数（报价乘子；本版只读，第 4 步清理）",
+            "type" : "number"
+          },
+          "displayName" : {
+            "description" : "显示名",
+            "type" : "string"
+          },
+          "enabled" : {
+            "description" : "是否启用",
+            "type" : "boolean"
+          },
+          "id" : {
+            "description" : "机型 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "maxPayloadKg" : {
+            "description" : "最大载重（kg）",
+            "type" : "number"
+          },
+          "modelCode" : {
+            "description" : "型号代码",
+            "type" : "string"
+          },
+          "transportEnabled" : {
+            "description" : "是否支持吊运",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "AdminDispatchOrderAssignment" : {
         "description" : "派单（接单）记录，每次重新派单 assignmentVersion 递增",
         "properties" : {
@@ -378,6 +444,39 @@
           "userId" : {
             "description" : "下单用户ID",
             "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminAircraftModelVO" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminAircraftModelVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
             "type" : "integer"
           }
         },
@@ -1007,6 +1106,17 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "AircraftModelEnabledDTO" : {
+        "description" : "机型启用/停用",
+        "properties" : {
+          "enabled" : {
+            "description" : "true=启用，false=停用；停用后登记无人机时不可选",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "enabled" ],
         "type" : "object"
       },
       "AircraftModelVO" : {
@@ -2704,6 +2814,33 @@
         },
         "type" : "object"
       },
+      "ResultAdminAircraftModelVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminAircraftModelVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultAdminDispatchOrderDetail" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2795,6 +2932,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/AdminOrderVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminAircraftModelVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminAircraftModelVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -6278,6 +6442,206 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/admin/aircraft-models" : {
+      "get" : {
+        "description" : "按型号代码升序；page 从 0 起，size 上限 100；含已停用机型。公开启用目录仍走 GET /api/aircraft-models",
+        "operationId" : "adminListAircraftModels",
+        "parameters" : [ {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "机型分页列表",
+        "tags" : [ "Admin Aircraft Model API" ]
+      },
+      "post" : {
+        "description" : "型号代码全局唯一（大小写不敏感，重复 409）；默认启用；coefficient 固定为 1.000（本版不开放改口）",
+        "operationId" : "adminCreateAircraftModel",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminAircraftModelDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "新增机型",
+        "tags" : [ "Admin Aircraft Model API" ]
+      }
+    },
+    "/admin/aircraft-models/{modelId}" : {
+      "delete" : {
+        "description" : "仅当从未被无人机、飞手资质/绑机、执飞连接或旧应征引用时可删；否则 409，提示改为停用",
+        "operationId" : "adminDeleteAircraftModel",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "modelId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "删除机型",
+        "tags" : [ "Admin Aircraft Model API" ]
+      },
+      "get" : {
+        "operationId" : "adminGetAircraftModel",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "modelId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "机型详情",
+        "tags" : [ "Admin Aircraft Model API" ]
+      },
+      "put" : {
+        "description" : "可改型号代码、显示名、最大载重、是否吊运；型号代码冲突 409；不改 coefficient 与 enabled",
+        "operationId" : "adminUpdateAircraftModel",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "modelId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminAircraftModelDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "编辑机型",
+        "tags" : [ "Admin Aircraft Model API" ]
+      }
+    },
+    "/admin/aircraft-models/{modelId}/enabled" : {
+      "post" : {
+        "description" : "停用后登记无人机与公开目录都选不到；已引用该机型的无人机/资质/执飞记录仍照常显示",
+        "operationId" : "adminSetAircraftModelEnabled",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "modelId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AircraftModelEnabledDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminAircraftModelVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "启用/停用机型",
+        "tags" : [ "Admin Aircraft Model API" ]
+      }
+    },
     "/admin/complaint/list" : {
       "get" : {
         "description" : "分页查看投诉，可按状态筛选",
@@ -11776,6 +12140,9 @@
   }, {
     "description" : "管理端机场/无人机管理（仅管理员；无人机归平台所有）",
     "name" : "Admin Drone API"
+  }, {
+    "description" : "管理端机型管理（仅管理员）",
+    "name" : "Admin Aircraft Model API"
   }, {
     "description" : "管理端派单订单查询（只读，仅管理员）",
     "name" : "Admin Dispatch Order API"

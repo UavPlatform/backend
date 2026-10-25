@@ -13,4 +13,8 @@ public interface ProviderDroneRepository extends JpaRepository<ProviderDrone, St
     Page<ProviderDrone> findByProviderId(Long provider, Pageable page);
     @Query("select d from ProviderDrone d, EquipmentProvider p, AircraftModel m where d.providerId = p.id and d.aircraftModelId = m.id and p.enabled = true and d.enabled = true and m.enabled = true and (:provider is null or d.providerId = :provider)")
     Page<ProviderDrone> catalog(@Param("provider") Long provider, Pageable page);
+    /** Admin supervision list (ADR-0008): optional provider / airport-name filters. */
+    @Query("select d from ProviderDrone d where (:provider is null or d.providerId = :provider)"
+            + " and (:airport is null or d.airportName like :airport escape '\\')")
+    Page<ProviderDrone> adminSearch(@Param("provider") Long provider, @Param("airport") String airport, Pageable page);
 }

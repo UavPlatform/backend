@@ -725,6 +725,23 @@
         },
         "type" : "object"
       },
+      "DispatchConfigVO" : {
+        "properties" : {
+          "currency" : {
+            "type" : "string"
+          },
+          "depositAmount" : {
+            "type" : "number"
+          },
+          "orderingEnabled" : {
+            "type" : "boolean"
+          },
+          "pilotServiceFee" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
       "DroneBorrowDTO" : {
         "properties" : {
           "droneId" : {
@@ -1645,6 +1662,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/ComplaintListVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultDispatchConfigVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/DispatchConfigVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -2968,6 +3012,33 @@
         },
         "type" : "object"
       },
+      "ResultWaybillDraftVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/WaybillDraftVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultWebUavStatusVo" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -4000,6 +4071,62 @@
           },
           "userName" : {
             "description" : "userName",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WaybillDraftDTO" : {
+        "properties" : {
+          "expectedRevision" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "fields" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "maximum" : 1,
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "step" : {
+            "format" : "int32",
+            "maximum" : 4,
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "fields", "schemaVersion", "step" ],
+        "type" : "object"
+      },
+      "WaybillDraftVO" : {
+        "properties" : {
+          "fields" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "revision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "step" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
             "type" : "string"
           }
         },
@@ -5283,6 +5410,74 @@
         },
         "summary" : "列出会话",
         "tags" : [ "chat session API" ]
+      }
+    },
+    "/dispatch/config" : {
+      "get" : {
+        "description" : "需登录；仅返回平台定金和按单飞手服务费，非总价或预估价；orderingEnabled取决于服务端评估数据和受限模拟支付是否可用",
+        "operationId" : "config",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDispatchConfigVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "派单固定金额配置",
+        "tags" : [ "Dispatch Draft API" ]
+      }
+    },
+    "/dispatch/waybill-draft" : {
+      "get" : {
+        "description" : "仅需求方本人；无草稿时 success=true,data=null；照片仍只保存在本机，不包含于账号草稿",
+        "operationId" : "draft",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultWaybillDraftVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "读取我的运单草稿",
+        "tags" : [ "Dispatch Draft API" ]
+      },
+      "put" : {
+        "description" : "允许部分文本输入；不创建任务、订单或支付；首次保存 expectedRevision 省略，后续传最新 revision；并发或旧版本写入返回409/WAYBILL_DRAFT_CONFLICT；拒绝未知字段、价格和本机照片路径",
+        "operationId" : "save",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WaybillDraftDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultWaybillDraftVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "保存我的运单草稿",
+        "tags" : [ "Dispatch Draft API" ]
       }
     },
     "/equipment/admin/borrows" : {
@@ -8087,6 +8282,9 @@
   }, {
     "description" : "文件上传管理",
     "name" : "Upload API"
+  }, {
+    "description" : "派单固定配置与账号运单草稿，不创建订单或收款",
+    "name" : "Dispatch Draft API"
   }, {
     "description" : "真实借还登记；不绑定飞手、不关联订单、不收费、不收押金",
     "name" : "Drone Borrowing API"

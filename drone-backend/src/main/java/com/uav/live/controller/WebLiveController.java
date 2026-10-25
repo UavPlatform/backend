@@ -1,6 +1,5 @@
 package com.uav.live.controller;
 
-import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
 import com.uav.user.pojo.entity.UserRecord;
 import com.uav.server.enums.ApiErrorCode;
@@ -10,7 +9,6 @@ import com.uav.live.pojo.vo.PullCredentialsVO;
 import com.uav.live.service.impl.LiveSessionSnapshot;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RateLimiter;
-import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.ws.DroneCommandService;
@@ -57,8 +55,12 @@ public class WebLiveController {
     @Autowired
     private LiveSessionService liveSessionService;
 
+    private com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
+
     @Autowired
-    private RiderUavRepository riderUavRepository;
+    void setPilotDeviceAccess(com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess) {
+        this.pilotDeviceAccess = pilotDeviceAccess;
+    }
 
     @OperationLog("请求开播")
     @RateLimiter(limit = 5, windowSeconds = 60)
@@ -86,7 +88,6 @@ public class WebLiveController {
      * 复用 START_LIVE 下发/ACK 与 /live/get 凭证链路；停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路。
      */
     @RequireRole(1)
-    @RequireDrone
     @OperationLog("飞手主动开播")
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
@@ -106,7 +107,8 @@ public class WebLiveController {
     public Result<LiveStartVO> riderStartLive(@RequestParam String deviceId) {
         Long riderId = UserContext.getUserId();
         webUavService.getRegisteredUav(deviceId);
-        if (riderId == null || !riderUavRepository.existsByUserIdAndDjiId(riderId, deviceId)) {
+        // ADR-0007 (10-22): the drone belongs to the dispatch task; see PilotDeviceAccess.
+        if (!pilotDeviceAccess.mayUse(riderId, deviceId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "设备未绑定到当前飞手");
         }
         return doStartLive(deviceId, LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS);

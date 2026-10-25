@@ -1,5 +1,4 @@
 Field <com.uav.live.controller.AppWebSocketController.riderUavRepository> has type <com.uav.user.mapper.RiderUavRepository> in (AppWebSocketController.java:0)
-Field <com.uav.live.controller.WebLiveController.riderUavRepository> has type <com.uav.user.mapper.RiderUavRepository> in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.userRecordRepository> has type <com.uav.user.mapper.UserRecordRepository> in (WebLiveController.java:0)
 Field <com.uav.user.controller.UserController.userRecordRepository> has type <com.uav.user.mapper.UserRecordRepository> in (UserController.java:0)
 Method <com.uav.live.controller.AppWebSocketController.requestConnection(java.lang.String)> calls method <com.uav.user.mapper.RiderUavRepository.existsByUserIdAndDjiId(java.lang.Long, java.lang.String)> in (AppWebSocketController.java:50)
@@ -9,5 +8,4 @@ Method <com.uav.live.controller.WebLiveController.closeCallerOpenRecord(java.lan
 Method <com.uav.live.controller.WebLiveController.closeCallerOpenRecord(java.lang.String, java.lang.String)> calls method <com.uav.user.mapper.UserRecordRepository.save(java.lang.Object)> in (WebLiveController.java:285)
 Method <com.uav.live.controller.WebLiveController.ensureOpenRecord(java.lang.String, java.lang.String)> calls method <com.uav.user.mapper.UserRecordRepository.findOpenRecords(java.lang.String, java.lang.String)> in (WebLiveController.java:301)
 Method <com.uav.live.controller.WebLiveController.ensureOpenRecord(java.lang.String, java.lang.String)> calls method <com.uav.user.mapper.UserRecordRepository.save(java.lang.Object)> in (WebLiveController.java:309)
-Method <com.uav.live.controller.WebLiveController.riderStartLive(java.lang.String)> calls method <com.uav.user.mapper.RiderUavRepository.existsByUserIdAndDjiId(java.lang.Long, java.lang.String)> in (WebLiveController.java:109)
 Method <com.uav.user.controller.UserController.getLiveRecords(java.lang.Integer, java.lang.Integer)> calls method <com.uav.user.mapper.UserRecordRepository.findAllByUserName(java.lang.String, org.springframework.data.domain.Pageable)> in (UserController.java:117)

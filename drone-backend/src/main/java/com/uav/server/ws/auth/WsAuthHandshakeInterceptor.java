@@ -44,11 +44,19 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
     private final JwtUtil jwtUtil;
     private final RiderUavRepository riderUavRepository;
     private final Mode mode;
+    /** Device-channel ownership check (pilot, deviceId); defaults to the legacy rider_uav binding. */
+    private final java.util.function.BiPredicate<Long, String> deviceAccess;
 
     public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, RiderUavRepository riderUavRepository, Mode mode) {
+        this(jwtUtil, riderUavRepository, mode, riderUavRepository::existsByUserIdAndDjiId);
+    }
+
+    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, RiderUavRepository riderUavRepository, Mode mode,
+                                      java.util.function.BiPredicate<Long, String> deviceAccess) {
         this.jwtUtil = jwtUtil;
         this.riderUavRepository = riderUavRepository;
         this.mode = mode;
+        this.deviceAccess = deviceAccess;
     }
 
     @Override
@@ -94,8 +102,8 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
                 log.warn("拒绝 WebSocket 握手（设备通道）：非飞手身份连接设备通道, userId={}, role={}", userId, role);
                 return false;
             }
-            if (!riderUavRepository.existsByUserIdAndDjiId(userId, deviceId)) {
-                log.warn("拒绝 WebSocket 握手（设备通道）：设备未绑定到该飞手, userId={}, deviceId={}", userId, deviceId);
+            if (!deviceAccess.test(userId, deviceId)) {
+                log.warn("拒绝 WebSocket 握手（设备通道）：设备未绑定到该飞手、也不是其派单任务当前连机的无人机, userId={}, deviceId={}", userId, deviceId);
                 return false;
             }
         }

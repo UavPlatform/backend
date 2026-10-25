@@ -10,7 +10,6 @@ import com.uav.live.pojo.vo.PullCredentialsVO;
 import com.uav.live.service.impl.LiveSessionSnapshot;
 import com.uav.server.annotation.OperationLog;
 import com.uav.server.annotation.RateLimiter;
-import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.server.exception.BusinessException;
 import com.uav.server.ws.DroneCommandService;
@@ -87,7 +86,6 @@ public class WebLiveController {
      * 停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路（/live/close 对所有发起方生效）。
      */
     @RequireRole(1)
-    @RequireDrone
     @OperationLog("飞手主动开播")
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(

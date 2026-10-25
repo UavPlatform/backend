@@ -69,31 +69,29 @@ class AccountAuthIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("飞手注册直接返回 token，绑定无人机后可通过 @RequireDrone 门槛")
-    void riderRegisterBindsDroneAndPassesRequireDroneGate() throws Exception {
+    @DisplayName("飞手注册直接返回 token")
+    void riderRegisterReturnsToken() {
         TestAccounts.Account rider = accounts().registerRider();
         assertThat(rider.role()).isEqualTo(1);
         assertThat(rider.djiId()).isNotBlank();
-
-        // /rider/complete 标注 @RequireDrone：未绑定 → 403，未认证 → 401，角色不符 → 403；
-        // 返回 404（任务不存在）唯一地证明身份、角色与无人机绑定三道门槛全部通过。
-        // （旧 /rider/accept 已随 ADR-0003 移除，@RequireDrone 门槛改由 /rider/complete 承载）
-        mockMvc.perform(post("/rider/complete")
-                        .param("taskNum", UniqueNames.unique("TN"))
-                        .header("Authorization", rider.authorization()))
-                .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("未绑定无人机的飞手访问 @RequireDrone 端点被 403 拒绝")
-    void riderWithoutDroneIsRejectedByRequireDroneGate() throws Exception {
+    @DisplayName("ADR-0007：未手动绑定无人机的飞手也能取消、完成、开播，不再被「请先绑定」拦截")
+    void riderWithoutDroneIsNoLongerBlockedByBindGate() throws Exception {
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), null);
-
-        mockMvc.perform(post("/rider/complete")
-                        .param("taskNum", UniqueNames.unique("TN"))
+        // 404（任务不存在）证明身份与角色通过，且没有绑机门槛。
+        for (String path : new String[]{"/rider/complete", "/rider/cancel"}) {
+            mockMvc.perform(post(path)
+                            .param("taskNum", UniqueNames.unique("TN"))
+                            .header("Authorization", rider.authorization()))
+                    .andExpect(status().isNotFound());
+        }
+        String body = mockMvc.perform(post("/live/rider/req")
+                        .param("deviceId", UniqueNames.djiId())
                         .header("Authorization", rider.authorization()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("请先绑定至少一台无人机"));
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).doesNotContain("请先绑定至少一台无人机");
     }
 
     @Test

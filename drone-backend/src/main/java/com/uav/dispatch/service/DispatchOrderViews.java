@@ -19,15 +19,11 @@ final class DispatchOrderViews {
                 order.getRefundReference(), fields(order), order.getCreatedAt(), order.getUpdatedAt(),
                 order.getAssignedPilotId(), order.getAssignmentVersion(),
                 order.getQuoteJson() == null ? null : new DispatchBillVO(DispatchPricingService.decode(order.getQuoteJson()),
-                        order.getCompletedAt() == null ? null : finalAmount(order),
+                        order.getCompletedAt() == null ? null : DispatchPricingService.decode(order.getQuoteJson()).totalAmount(),
                         order.getBalanceAmount(), order.getSettlementReference(), order.getSettledAt(),
-                        order.getReviewScore(), order.getReviewComment(), order.getSettlementBasis(), order.getActualFlightSeconds()),
+                        order.getReviewScore(), order.getReviewComment()),
                 order.getStartedAt(), order.getDeliveredAt(), order.getReceiptAt(),
                 order.getExecutedSerialNumber() == null ? null : new DispatchExecutedDroneVO(order.getExecutedSerialNumber(),
                         order.getExecutedModelCode(), order.getExecutedModelName(), order.getExecutedAircraftModelId()));
-    }
-    /** Orders completed before actual settlement existed keep their estimate as the final amount. */
-    private static java.math.BigDecimal finalAmount(DispatchOrder order) {
-        return order.getFinalAmount() != null ? order.getFinalAmount() : DispatchPricingService.decode(order.getQuoteJson()).totalAmount();
     }
 }

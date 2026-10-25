@@ -44,9 +44,6 @@ public class DispatchOrder {
     @Column(length = 128) private String executedModelCode;
     @Column(length = 128) private String executedModelName;
     @Column private Long executedAircraftModelId;
-    @Column private Long actualFlightSeconds;
-    @Column(precision = 10, scale = 2) private BigDecimal finalAmount;
-    @Column(length = 32) private String settlementBasis;
     @Column private Integer reviewScore;
     @Column(length = 500) private String reviewComment;
 }

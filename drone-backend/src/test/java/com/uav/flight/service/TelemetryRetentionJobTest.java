@@ -26,9 +26,13 @@ class TelemetryRetentionJobTest {
         var oct = YearMonth.of(2026, 10);
         assertThat(TelemetryPartitions.name(oct)).isEqualTo("p202610");
         assertThat(TelemetryPartitions.upperBound(oct)).isEqualTo(Instant.parse("2026-10-31T16:00:00Z").toEpochMilli());
-        var sql = TelemetryPartitions.convertStatements(oct, 2);
+        var sql = TelemetryPartitions.convertStatements(oct, 2, null);
         assertThat(sql.get(0)).contains("PRIMARY KEY (id, captured_at)").contains("uk_flight_sample (connection_id, sequence_number, captured_at)");
         assertThat(sql.get(1)).contains("p_hist", "p202610", "p202611", "p202612", "pmax VALUES LESS THAN MAXVALUE").doesNotContain("p202701");
+        assertThat(TelemetryPartitions.convertStatements(oct, 2, YearMonth.of(2026, 8)).get(1))
+                .contains("PARTITION p_hist VALUES LESS THAN (" + TelemetryPartitions.upperBound(YearMonth.of(2026, 7)) + ")", "p202608", "p202609")
+                .doesNotContain("p202607 ");
+        assertThat(TelemetryPartitions.convertStatements(oct, 2, YearMonth.of(2020, 1)).get(1)).contains("p202603").doesNotContain("p202602");
         assertThat(TelemetryPartitions.addStatement(oct)).contains("REORGANIZE PARTITION pmax INTO (PARTITION p202610");
         assertThat(TelemetryPartitions.dropStatement(List.of("p_hist", "p202603"))).endsWith("DROP PARTITION p_hist, p202603");
         assertThat(TelemetryPartitions.isMysql("MySQL")).isTrue();

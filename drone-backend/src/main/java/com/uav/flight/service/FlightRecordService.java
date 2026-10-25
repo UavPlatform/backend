@@ -84,9 +84,9 @@ public class FlightRecordService {
 
     /**
      * Periodic or offline backfill upload (ADR-0009). Accepted while the pilot still holds the assignment, including
-     * after the connection ended or delivery was submitted, so cached samples are not lost. Invalid, conflicting or
-     * out-of-window items are counted as rejected instead of failing the batch; storage errors fail the whole request
-     * so the client keeps its cache and retries.
+     * after the connection ended or delivery was submitted, so cached samples are not lost. Already stored samples
+     * (same connection+sequence or device+capture time, also concurrent inserts) are skipped and counted as duplicates;
+     * invalid or out-of-window items are counted as rejected. Neither fails the batch.
      */
     @Transactional
     public FlightSampleBatchVO batch(Long pilot, String id, String connectionId, FlightSampleBatchDTO input) {
@@ -98,17 +98,24 @@ public class FlightRecordService {
         long latest = (c.getEndedAt() == null ? System.currentTimeMillis()
                 : c.getEndedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) + BACKFILL_SKEW_MS;
         int accepted = 0, duplicates = 0, rejected = 0;
-        FlightSample newest = null;
+        FlightSampleDTO newest = null;
         for (var item : input.samples().stream().sorted(Comparator.comparingLong(FlightSampleDTO::sequence)).toList()) {
             if (!valid(item) || item.capturedAt() < earliest || item.capturedAt() > latest) { rejected++; continue; }
-            StoredSample stored;
-            try { stored = store(c, item); }
-            catch (BusinessException e) { rejected++; continue; }
-            if (!stored.created()) { duplicates++; continue; }
+            // Already stored (same connection+sequence or same device+capture time): skip, first write wins.
+            if (samples.findByConnectionIdAndSequenceNumber(c.getId(), item.sequence()).isPresent()
+                    || samples.findBySerialNumberAndCapturedAt(c.getSerialNumber(), item.capturedAt()).isPresent()) {
+                duplicates++; continue;
+            }
+            int rows = samples.insertIgnore(c.getId(), c.getOrderId(), c.getSerialNumber(), item.sequence(), fingerprint(item),
+                    item.capturedAt(), LocalDateTime.now(), item.latitude(), item.longitude(), item.altitude(), item.speed(),
+                    item.battery(), item.flying(), item.payloadKg());
+            if (rows == 0) { duplicates++; continue; }
             accepted++;
-            if (newest == null || stored.sample().getSequenceNumber() > newest.getSequenceNumber()) newest = stored.sample();
+            if (newest == null || item.sequence() > newest.sequence()) newest = item;
         }
-        if (newest != null && c.getEndedAt() == null) advance(c, newest);
+        if (newest != null && c.getEndedAt() == null) {
+            samples.findBySerialNumberAndCapturedAt(c.getSerialNumber(), newest.capturedAt()).ifPresent(s -> advance(c, s));
+        }
         return new FlightSampleBatchVO(accepted, duplicates, rejected);
     }
 
@@ -204,12 +211,6 @@ public class FlightRecordService {
         var last = items.isEmpty() ? null : items.getLast();
         return new FlightHistoryVO(items, connections.findByOrderIdOrderByOpenedAtAscIdAsc(id).stream().map(c -> view(c, order)).toList(),
                 last == null ? null : last.capturedAt(), last == null ? null : last.sampleId(), more);
-    }
-
-    /** Billing input (ADR-0007): connection records survive telemetry retention. Open connections end at {@code fallbackEnd}. */
-    @Transactional(readOnly = true)
-    public List<FlightConnection> connectionsOf(String id) {
-        return connections.findByOrderIdOrderByOpenedAtAscIdAsc(id);
     }
 
     private void end(FlightConnection c, String reason) {

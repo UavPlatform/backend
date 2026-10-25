@@ -25,7 +25,6 @@ class DispatchFullFlowE2EIT extends RealProtocolTestBase {
     @Autowired DispatchMaterialRepository materials;
     @Autowired DispatchObjectStoreFixture storage;
     @Autowired DispatchPaymentConfig config;
-    @Autowired com.uav.server.config.DispatchBillingConfig billing;
     private HttpResponse<String> response(HttpClient client, Account actor, String path, Object body) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create(baseUrl() + path)).header("Authorization", "Bearer " + actor.token()).header("Content-Type", "application/json");
         if (body != null) builder.POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
@@ -64,10 +63,8 @@ class DispatchFullFlowE2EIT extends RealProtocolTestBase {
             if (refund) config.setDepositAmount(new BigDecimal("99999.00"));
             var waybill = DispatchTestData.waybill(DispatchTestData.fields());
             var assessment = send(client, owner, "/dispatch/assessments", waybill);
-            // ADR-0007 #4: settlement uses the actual flight; a ~0 s connection bills the minimum equipment charge.
-            BigDecimal actual = billing.getMinimumEquipmentCharge().add(oldFee);
             if (zero) {
-                config.setDepositAmount(actual);
+                config.setDepositAmount(new BigDecimal(assessment.path("quote").path("totalAmount").asText()));
                 assessment = send(client, owner, "/dispatch/assessments", waybill);
             }
             var quote = assessment.path("quote");
@@ -91,6 +88,7 @@ class DispatchFullFlowE2EIT extends RealProtocolTestBase {
             String serial = UniqueNames.djiId();
             var connection = send(client, pilot, pilotBase + "/flight-connections", Map.of("assignmentVersion", epoch,
                     "requestKey", UUID.randomUUID().toString(), "serialNumber", serial, "modelCode", "FC30", "modelName", "DJI FlyCart 30"));
+            // ADR-0007 #6/#9: the order's drone is what djifly reported on connection.
             assertThat(send(client, owner, base, null).path("executedDrone").path("serialNumber").asText()).isEqualTo(serial);
             String sampling = pilotBase + "/flight-connections/" + connection.path("connectionId").asText() + "/samples";
             send(client, pilot, sampling, Map.of("sequence", 0, "capturedAt", System.currentTimeMillis(), "latitude", 28.2, "longitude", 113.0));
@@ -119,9 +117,7 @@ class DispatchFullFlowE2EIT extends RealProtocolTestBase {
             var done = send(client, owner, base + "/receipt", Map.of("materialIds", List.of(receiptId)));
             send(client, owner, base + "/receipt", Map.of("materialIds", List.of(receiptId)));
             assertThat(done.path("stage").asText()).isEqualTo("COMPLETED");
-            assertThat(done.path("bill").path("finalAmount").decimalValue()).isEqualByComparingTo(actual);
-            assertThat(done.path("bill").path("settlementBasis").asText()).isEqualTo("ACTUAL_FLIGHT_V1");
-            assertThat(done.path("executedDrone").path("modelCode").asText()).isEqualTo("FC30");
+            assertThat(done.path("bill").path("finalAmount").decimalValue()).isEqualByComparingTo(quote.path("totalAmount").decimalValue());
             assertThat(done.path("fundsStatus").asText()).isEqualTo(refund || zero ? "SETTLED" : "BALANCE_DUE");
             if (refund) assertThat(done.path("refundReference").asText()).isEqualTo("sim-difference-" + id);
             for (int i = 0; i < 2; i++) assertThat(send(client, owner, base + "/settle", Map.of()).path("fundsStatus").asText()).isEqualTo("SETTLED");

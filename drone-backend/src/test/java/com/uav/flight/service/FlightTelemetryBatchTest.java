@@ -51,6 +51,13 @@ class FlightTelemetryBatchTest {
         when(samples.saveAndFlush(any())).thenAnswer(inv -> {
             FlightSample s = inv.getArgument(0); s.setId((long) stored.size() + 1); stored.add(s); return s;
         });
+        when(samples.insertIgnore(any(), any(), any(), anyLong(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    var s = new FlightSample(); s.setId((long) stored.size() + 1); s.setConnectionId(inv.getArgument(0));
+                    s.setSerialNumber(inv.getArgument(2)); s.setSequenceNumber(inv.getArgument(3)); s.setFingerprint(inv.getArgument(4));
+                    s.setCapturedAt(inv.getArgument(5)); s.setReceivedAt(inv.getArgument(6)); s.setPayloadKg(inv.getArgument(13));
+                    stored.add(s); return 1;
+                });
         when(samples.findById(anyLong())).thenAnswer(inv -> stored.stream().filter(s -> s.getId().equals(inv.getArgument(0))).findFirst());
     }
 
@@ -66,12 +73,20 @@ class FlightTelemetryBatchTest {
                 new FlightSampleDTO(3, now - 1000, 30.0, null, null, null, null, null, null),
                 dto(4, now - 86_400_000L, null), dto(5, now - 4000, 99.0))));
         assertThat(result.accepted()).isEqualTo(2);
-        assertThat(result.duplicates()).isEqualTo(1);
-        assertThat(result.rejected()).isEqualTo(3);
+        assertThat(result.duplicates()).isEqualTo(2); // seq 0 resent + seq 5 at an already stored capture time
+        assertThat(result.rejected()).isEqualTo(2);
         assertThat(stored).extracting(FlightSample::getSerialNumber).containsOnly("SN1");
         assertThat(stored.getFirst().getPayloadKg()).isEqualTo(12.5);
         assertThat(connection.getLatestSampleId()).isEqualTo(stored.stream().filter(s -> s.getSequenceNumber() == 2).findFirst().orElseThrow().getId());
         verify(broadcaster, times(2)).publish(eq(connection), any());
+    }
+
+    @Test void concurrentInsertSkippedByUniqueKeyCountsAsDuplicateNotFailure() {
+        when(samples.insertIgnore(any(), any(), any(), anyLong(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+        var result = service.batch(7L, "o1", "c1", new FlightSampleBatchDTO(List.of(dto(1, System.currentTimeMillis(), null))));
+        assertThat(result.accepted()).isZero(); assertThat(result.duplicates()).isEqualTo(1);
+        verifyNoInteractions(broadcaster);
     }
 
     @Test void endedConnectionAcceptsBackfillWithoutTouchingRealtimeState() {

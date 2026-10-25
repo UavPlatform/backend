@@ -738,10 +738,6 @@
       },
       "DispatchBillVO" : {
         "properties" : {
-          "actualFlightSeconds" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
           "balanceAmount" : {
             "type" : "number"
           },
@@ -760,9 +756,6 @@
           },
           "settledAt" : {
             "format" : "date-time",
-            "type" : "string"
-          },
-          "settlementBasis" : {
             "type" : "string"
           },
           "settlementReference" : {

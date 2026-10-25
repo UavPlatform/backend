@@ -1,7 +1,7 @@
 -- ADR-0009 / ADR-0007 / REQ-SUP-MON-005 / REQ-SUP-MON-007 / REQ-SHIP-EXEC-004.
 -- Telemetry samples: device + capture-time de-duplication, optional payload weight, no FKs so the
 -- table can be RANGE-partitioned by captured_at on MySQL (V21) and old months dropped after 180 days.
--- Billing facts (connections, executed drone, flight seconds, final amount) live outside this table.
+-- Connection records and the executed drone on the order live outside this table and are kept.
 ALTER TABLE dispatch_flight_sample ADD COLUMN serial_number VARCHAR(64);
 ALTER TABLE dispatch_flight_sample ADD COLUMN payload_kg DOUBLE;
 UPDATE dispatch_flight_sample SET serial_number = (
@@ -17,6 +17,3 @@ ALTER TABLE dispatch_order ADD COLUMN executed_serial_number VARCHAR(64);
 ALTER TABLE dispatch_order ADD COLUMN executed_model_code VARCHAR(128);
 ALTER TABLE dispatch_order ADD COLUMN executed_model_name VARCHAR(128);
 ALTER TABLE dispatch_order ADD COLUMN executed_aircraft_model_id BIGINT;
-ALTER TABLE dispatch_order ADD COLUMN actual_flight_seconds BIGINT;
-ALTER TABLE dispatch_order ADD COLUMN final_amount DECIMAL(10,2);
-ALTER TABLE dispatch_order ADD COLUMN settlement_basis VARCHAR(32);

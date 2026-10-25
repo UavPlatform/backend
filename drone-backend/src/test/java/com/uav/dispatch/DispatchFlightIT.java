@@ -136,7 +136,8 @@ class DispatchFlightIT extends IntegrationTestBase {
         items.add(Map.of("sequence", 9, "capturedAt", now - 3000, "battery", 10)); // same device + time, other content
         var result = send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", items), 200);
         assertThat(result.path("accepted").asInt()).isEqualTo(3);
-        assertThat(result.path("rejected").asInt()).isEqualTo(1);
+        assertThat(result.path("duplicates").asInt()).isEqualTo(1); // skipped, batch still 200
+        assertThat(result.path("rejected").asInt()).isZero();
         assertThat(send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", items.subList(0, 3)), 200)
                 .path("duplicates").asInt()).isEqualTo(3);
         send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", List.of()), 400);

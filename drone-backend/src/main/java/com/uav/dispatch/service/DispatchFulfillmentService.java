@@ -21,12 +21,9 @@ public class DispatchFulfillmentService {
     private final DispatchSandboxPayment payment;
     private final DispatchNotificationService notifications;
     private final com.uav.flight.service.FlightRecordService flight;
-    private final DispatchActualSettlement settlement;
     public DispatchFulfillmentService(DispatchOrderRepository orders, DispatchAssignmentRepository assignments,
-            DispatchMaterialService materials, DispatchSandboxPayment payment, DispatchNotificationService notifications,
-            com.uav.flight.service.FlightRecordService flight, DispatchActualSettlement settlement) {
+            DispatchMaterialService materials, DispatchSandboxPayment payment, DispatchNotificationService notifications, com.uav.flight.service.FlightRecordService flight) {
         this.orders = orders; this.assignments = assignments; this.materials = materials; this.payment = payment; this.notifications = notifications; this.flight = flight;
-        this.settlement = settlement;
     }
     @Transactional
     public DispatchOrderVO start(Long pilot, String id, long version) {
@@ -59,9 +56,7 @@ public class DispatchFulfillmentService {
         materials.requireVerified(order, owner, "SHIPPER_RECEIPT", ids);
         materials.requireVerified(order, order.getAssignedPilotId(), "PILOT_DELIVERY", JSON.parseArray(order.getPilotMaterialIdsJson(), String.class));
         var quote = DispatchPricingService.decode(order.getQuoteJson());
-        // ADR-0007 #4: final amount = actual drone + actual flight time; balance = final − deposit (may be negative).
-        var finalAmount = settlement.settle(order, quote, order.getDeliveredAt() != null ? order.getDeliveredAt() : LocalDateTime.now());
-        order.setBalanceAmount(finalAmount.subtract(order.getDepositAmount()));
+        order.setBalanceAmount(quote.totalAmount().subtract(order.getDepositAmount()));
         if (order.getBalanceAmount().signum() < 0) payment.requireAvailable();
         order.setReceiptMaterialIdsJson(canonical); order.setReceiptAt(LocalDateTime.now());
         order.setCompletedAt(order.getReceiptAt()); order.setUpdatedAt(order.getReceiptAt()); order.setStage("COMPLETED");

@@ -111,6 +111,17 @@
 			<artifactId>h2</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- ADR-0009：真实 MySQL 8 验证分区迁移与保留任务（无 Docker 时跳过，CI 运行） -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-mysql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
 		<!-- 测试聚合门禁：JUnit5 + Mockito + AssertJ + Spring Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

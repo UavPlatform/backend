@@ -32,16 +32,25 @@ public final class TelemetryPartitions {
         return "p" + m.format(NAME);
     }
 
-    /** One-off conversion: keys must contain the partition column, then RANGE partitions + MAXVALUE catch-all. */
-    public static List<String> convertStatements(YearMonth current, int monthsAhead) {
+    /** Months of existing data that get their own partition at conversion; older rows land in p_hist (already past 180 days). */
+    public static final int BACKFILL_MONTHS = 7;
+
+    /**
+     * One-off in-place conversion of the existing table (ALTER TABLE, no copy/rename by hand). MySQL requires every
+     * PRIMARY/UNIQUE key to contain the partition column, so the keys are widened with {@code captured_at} first; the
+     * device key {@code uk_flight_sample_device (serial_number, captured_at)} already contains it. Monthly partitions start
+     * at the oldest data month (at most {@link #BACKFILL_MONTHS} back), older rows go to {@code p_hist}.
+     */
+    public static List<String> convertStatements(YearMonth current, int monthsAhead, YearMonth oldestData) {
         var sql = new ArrayList<String>();
         sql.add("ALTER TABLE " + TABLE + " DROP INDEX uk_flight_sample, "
                 + "ADD UNIQUE KEY uk_flight_sample (connection_id, sequence_number, captured_at), "
                 + "DROP PRIMARY KEY, ADD PRIMARY KEY (id, captured_at)");
         var parts = new StringBuilder("ALTER TABLE " + TABLE + " PARTITION BY RANGE (captured_at) (");
-        parts.append("PARTITION p_hist VALUES LESS THAN (").append(upperBound(current.minusMonths(1))).append("), ");
-        for (int i = 0; i <= monthsAhead; i++) {
-            YearMonth m = current.plusMonths(i);
+        YearMonth first = current.minusMonths(BACKFILL_MONTHS);
+        if (oldestData != null && oldestData.isAfter(first)) first = oldestData.isAfter(current) ? current : oldestData;
+        parts.append("PARTITION p_hist VALUES LESS THAN (").append(upperBound(first.minusMonths(1))).append("), ");
+        for (YearMonth m = first; !m.isAfter(current.plusMonths(monthsAhead)); m = m.plusMonths(1)) {
             parts.append("PARTITION ").append(name(m)).append(" VALUES LESS THAN (").append(upperBound(m)).append("), ");
         }
         parts.append("PARTITION ").append(MAX).append(" VALUES LESS THAN MAXVALUE)");

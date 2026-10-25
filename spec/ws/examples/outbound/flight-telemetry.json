@@ -1,0 +1,22 @@
+{
+  "type": "event",
+  "name": "FLIGHT_TELEMETRY",
+  "deviceId": "1581F5BKD225400P0001",
+  "timestamp": 1761357600000,
+  "data": {
+    "orderId": "0b9c7a52-2f0e-4c41-9a43-3c0f0f8e7d11",
+    "connectionId": "5a1e2c3d-4b5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "modelCode": "FC30",
+    "modelName": "DJI FlyCart 30",
+    "sampleId": 1024,
+    "sequence": 42,
+    "capturedAt": 1761357600000,
+    "latitude": 28.2282,
+    "longitude": 112.9388,
+    "altitude": 56.4,
+    "speed": 8.2,
+    "battery": 76,
+    "payloadKg": null,
+    "flying": true
+  }
+}

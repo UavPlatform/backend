@@ -122,4 +122,38 @@ class DispatchFlightIT extends IntegrationTestBase {
         assertThat(read(owner, view).path("stale").asBoolean()).isTrue();
         assertThat(read(owner, "/dispatch/orders/" + id + "/flight/track").path("items").size()).isEqualTo(3);
     }
+    @Test void batchBackfillDedupesByDeviceTimeAndHistoryReplaysByCaptureTime() throws Exception {
+        var owner = accounts().registerUser(); var pilot = accounts().registerRider(UniqueNames.userName("batch"), null);
+        var stranger = accounts().registerUser();
+        String id = prepare(owner, pilot); String endpoint = path(id) + "/flight-connections";
+        String serial = UniqueNames.djiId();
+        String cid = send(pilot, endpoint, connect(serial), 200).path("connectionId").asText();
+        assertThat(read(owner, "/dispatch/orders/" + id).path("executedDrone").path("serialNumber").asText()).isEqualTo(serial);
+        long now = System.currentTimeMillis();
+        var items = new ArrayList<Map<String, Object>>();
+        for (int i = 0; i < 3; i++) items.add(Map.of("sequence", i, "capturedAt", now - 3000 + i * 1000L, "latitude", 28.2 + i * 0.001,
+                "longitude", 113.0, "altitude", 50.0, "payloadKg", 12.5));
+        items.add(Map.of("sequence", 9, "capturedAt", now - 3000, "battery", 10)); // same device + time, other content
+        var result = send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", items), 200);
+        assertThat(result.path("accepted").asInt()).isEqualTo(3);
+        assertThat(result.path("rejected").asInt()).isEqualTo(1);
+        assertThat(send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", items.subList(0, 3)), 200)
+                .path("duplicates").asInt()).isEqualTo(3);
+        send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", List.of()), 400);
+        var view = read(owner, "/dispatch/orders/" + id + "/flight");
+        assertThat(view.path("latest").path("sequence").asLong()).isEqualTo(2);
+        assertThat(view.path("latest").path("payloadKg").asDouble()).isEqualTo(12.5);
+        var page = read(owner, "/dispatch/orders/" + id + "/flight/history?limit=2");
+        assertThat(page.path("items").size()).isEqualTo(2); assertThat(page.path("hasNext").asBoolean()).isTrue();
+        var rest = read(owner, "/dispatch/orders/" + id + "/flight/history?limit=2&afterCapturedAt=" + page.path("nextCapturedAt").asLong()
+                + "&afterSampleId=" + page.path("nextSampleId").asLong());
+        assertThat(rest.path("items").size()).isEqualTo(1); assertThat(rest.path("hasNext").asBoolean()).isFalse();
+        assertThat(rest.path("connections").size()).isEqualTo(1);
+        assertThat(read(owner, "/dispatch/orders/" + id + "/flight/history?from=" + (now - 1500)).path("items").size()).isEqualTo(1);
+        mockMvc.perform(get("/dispatch/orders/" + id + "/flight/history").header("Authorization", "Bearer " + stranger.token())).andExpect(status().isNotFound());
+        send(pilot, endpoint + "/" + cid + "/close", Map.of(), 200);
+        var late = send(pilot, endpoint + "/" + cid + "/samples/batch", Map.of("samples", List.of(Map.of("sequence", 3, "capturedAt", now - 500))), 200);
+        assertThat(late.path("accepted").asInt()).isEqualTo(1);
+        assertThat(read(owner, "/dispatch/orders/" + id + "/flight").path("latest").path("sequence").asLong()).isEqualTo(2);
+    }
 }

@@ -32,7 +32,7 @@ class FlightRecordServiceTest {
     private final FlightSampleRepository samples = mock(FlightSampleRepository.class);
     private final AircraftModelRepository models = mock(AircraftModelRepository.class);
     private final DispatchLiveService live = mock(DispatchLiveService.class);
-    private final FlightRecordService service = new FlightRecordService(orders, connections, samples, models, live);
+    private final FlightRecordService service = new FlightRecordService(orders, connections, samples, models, live, mock(FlightTelemetryBroadcaster.class));
     private DispatchOrder order;
 
     @BeforeEach void setUp() {

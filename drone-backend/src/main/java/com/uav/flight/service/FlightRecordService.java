@@ -26,9 +26,14 @@ public class FlightRecordService {
     private final FlightSampleRepository samples;
     private final AircraftModelRepository models;
     private final DispatchLiveService live;
+    private final FlightTelemetryBroadcaster broadcaster;
+    private static final long BACKFILL_SKEW_MS = 10 * 60_000L;
+    private static final int HISTORY_MAX = 1000;
     public FlightRecordService(DispatchOrderRepository orders, FlightConnectionRepository connections,
-            FlightSampleRepository samples, AircraftModelRepository models, DispatchLiveService live) {
+            FlightSampleRepository samples, AircraftModelRepository models, DispatchLiveService live,
+            FlightTelemetryBroadcaster broadcaster) {
         this.orders = orders; this.connections = connections; this.samples = samples; this.models = models; this.live = live;
+        this.broadcaster = broadcaster;
     }
 
     @Transactional
@@ -57,6 +62,10 @@ public class FlightRecordService {
         c.setOpenedAt(LocalDateTime.now()); c.setActiveOrderId(id); c.setActiveSerial(input.serialNumber().trim().toUpperCase(Locale.ROOT));
         try { connections.saveAndFlush(c); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
+        // ADR-0007 #6/#9: the order's drone is what djifly reported, never a manually entered number.
+        order.setExecutedSerialNumber(c.getSerialNumber()); order.setExecutedModelCode(c.getModelCode());
+        order.setExecutedModelName(c.getModelName()); order.setExecutedAircraftModelId(c.getAircraftModelId());
+        orders.save(order);
         return view(c, order);
     }
 
@@ -68,24 +77,77 @@ public class FlightRecordService {
         requireOpenStage(order);
         if (c.getEndedAt() != null || !pilot.equals(c.getPilotId())) throw conflict();
         validate(input);
-        // Canonical scalar list preserves nulls; never serialize records using fastjson's bean codec.
-        String fingerprint = sha256(JSON.toJSONString(Arrays.asList(input.capturedAt(), input.latitude(), input.longitude(),
-                input.altitude(), input.speed(), input.battery(), input.flying())).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        var retry = samples.findByConnectionIdAndSequenceNumber(connectionId, input.sequence());
+        var stored = store(c, input);
+        if (stored.created()) advance(c, stored.sample());
+        return view(stored.sample());
+    }
+
+    /**
+     * Periodic or offline backfill upload (ADR-0009). Accepted while the pilot still holds the assignment, including
+     * after the connection ended or delivery was submitted, so cached samples are not lost. Invalid, conflicting or
+     * out-of-window items are counted as rejected instead of failing the batch; storage errors fail the whole request
+     * so the client keeps its cache and retries.
+     */
+    @Transactional
+    public FlightSampleBatchVO batch(Long pilot, String id, String connectionId, FlightSampleBatchDTO input) {
+        var order = locked(id);
+        var c = connection(id, connectionId);
+        requirePilot(order, pilot, c.getAssignmentVersion());
+        if (!pilot.equals(c.getPilotId()) || !BACKFILL_STAGES.contains(order.getStage())) throw conflict();
+        long earliest = c.getOpenedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() - BACKFILL_SKEW_MS;
+        long latest = (c.getEndedAt() == null ? System.currentTimeMillis()
+                : c.getEndedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()) + BACKFILL_SKEW_MS;
+        int accepted = 0, duplicates = 0, rejected = 0;
+        FlightSample newest = null;
+        for (var item : input.samples().stream().sorted(Comparator.comparingLong(FlightSampleDTO::sequence)).toList()) {
+            if (!valid(item) || item.capturedAt() < earliest || item.capturedAt() > latest) { rejected++; continue; }
+            StoredSample stored;
+            try { stored = store(c, item); }
+            catch (BusinessException e) { rejected++; continue; }
+            if (!stored.created()) { duplicates++; continue; }
+            accepted++;
+            if (newest == null || stored.sample().getSequenceNumber() > newest.getSequenceNumber()) newest = stored.sample();
+        }
+        if (newest != null && c.getEndedAt() == null) advance(c, newest);
+        return new FlightSampleBatchVO(accepted, duplicates, rejected);
+    }
+
+    private record StoredSample(FlightSample sample, boolean created) { }
+
+    /** Idempotent by (connection, sequence) and by (device serial, capture time); same key + other content = 409. */
+    private StoredSample store(FlightConnection c, FlightSampleDTO input) {
+        String fingerprint = fingerprint(input);
+        var retry = samples.findByConnectionIdAndSequenceNumber(c.getId(), input.sequence())
+                .or(() -> samples.findBySerialNumberAndCapturedAt(c.getSerialNumber(), input.capturedAt()));
         if (retry.isPresent()) {
             if (!fingerprint.equals(retry.get().getFingerprint())) throw conflict();
-            return view(retry.get());
+            return new StoredSample(retry.get(), false);
         }
         var s = new FlightSample();
-        s.setConnectionId(connectionId); s.setOrderId(id); s.setSequenceNumber(input.sequence());
+        s.setConnectionId(c.getId()); s.setOrderId(c.getOrderId()); s.setSerialNumber(c.getSerialNumber());
+        s.setSequenceNumber(input.sequence());
         s.setCapturedAt(input.capturedAt()); s.setReceivedAt(LocalDateTime.now()); s.setFingerprint(fingerprint);
         s.setLatitude(input.latitude()); s.setLongitude(input.longitude()); s.setAltitude(input.altitude());
-        s.setSpeed(input.speed()); s.setBattery(input.battery()); s.setFlying(input.flying());
+        s.setSpeed(input.speed()); s.setBattery(input.battery()); s.setFlying(input.flying()); s.setPayloadKg(input.payloadKg());
         samples.saveAndFlush(s);
+        return new StoredSample(s, true);
+    }
+
+    private void advance(FlightConnection c, FlightSample s) {
         var latest = c.getLatestSampleId() == null ? null : samples.findById(c.getLatestSampleId()).orElse(null);
-        if (latest == null || s.getSequenceNumber() > latest.getSequenceNumber()) c.setLatestSampleId(s.getId());
-        connections.save(c);
-        return view(s);
+        if (latest == null || s.getSequenceNumber() > latest.getSequenceNumber()) {
+            c.setLatestSampleId(s.getId());
+            connections.save(c);
+            broadcaster.publish(c, view(s));
+        }
+    }
+
+    private static String fingerprint(FlightSampleDTO input) {
+        // Canonical scalar list preserves nulls; never serialize records using fastjson's bean codec.
+        var values = new ArrayList<Object>(Arrays.asList(input.capturedAt(), input.latitude(), input.longitude(),
+                input.altitude(), input.speed(), input.battery(), input.flying()));
+        if (input.payloadKg() != null) values.add(input.payloadKg());
+        return sha256(JSON.toJSONString(values).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     @Transactional
@@ -127,6 +189,29 @@ public class FlightRecordService {
         return new FlightTrackVO(items, items.isEmpty() ? after : items.getLast().sampleId(), page.hasNext());
     }
 
+    /** Replay / history query ordered by capture time, optionally limited to [from, to] (epoch millis). */
+    @Transactional(readOnly = true)
+    public FlightHistoryVO history(Long caller, Integer role, String id, Long from, Long to,
+            Long afterCapturedAt, Long afterSampleId, int limit) {
+        var order = readable(caller, role, id);
+        long lo = from == null ? 0 : from, hi = to == null ? Long.MAX_VALUE : to;
+        if (lo > hi || limit < 1 || limit > HISTORY_MAX) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        long afterAt = afterCapturedAt == null ? Long.MIN_VALUE : afterCapturedAt;
+        long afterId = afterSampleId == null ? Long.MIN_VALUE : afterSampleId;
+        var page = samples.history(id, lo, hi, afterAt, afterId, PageRequest.of(0, limit + 1));
+        boolean more = page.size() > limit;
+        var items = page.stream().limit(limit).map(this::view).toList();
+        var last = items.isEmpty() ? null : items.getLast();
+        return new FlightHistoryVO(items, connections.findByOrderIdOrderByOpenedAtAscIdAsc(id).stream().map(c -> view(c, order)).toList(),
+                last == null ? null : last.capturedAt(), last == null ? null : last.sampleId(), more);
+    }
+
+    /** Billing input (ADR-0007): connection records survive telemetry retention. Open connections end at {@code fallbackEnd}. */
+    @Transactional(readOnly = true)
+    public List<FlightConnection> connectionsOf(String id) {
+        return connections.findByOrderIdOrderByOpenedAtAscIdAsc(id);
+    }
+
     private void end(FlightConnection c, String reason) {
         if (c.getEndedAt() != null) return;
         live.closeConnection(c.getId());
@@ -146,10 +231,11 @@ public class FlightRecordService {
     private void requirePilot(DispatchOrder o, Long pilot, long version) {
         if (!Objects.equals(pilot, o.getAssignedPilotId()) || version != o.getAssignmentVersion()) throw conflict();
     }
+    private static final Set<String> BACKFILL_STAGES = Set.of("PILOT_ARRIVED", "IN_TRANSIT", "DELIVERY_CONFIRMATION", "COMPLETED");
     private void requireOpenStage(DispatchOrder o) {
         if (!Set.of("PILOT_ARRIVED", "IN_TRANSIT").contains(o.getStage())) throw conflict();
     }
-    private String sha256(byte[] bytes) {
+    private static String sha256(byte[] bytes) {
         try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)); }
         catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
@@ -157,9 +243,11 @@ public class FlightRecordService {
         return value.isBlank() || Set.of("n/a", "unrecognized", "unknown", "unknown_aircraft", "未知设备").contains(value.trim().toLowerCase(Locale.ROOT));
     }
     private void validate(FlightSampleDTO d) {
-        if ((d.latitude() == null) != (d.longitude() == null)
-                || Arrays.asList(d.latitude(), d.longitude(), d.altitude(), d.speed()).stream().anyMatch(v -> v != null && !Double.isFinite(v)))
-            throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        if (!valid(d)) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+    }
+    private static boolean valid(FlightSampleDTO d) {
+        return (d.latitude() == null) == (d.longitude() == null)
+                && Arrays.asList(d.latitude(), d.longitude(), d.altitude(), d.speed(), d.payloadKg()).stream().allMatch(v -> v == null || Double.isFinite(v));
     }
     private FlightConnectionVO view(FlightConnection c, DispatchOrder order) {
         var model = c.getAircraftModelId() == null ? null : models.findById(c.getAircraftModelId()).orElse(null);
@@ -173,7 +261,7 @@ public class FlightRecordService {
     }
     private FlightSampleVO view(FlightSample s) {
         return new FlightSampleVO(s.getId(), s.getConnectionId(), s.getSequenceNumber(), s.getCapturedAt(), s.getReceivedAt(),
-                s.getLatitude(), s.getLongitude(), s.getAltitude(), s.getSpeed(), s.getBattery(), s.getFlying());
+                s.getLatitude(), s.getLongitude(), s.getAltitude(), s.getSpeed(), s.getBattery(), s.getFlying(), s.getPayloadKg());
     }
     private BusinessException missing() { return new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND); }
     private BusinessException denied() { return new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION); }

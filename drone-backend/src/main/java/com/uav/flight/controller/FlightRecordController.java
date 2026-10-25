@@ -27,6 +27,11 @@ public class FlightRecordController {
     public Result<FlightSampleVO> sample(@PathVariable String orderId, @PathVariable String connectionId, @Valid @RequestBody FlightSampleDTO input) {
         return Result.success(records.sample(UserContext.getUserId(), orderId, connectionId, input));
     }
+    @PostMapping("/pilot/orders/{orderId}/flight-connections/{connectionId}/samples/batch") @RequireRole(1)
+    @Operation(summary = "批量上报/补传实际SDK采样", description = "djifly定时批量或断网恢复后补传，最多500条。按(连接,序号)与(机身号,采集时间)去重：已存在且内容一致计duplicates；非法、内容冲突或采集时间不在连接时段±10分钟内计rejected，客户端可丢弃；存储失败整批返回5xx，客户端保留缓存重试。连接结束后、送达确认或结单阶段仍可补传，但不更新实时状态。未知值为null。")
+    public Result<FlightSampleBatchVO> batch(@PathVariable String orderId, @PathVariable String connectionId, @Valid @RequestBody FlightSampleBatchDTO input) {
+        return Result.success(records.batch(UserContext.getUserId(), orderId, connectionId, input));
+    }
     @PostMapping("/pilot/orders/{orderId}/flight-connections/{connectionId}/close") @RequireRole(1)
     @Operation(summary = "结束本人设备连接", description = "原飞手可幂等结束自己的连接；历史请求不能结束新连接；不控制物理飞行，成功data=null。")
     public Result<Void> close(@PathVariable String orderId, @PathVariable String connectionId) {
@@ -41,5 +46,13 @@ public class FlightRecordController {
     @Operation(summary = "读取本单实际采样轨迹", description = "同飞行状态权限，after为上页nextAfter；每页200条，保持服务端保存顺序；不插值补点。")
     public Result<FlightTrackVO> track(@PathVariable String orderId, @RequestParam(defaultValue = "0") @Min(0) long after) {
         return Result.success(records.track(UserContext.getUserId(), UserContext.getRole(), orderId, after));
+    }
+    @GetMapping("/orders/{orderId}/flight/history") @RequireRole({0, 1, 2})
+    @Operation(summary = "按时间查询历史轨迹（回放）", description = "同飞行状态权限。按设备采集时间升序，可选from/to（毫秒，含端点）；续页传上页nextCapturedAt与nextSampleId；limit 1-1000，默认500。附带本单全部连机记录。遥测保留180天，超期采样不可查，连机记录与结算数据不受影响。")
+    public Result<FlightHistoryVO> history(@PathVariable String orderId,
+            @RequestParam(required = false) Long from, @RequestParam(required = false) Long to,
+            @RequestParam(required = false) Long afterCapturedAt, @RequestParam(required = false) Long afterSampleId,
+            @RequestParam(defaultValue = "500") int limit) {
+        return Result.success(records.history(UserContext.getUserId(), UserContext.getRole(), orderId, from, to, afterCapturedAt, afterSampleId, limit));
     }
 }

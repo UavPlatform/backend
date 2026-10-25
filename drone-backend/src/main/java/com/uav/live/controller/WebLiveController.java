@@ -59,6 +59,9 @@ public class WebLiveController {
     @Autowired
     private RiderUavRepository riderUavRepository;
 
+    @Autowired
+    private com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
+
     @OperationLog("请求开播")
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
@@ -105,7 +108,8 @@ public class WebLiveController {
     public Result<LiveStartVO> riderStartLive(@RequestParam String deviceId) {
         Long riderId = UserContext.getUserId();
         webUavService.getRegisteredUav(deviceId);
-        if (riderId == null || !riderUavRepository.existsByUserIdAndDjiId(riderId, deviceId)) {
+        // ADR-0007 (10-22): the drone belongs to the dispatch task; see PilotDeviceAccess.
+        if (!pilotDeviceAccess.mayUse(riderId, deviceId)) {
             throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "设备未绑定到当前飞手");
         }
         return doStartLive(deviceId, LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS);

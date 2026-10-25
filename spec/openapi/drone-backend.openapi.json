@@ -391,6 +391,39 @@
         },
         "type" : "object"
       },
+      "AdminPageVoAdminProviderDroneVO" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminProviderDroneVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "AdminPageVoAdminTaskVo" : {
         "description" : "管理端分页信封（page 从 0 开始）",
         "properties" : {
@@ -578,6 +611,53 @@
           },
           "userName" : {
             "description" : "用户名（昵称）",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminProviderDroneVO" : {
+        "description" : "管理端服务商无人机/机场行",
+        "properties" : {
+          "airportName" : {
+            "description" : "机场名称",
+            "type" : "string"
+          },
+          "borrowed" : {
+            "description" : "是否借出中",
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "description" : "登记时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "droneId" : {
+            "description" : "设备登记 ID",
+            "type" : "string"
+          },
+          "enabled" : {
+            "description" : "设备是否启用",
+            "type" : "boolean"
+          },
+          "latitude" : {
+            "description" : "机场纬度",
+            "type" : "number"
+          },
+          "longitude" : {
+            "description" : "机场经度",
+            "type" : "number"
+          },
+          "model" : {
+            "$ref" : "#/components/schemas/Model",
+            "description" : "机型"
+          },
+          "provider" : {
+            "$ref" : "#/components/schemas/Provider",
+            "description" : "服务商"
+          },
+          "serialNumber" : {
+            "description" : "机身号",
             "type" : "string"
           }
         },
@@ -2157,6 +2237,25 @@
         "required" : [ "content", "sessionId" ],
         "type" : "object"
       },
+      "Model" : {
+        "description" : "机型",
+        "properties" : {
+          "aircraftModelId" : {
+            "description" : "机型 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "displayName" : {
+            "description" : "机型名称",
+            "type" : "string"
+          },
+          "modelCode" : {
+            "description" : "机型编码",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "OrderComplaint" : {
         "properties" : {
           "adminNote" : {
@@ -2301,6 +2400,25 @@
           },
           "prepayId" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Provider" : {
+        "description" : "服务商主体",
+        "properties" : {
+          "displayName" : {
+            "description" : "服务商名称",
+            "type" : "string"
+          },
+          "enabled" : {
+            "description" : "服务商账号是否启用",
+            "type" : "boolean"
+          },
+          "providerId" : {
+            "description" : "服务商 ID",
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -2706,6 +2824,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/AdminPageVoAdminPilotVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminProviderDroneVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminProviderDroneVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -6261,7 +6406,7 @@
     "/admin/dispatch/orders" : {
       "get" : {
         "description" : "按创建时间倒序；page 从 0 起，size 上限 100",
-        "operationId" : "list_1",
+        "operationId" : "list_2",
         "parameters" : [ {
           "description" : "关键字：订单号、货主或飞手用户名模糊匹配",
           "in" : "query",
@@ -6710,6 +6855,64 @@
         },
         "summary" : "飞手详情",
         "tags" : [ "Admin Query API" ]
+      }
+    },
+    "/admin/provider/drones" : {
+      "get" : {
+        "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备与服务商",
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "description" : "服务商 ID（正整数，否则 400）",
+          "in" : "query",
+          "name" : "providerId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "机场名称，模糊匹配（最长 100 字）",
+          "in" : "query",
+          "name" : "airportName",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminProviderDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "服务商无人机/机场分页列表",
+        "tags" : [ "Admin Provider Drone API" ]
       }
     },
     "/admin/tasks" : {
@@ -11756,6 +11959,9 @@
   }, {
     "description" : "管理端投诉处理",
     "name" : "Admin Complaint API"
+  }, {
+    "description" : "管理端服务商无人机/机场查询（只读，仅管理员）",
+    "name" : "Admin Provider Drone API"
   }, {
     "description" : "管理端派单订单查询（只读，仅管理员）",
     "name" : "Admin Dispatch Order API"

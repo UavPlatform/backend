@@ -59,7 +59,7 @@ public class FlightRecordService {
         var matches = models.findAll().stream().filter(m -> m.getModelCode().equalsIgnoreCase(input.modelCode())
                 || m.getDisplayName().equalsIgnoreCase(input.modelName())).toList();
         if (matches.size() == 1) c.setAircraftModelId(matches.getFirst().getId());
-        c.setOpenedAt(LocalDateTime.now()); c.setActiveOrderId(id); c.setActiveSerial(input.serialNumber().trim().toUpperCase(Locale.ROOT));
+        c.setOpenedAt(openedAt(input.startedAt())); c.setActiveOrderId(id); c.setActiveSerial(input.serialNumber().trim().toUpperCase(Locale.ROOT));
         try { connections.saveAndFlush(c); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
         // ADR-0007 #6/#9: the order's drone is what djifly reported, never a manually entered number.
@@ -211,6 +211,14 @@ public class FlightRecordService {
         var last = items.isEmpty() ? null : items.getLast();
         return new FlightHistoryVO(items, connections.findByOrderIdOrderByOpenedAtAscIdAsc(id).stream().map(c -> view(c, order)).toList(),
                 last == null ? null : last.capturedAt(), last == null ? null : last.sampleId(), more);
+    }
+
+    /** Offline-first connections report their local start; clamp to [now - 24h, now] so a skewed clock cannot widen the window much. */
+    static LocalDateTime openedAt(Long startedAt) {
+        long now = System.currentTimeMillis();
+        if (startedAt == null) return LocalDateTime.now();
+        long at = Math.max(now - 86_400_000L, Math.min(now, startedAt));
+        return LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(at), java.time.ZoneId.systemDefault());
     }
 
     private void end(FlightConnection c, String reason) {

@@ -1542,6 +1542,12 @@
             "maxLength" : 64,
             "minLength" : 0,
             "type" : "string"
+          },
+          "startedAt" : {
+            "description" : "设备本地记录连机的时间（毫秒）；离线先记录、联网后补报时填写，服务端限制在最近 24 小时内",
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "required" : [ "modelCode", "modelName", "requestKey", "serialNumber" ],

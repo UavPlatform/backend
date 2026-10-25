@@ -81,6 +81,15 @@ class FlightTelemetryBatchTest {
         verify(broadcaster, times(2)).publish(eq(connection), any());
     }
 
+    @Test void offlineStartIsClampedToLast24Hours() {
+        long now = System.currentTimeMillis();
+        var zone = java.time.ZoneId.systemDefault();
+        assertThat(FlightRecordService.openedAt(now - 60_000).atZone(zone).toInstant().toEpochMilli()).isEqualTo(now - 60_000);
+        assertThat(FlightRecordService.openedAt(1L).atZone(zone).toInstant().toEpochMilli()).isGreaterThanOrEqualTo(now - 86_400_000L);
+        assertThat(FlightRecordService.openedAt(now + 3_600_000L).atZone(zone).toInstant().toEpochMilli()).isLessThanOrEqualTo(System.currentTimeMillis());
+        assertThat(FlightRecordService.openedAt(null)).isNotNull();
+    }
+
     @Test void concurrentInsertSkippedByUniqueKeyCountsAsDuplicateNotFailure() {
         when(samples.insertIgnore(any(), any(), any(), anyLong(), any(), anyLong(), any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(0);

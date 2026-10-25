@@ -106,6 +106,47 @@ class FlightTelemetryBatchTest {
         verifyNoInteractions(broadcaster);
     }
 
+    @Test void offlineConnectionRegisteredAfterDeliveryIsStoredEndedAndAcceptsBackfill() {
+        long started = System.currentTimeMillis() - 20 * 60_000L;
+        order.setStage("DELIVERY_CONFIRMATION"); order.setDeliveredAt(LocalDateTime.now().minusMinutes(2));
+        when(connections.findByPilotIdAndRequestKey(7L, "late")).thenReturn(Optional.empty());
+        when(connections.saveAndFlush(any())).thenAnswer(inv -> {
+            FlightConnection c = inv.getArgument(0); when(connections.findById(c.getId())).thenReturn(Optional.of(c)); return c;
+        });
+        var vo = service.connect(7L, "o1", new FlightConnectDTO(2, "late", "SN9", "FC30", "DJI FlyCart 30", started));
+        var saved = org.mockito.ArgumentCaptor.forClass(FlightConnection.class);
+        verify(connections).saveAndFlush(saved.capture());
+        var c = saved.getValue();
+        assertThat(c.getEndedAt()).isEqualTo(order.getDeliveredAt()); assertThat(c.getEndReason()).isEqualTo("LATE_REGISTRATION");
+        assertThat(c.getActiveSerial()).isNull(); assertThat(c.getActiveOrderId()).isNull();
+        assertThat(order.getExecutedSerialNumber()).isEqualTo("SN9");
+        verify(connections, never()).findByActiveOrderId(any());
+        var result = service.batch(7L, "o1", vo.connectionId(), new FlightSampleBatchDTO(List.of(dto(0, started + 1000, null))));
+        assertThat(result.accepted()).isEqualTo(1);
+        verifyNoInteractions(broadcaster);
+    }
+
+    @Test void lateRegistrationKeepsAuthAndWindow() {
+        order.setStage("COMPLETED"); order.setDeliveredAt(LocalDateTime.now().minusMinutes(1));
+        long now = System.currentTimeMillis();
+        // no client start time: not an offline record
+        assertThatThrownBy(() -> service.connect(7L, "o1", new FlightConnectDTO(2, "a", "SN9", "FC30", "DJI FlyCart 30")))
+                .isInstanceOf(BusinessException.class).extracting("httpStatus").isEqualTo(HttpStatus.CONFLICT);
+        // started after delivery
+        assertThatThrownBy(() -> service.connect(7L, "o1", new FlightConnectDTO(2, "b", "SN9", "FC30", "DJI FlyCart 30", now)))
+                .isInstanceOf(BusinessException.class).extracting("httpStatus").isEqualTo(HttpStatus.CONFLICT);
+        // another pilot / stale assignment
+        assertThatThrownBy(() -> service.connect(8L, "o1", new FlightConnectDTO(2, "c", "SN9", "FC30", "DJI FlyCart 30", now - 600_000)))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> service.connect(7L, "o1", new FlightConnectDTO(1, "d", "SN9", "FC30", "DJI FlyCart 30", now - 600_000)))
+                .isInstanceOf(BusinessException.class);
+        // cancelled orders never accept late registration
+        order.setStage("CANCELLED");
+        assertThatThrownBy(() -> service.connect(7L, "o1", new FlightConnectDTO(2, "e", "SN9", "FC30", "DJI FlyCart 30", now - 600_000)))
+                .isInstanceOf(BusinessException.class).extracting("httpStatus").isEqualTo(HttpStatus.CONFLICT);
+        verify(connections, never()).saveAndFlush(any());
+    }
+
     @Test void batchRefusesCancelledOrdersAndOtherPilots() {
         order.setStage("CANCELLED");
         var batch = new FlightSampleBatchDTO(List.of(dto(1, System.currentTimeMillis(), null)));

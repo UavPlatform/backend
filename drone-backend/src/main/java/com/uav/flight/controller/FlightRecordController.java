@@ -18,7 +18,7 @@ public class FlightRecordController {
     private final FlightRecordService records;
     public FlightRecordController(FlightRecordService records) { this.records = records; }
     @PostMapping("/pilot/orders/{orderId}/flight-connections") @RequireRole(1)
-    @Operation(summary = "登记本次实际设备连接", description = "当前到场或运输飞手及接单轮次；同请求幂等，换机结束旧连接。设备序列号同时只属于一个活动运单。未知机型不推测载重，不改变计价。")
+    @Operation(summary = "登记本次实际设备连接", description = "当前到场或运输飞手及接单轮次；同请求幂等，换机结束旧连接。设备序列号同时只属于一个活动运单。未知机型不推测载重，不改变计价。断网先在本机记录的连接可在送达确认/结单阶段补登记（须带startedAt，仍限本人当前接单轮次）：存为已结束连接（结束于送达时刻），只用于补传采样，不替换活动连接。")
     public Result<FlightConnectionVO> connect(@PathVariable String orderId, @Valid @RequestBody FlightConnectDTO input) {
         return Result.success(records.connect(UserContext.getUserId(), orderId, input));
     }

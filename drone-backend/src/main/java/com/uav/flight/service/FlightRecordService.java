@@ -48,17 +48,16 @@ public class FlightRecordService {
                     || !input.modelName().equals(c.getModelName())) throw conflict();
             return view(c, order);
         }
-        requireOpenStage(order);
+        // ADR-0009 offline-first: a connection recorded locally while offline may be registered after delivery was
+        // submitted (same pilot and assignment, client start time required); it is stored as already ended so its
+        // cached samples can be backfilled, and it never replaces live connections or takes the device.
+        boolean late = !OPEN_STAGES.contains(order.getStage());
+        if (late && (!BACKFILL_STAGES.contains(order.getStage()) || input.startedAt() == null)) throw conflict();
         if (List.of(input.serialNumber(), input.modelCode(), input.modelName()).stream().anyMatch(this::unknown))
             throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        if (late) return lateConnection(pilot, order, input);
         closeOrder(id, "REPLACED");
-        var c = new FlightConnection();
-        c.setId(UUID.randomUUID().toString()); c.setOrderId(id); c.setPilotId(pilot);
-        c.setAssignmentVersion(input.assignmentVersion()); c.setRequestKey(input.requestKey());
-        c.setSerialNumber(input.serialNumber()); c.setModelCode(input.modelCode()); c.setModelName(input.modelName());
-        var matches = models.findAll().stream().filter(m -> m.getModelCode().equalsIgnoreCase(input.modelCode())
-                || m.getDisplayName().equalsIgnoreCase(input.modelName())).toList();
-        if (matches.size() == 1) c.setAircraftModelId(matches.getFirst().getId());
+        var c = newConnection(pilot, id, input);
         c.setOpenedAt(openedAt(input.startedAt())); c.setActiveOrderId(id); c.setActiveSerial(input.serialNumber().trim().toUpperCase(Locale.ROOT));
         try { connections.saveAndFlush(c); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
@@ -67,6 +66,33 @@ public class FlightRecordService {
         order.setExecutedModelName(c.getModelName()); order.setExecutedAircraftModelId(c.getAircraftModelId());
         orders.save(order);
         return view(c, order);
+    }
+
+    private FlightConnectionVO lateConnection(Long pilot, DispatchOrder order, FlightConnectDTO input) {
+        LocalDateTime end = order.getDeliveredAt() != null ? order.getDeliveredAt() : LocalDateTime.now();
+        LocalDateTime opened = openedAt(input.startedAt());
+        if (opened.isAfter(end)) throw conflict();
+        var c = newConnection(pilot, order.getId(), input);
+        c.setOpenedAt(opened); c.setEndedAt(end); c.setEndReason("LATE_REGISTRATION");
+        try { connections.saveAndFlush(c); }
+        catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
+        if (order.getExecutedSerialNumber() == null) {
+            order.setExecutedSerialNumber(c.getSerialNumber()); order.setExecutedModelCode(c.getModelCode());
+            order.setExecutedModelName(c.getModelName()); order.setExecutedAircraftModelId(c.getAircraftModelId());
+            orders.save(order);
+        }
+        return view(c, order);
+    }
+
+    private FlightConnection newConnection(Long pilot, String id, FlightConnectDTO input) {
+        var c = new FlightConnection();
+        c.setId(UUID.randomUUID().toString()); c.setOrderId(id); c.setPilotId(pilot);
+        c.setAssignmentVersion(input.assignmentVersion()); c.setRequestKey(input.requestKey());
+        c.setSerialNumber(input.serialNumber()); c.setModelCode(input.modelCode()); c.setModelName(input.modelName());
+        var matches = models.findAll().stream().filter(m -> m.getModelCode().equalsIgnoreCase(input.modelCode())
+                || m.getDisplayName().equalsIgnoreCase(input.modelName())).toList();
+        if (matches.size() == 1) c.setAircraftModelId(matches.getFirst().getId());
+        return c;
     }
 
     @Transactional
@@ -241,8 +267,9 @@ public class FlightRecordService {
         if (!Objects.equals(pilot, o.getAssignedPilotId()) || version != o.getAssignmentVersion()) throw conflict();
     }
     private static final Set<String> BACKFILL_STAGES = Set.of("PILOT_ARRIVED", "IN_TRANSIT", "DELIVERY_CONFIRMATION", "COMPLETED");
+    private static final Set<String> OPEN_STAGES = Set.of("PILOT_ARRIVED", "IN_TRANSIT");
     private void requireOpenStage(DispatchOrder o) {
-        if (!Set.of("PILOT_ARRIVED", "IN_TRANSIT").contains(o.getStage())) throw conflict();
+        if (!OPEN_STAGES.contains(o.getStage())) throw conflict();
     }
     private static String sha256(byte[] bytes) {
         try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)); }

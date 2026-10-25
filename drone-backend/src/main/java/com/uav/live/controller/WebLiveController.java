@@ -92,13 +92,13 @@ public class WebLiveController {
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
             summary = "飞手主动开播",
-            description = "飞手对本人绑定且在线的设备发送开播请求（1B-4b）；设备归属校验 rider_uav",
+            description = "飞手对在线设备发送开播请求（1B-4b / ADR-0007）：设备须为本人派单任务当前连机的无人机，或旧流程中本人绑定（rider_uav）的设备",
             parameters = {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
                     @ApiResponse(responseCode = "200", description = "发送成功 / 已运行 / 等待确认"),
-                    @ApiResponse(responseCode = "403", description = "设备未绑定到当前飞手"),
+                    @ApiResponse(responseCode = "403", description = "设备不是本人当前派单连机的无人机，也未绑定到当前飞手"),
                     @ApiResponse(responseCode = "404", description = "设备未注册"),
                     @ApiResponse(responseCode = "409", description = "设备未连接 / 正在启动中")
             }

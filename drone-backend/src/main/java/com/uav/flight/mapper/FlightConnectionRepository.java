@@ -9,4 +9,6 @@ public interface FlightConnectionRepository extends JpaRepository<FlightConnecti
  Optional<FlightConnection> findTopByOrderIdOrderByOpenedAtDescIdDesc(String order);
  /** Active dispatch connection of a device (active_serial is upper-cased and cleared when the connection ends). */
  Optional<FlightConnection> findByActiveSerial(String serial);
+ /** REQ-SUP-GOV-006: block delete when any flight connection referenced this model. */
+ boolean existsByAircraftModelId(Long aircraftModelId);
 }

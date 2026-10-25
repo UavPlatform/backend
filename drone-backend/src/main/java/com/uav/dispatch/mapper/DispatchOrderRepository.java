@@ -44,4 +44,7 @@ public interface DispatchOrderRepository extends JpaRepository<DispatchOrder, St
     Page<DispatchOrder> adminSearch(@Param("stage") String stage, @Param("funds") String fundsStatus,
             @Param("from") java.time.LocalDateTime from, @Param("to") java.time.LocalDateTime to,
             @Param("kw") String keyword, Pageable page);
+
+    /** REQ-SUP-GOV-006: block model delete while a completed flight order still records this model. */
+    boolean existsByExecutedAircraftModelId(Long executedAircraftModelId);
 }

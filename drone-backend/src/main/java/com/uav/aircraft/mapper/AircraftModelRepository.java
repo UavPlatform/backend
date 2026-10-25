@@ -1,6 +1,8 @@
 package com.uav.aircraft.mapper;
 
 import com.uav.aircraft.pojo.entity.AircraftModel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,4 +16,11 @@ public interface AircraftModelRepository extends JpaRepository<AircraftModel, Lo
     List<AircraftModel> findByEnabledTrueOrderByModelCodeAsc();
 
     Optional<AircraftModel> findByModelCode(String modelCode);
+
+    /** 管理端列表：启用+停用，按型号代码升序。 */
+    Page<AircraftModel> findAllByOrderByModelCodeAsc(Pageable pageable);
+
+    boolean existsByModelCodeIgnoreCase(String modelCode);
+
+    boolean existsByModelCodeIgnoreCaseAndIdNot(String modelCode, Long id);
 }

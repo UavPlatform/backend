@@ -9,6 +9,5 @@ public interface DroneBorrowRepository extends JpaRepository<DroneBorrow, String
     boolean existsByDroneId(String droneId);
     Optional<DroneBorrow> findByPilotIdAndRequestKey(Long pilot, String requestKey);
     Page<DroneBorrow> findByPilotId(Long pilot, Pageable page);
-    @Query("select b from DroneBorrow b, ProviderDrone d where b.droneId = d.id and d.providerId = :provider")
-    Page<DroneBorrow> providerHistory(@Param("provider") Long provider, Pageable page);
+    Page<DroneBorrow> findByDroneId(String droneId, Pageable page);
 }

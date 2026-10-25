@@ -29,17 +29,12 @@ class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
         assertThat(response.statusCode()).as("HTTP %s", path).isEqualTo(200);
         return json.readTree(response.body()).path("data");
     }
-    private JsonNode provider(HttpClient client, String admin) throws Exception {
-        String name = UniqueNames.userName("equipment");
-        send(client, admin, "/equipment/admin/providers", Map.of("username", name, "password", "equipment-test-pass", "displayName", "并发测试机场"));
-        return send(client, null, "/equipment/provider/login", Map.of("username", name, "password", "equipment-test-pass"));
-    }
     @Test void onePhysicalDroneCanOnlyBeBorrowedOnceAndOldReturnCannotEndNewLoan() throws Exception {
         var admin = accounts().adminLogin();
         var a = accounts().registerRider(UniqueNames.userName("loana"), null); var b = accounts().registerRider(UniqueNames.userName("loanb"), null);
         try (var client = HttpClient.newHttpClient()) {
-            var provider = provider(client, admin.token()); String token = provider.path("token").asText();
-            String id = send(client, token, "/equipment/provider/drones", Map.of("aircraftModelId", fixtures.defaultAircraftModelId(),
+            String token = admin.token();
+            String id = send(client, token, "/admin/drones", Map.of("aircraftModelId", fixtures.defaultAircraftModelId(),
                     "serialNumber", UniqueNames.djiId(), "airportName", "测试机场", "latitude", 28.2, "longitude", 113.0)).path("droneId").asText();
             var inputA = Map.of("droneId", id, "requestKey", UUID.randomUUID().toString());
             var inputB = Map.of("droneId", id, "requestKey", UUID.randomUUID().toString());
@@ -58,19 +53,7 @@ class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
             assertThat(actual.path("borrowId").asText()).isEqualTo(current);
             assertThat(actual.path("returnedAt").isNull()).isTrue();
             assertThat(bindings.findByUserId(winner.id())).isEmpty(); assertThat(bindings.findByUserId(loser.id())).isEmpty();
-            assertThat(send(client, token, "/equipment/provider/borrows", null).path("items").size()).isEqualTo(2);
-        }
-    }
-    @Test void providerIdentityCannotSubscribeToAnyLegacyWebSocketNamespace() throws Exception {
-        var admin = accounts().adminLogin();
-        try (var client = HttpClient.newHttpClient()) {
-            var provider = provider(client, admin.token());
-            String token = provider.path("token").asText();
-            for (String path : List.of("/ws/web", "/ws/drone?deviceId=not-a-real-device", "/ws/" + provider.path("provider").path("providerId").asLong())) {
-                assertThatThrownBy(() -> client.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + token)
-                        .buildAsync(URI.create(wsBaseUrl() + path), new WebSocket.Listener() { }).get(15, TimeUnit.SECONDS))
-                        .hasCauseInstanceOf(WebSocketHandshakeException.class);
-            }
+            assertThat(send(client, token, "/admin/drones/" + id + "/borrows", null).path("totalElements").asLong()).isEqualTo(2);
         }
     }
 }

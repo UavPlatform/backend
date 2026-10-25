@@ -99,12 +99,6 @@ public class JwtInterceptor implements AsyncHandlerInterceptor {
             if (requireRole == null) {
                 requireRole = handlerMethod.getBeanType().getAnnotation(RequireRole.class);
             }
-            // Provider IDs belong to a separate table: never treat them as legacy user/admin IDs.
-            if (Integer.valueOf(3).equals(UserContext.getRole()) && (requireRole == null ||
-                    java.util.Arrays.stream(requireRole.value()).noneMatch(r -> r == 3))) {
-                sendForbidden(response, "服务商仅可访问服务商工作台");
-                return false;
-            }
             if (requireRole != null && requireRole.value().length > 0) {
                 Integer userRole = UserContext.getRole();
                 boolean allowed = java.util.Arrays.stream(requireRole.value())

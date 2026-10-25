@@ -12,6 +12,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface DispatchOrderRepository extends JpaRepository<DispatchOrder, String> {
+    /** REQ-SUP-GOV-005: latest order flown with this drone (djifly-reported serial; indexed in V22). */
+    Optional<DispatchOrder> findFirstByExecutedSerialNumberOrderByCreatedAtDescIdDesc(String serialNumber);
+    boolean existsByExecutedSerialNumberAndStageIn(String serialNumber, java.util.Collection<String> stages);
     Optional<DispatchOrder> findByUserIdAndRequestKey(Long userId, String requestKey);
     List<DispatchOrder> findTop50ByUserIdOrderByCreatedAtDesc(Long userId);
     Page<DispatchOrder> findByStageAndFundsStatusOrderByCreatedAtAsc(String stage, String fundsStatus, Pageable page);

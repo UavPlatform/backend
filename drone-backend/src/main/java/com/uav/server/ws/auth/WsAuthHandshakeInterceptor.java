@@ -79,8 +79,6 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
             log.warn("拒绝 WebSocket 握手（{}）：令牌解析失败, uri={}", mode, request.getURI());
             return false;
         }
-        // Separate provider identity namespace has no access to legacy user chat, device or supervision channels.
-        if (Integer.valueOf(3).equals(role)) return false;
         if (userId == null) {
             log.warn("拒绝 WebSocket 握手（{}）：令牌缺少用户身份, uri={}", mode, request.getURI());
             return false;

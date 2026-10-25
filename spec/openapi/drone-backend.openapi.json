@@ -178,6 +178,97 @@
         },
         "type" : "object"
       },
+      "AdminDroneBorrowVO" : {
+        "description" : "管理端无人机借还记录",
+        "properties" : {
+          "borrowId" : {
+            "description" : "借用记录 ID",
+            "type" : "string"
+          },
+          "borrowedAt" : {
+            "description" : "借出时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "droneId" : {
+            "description" : "无人机登记 ID",
+            "type" : "string"
+          },
+          "pilotId" : {
+            "description" : "借用飞手 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pilotName" : {
+            "description" : "借用飞手用户名",
+            "type" : "string"
+          },
+          "returnedAt" : {
+            "description" : "归还时间；未归还为 null",
+            "format" : "date-time",
+            "type" : [ "null", "string" ]
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDroneVO" : {
+        "description" : "管理端平台租借无人机",
+        "properties" : {
+          "airportName" : {
+            "description" : "机场名称",
+            "type" : "string"
+          },
+          "borrowStatus" : {
+            "description" : "借用状态：IN_STOCK 在库，BORROWED 已借出",
+            "enum" : [ "BORROWED", "IN_STOCK" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "登记时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currentBorrow" : {
+            "$ref" : "#/components/schemas/CurrentBorrow",
+            "description" : "当前借用（仅 BORROWED 时有值）",
+            "type" : "null"
+          },
+          "droneId" : {
+            "description" : "无人机登记 ID",
+            "type" : "string"
+          },
+          "enabled" : {
+            "description" : "是否启用（停用后飞手不可借）",
+            "type" : "boolean"
+          },
+          "executing" : {
+            "description" : "执飞中：有进行中（PILOT_ARRIVED / IN_TRANSIT）的派单订单 executed_serial_number 等于本机机身号",
+            "type" : "boolean"
+          },
+          "latestOrder" : {
+            "$ref" : "#/components/schemas/LatestOrder",
+            "description" : "最近一笔使用本机的派单订单（按 executed_serial_number 匹配）；从未执飞为 null",
+            "type" : "null"
+          },
+          "latitude" : {
+            "description" : "机场纬度",
+            "type" : "number"
+          },
+          "longitude" : {
+            "description" : "机场经度",
+            "type" : "number"
+          },
+          "model" : {
+            "$ref" : "#/components/schemas/Model",
+            "description" : "机型（引用 aircraft_model）"
+          },
+          "serialNumber" : {
+            "description" : "机身号（全局唯一，大写）",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AdminDto" : {
         "properties" : {
           "name" : {
@@ -325,6 +416,72 @@
         },
         "type" : "object"
       },
+      "AdminPageVoAdminDroneBorrowVO" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDroneBorrowVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminDroneVO" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDroneVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "AdminPageVoAdminOrderVo" : {
         "description" : "管理端分页信封（page 从 0 开始）",
         "properties" : {
@@ -365,39 +522,6 @@
             "description" : "当前页数据列表",
             "items" : {
               "$ref" : "#/components/schemas/AdminPilotVo"
-            },
-            "type" : "array"
-          },
-          "page" : {
-            "description" : "当前页码（从 0 开始）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "size" : {
-            "description" : "每页条数",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "totalElements" : {
-            "description" : "总记录数",
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "totalPages" : {
-            "description" : "总页数（由总记录数与每页条数计算）",
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AdminPageVoAdminProviderDroneVO" : {
-        "description" : "管理端分页信封（page 从 0 开始）",
-        "properties" : {
-          "content" : {
-            "description" : "当前页数据列表",
-            "items" : {
-              "$ref" : "#/components/schemas/AdminProviderDroneVO"
             },
             "type" : "array"
           },
@@ -611,53 +735,6 @@
           },
           "userName" : {
             "description" : "用户名（昵称）",
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "AdminProviderDroneVO" : {
-        "description" : "管理端服务商无人机/机场行",
-        "properties" : {
-          "airportName" : {
-            "description" : "机场名称",
-            "type" : "string"
-          },
-          "borrowed" : {
-            "description" : "是否借出中",
-            "type" : "boolean"
-          },
-          "createdAt" : {
-            "description" : "登记时间",
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "droneId" : {
-            "description" : "设备登记 ID",
-            "type" : "string"
-          },
-          "enabled" : {
-            "description" : "设备是否启用",
-            "type" : "boolean"
-          },
-          "latitude" : {
-            "description" : "机场纬度",
-            "type" : "number"
-          },
-          "longitude" : {
-            "description" : "机场经度",
-            "type" : "number"
-          },
-          "model" : {
-            "$ref" : "#/components/schemas/Model",
-            "description" : "机型"
-          },
-          "provider" : {
-            "$ref" : "#/components/schemas/Provider",
-            "description" : "服务商"
-          },
-          "serialNumber" : {
-            "description" : "机身号",
             "type" : "string"
           }
         },
@@ -1011,6 +1088,30 @@
           "totalPages" : {
             "format" : "int32",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CurrentBorrow" : {
+        "description" : "当前借用",
+        "properties" : {
+          "borrowId" : {
+            "description" : "借用记录 ID",
+            "type" : "string"
+          },
+          "borrowedAt" : {
+            "description" : "借出时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "pilotId" : {
+            "description" : "借用飞手 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pilotName" : {
+            "description" : "借用飞手用户名",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2126,6 +2227,25 @@
         },
         "type" : "object"
       },
+      "LatestOrder" : {
+        "description" : "最近使用订单（跳管理端派单订单详情 GET /admin/dispatch/orders/{orderId}）",
+        "properties" : {
+          "createdAt" : {
+            "description" : "下单时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "orderId" : {
+            "description" : "派单订单 ID",
+            "type" : "string"
+          },
+          "stage" : {
+            "description" : "订单阶段",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LiveStartVO" : {
         "description" : "开播（启动图传）结果",
         "properties" : {
@@ -2419,61 +2539,6 @@
         },
         "type" : "object"
       },
-      "Provider" : {
-        "description" : "服务商主体",
-        "properties" : {
-          "displayName" : {
-            "description" : "服务商名称",
-            "type" : "string"
-          },
-          "enabled" : {
-            "description" : "服务商账号是否启用",
-            "type" : "boolean"
-          },
-          "providerId" : {
-            "description" : "服务商 ID",
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "ProviderAccountPageVO" : {
-        "properties" : {
-          "hasNext" : {
-            "type" : "boolean"
-          },
-          "items" : {
-            "items" : {
-              "$ref" : "#/components/schemas/ProviderAccountVO"
-            },
-            "type" : "array"
-          },
-          "page" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "ProviderAccountVO" : {
-        "properties" : {
-          "displayName" : {
-            "type" : "string"
-          },
-          "enabled" : {
-            "type" : "boolean"
-          },
-          "providerId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "username" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "ProviderDroneDTO" : {
         "properties" : {
           "aircraftModelId" : {
@@ -2556,65 +2621,10 @@
           "modelName" : {
             "type" : "string"
           },
-          "providerId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "providerName" : {
-            "type" : "string"
-          },
           "serialNumber" : {
             "type" : "string"
           }
         },
-        "type" : "object"
-      },
-      "ProviderLoginDTO" : {
-        "properties" : {
-          "password" : {
-            "maxLength" : 72,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "username" : {
-            "maxLength" : 64,
-            "minLength" : 0,
-            "type" : "string"
-          }
-        },
-        "required" : [ "password", "username" ],
-        "type" : "object"
-      },
-      "ProviderLoginVO" : {
-        "properties" : {
-          "provider" : {
-            "$ref" : "#/components/schemas/ProviderAccountVO"
-          },
-          "token" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "ProviderProvisionDTO" : {
-        "properties" : {
-          "displayName" : {
-            "maxLength" : 100,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "password" : {
-            "maxLength" : 72,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "username" : {
-            "maxLength" : 64,
-            "minLength" : 0,
-            "type" : "string"
-          }
-        },
-        "required" : [ "displayName", "password", "username" ],
         "type" : "object"
       },
       "PullCredentialsVO" : {
@@ -2721,6 +2731,33 @@
         },
         "type" : "object"
       },
+      "ResultAdminDroneVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminDroneVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultAdminLoginVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2802,6 +2839,60 @@
         },
         "type" : "object"
       },
+      "ResultAdminPageVoAdminDroneBorrowVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminDroneBorrowVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminDroneVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminDroneVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultAdminPageVoAdminOrderVo" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2839,33 +2930,6 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/AdminPageVoAdminPilotVo",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultAdminPageVoAdminProviderDroneVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/AdminPageVoAdminProviderDroneVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -4386,60 +4450,6 @@
         },
         "type" : "object"
       },
-      "ResultProviderAccountPageVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/ProviderAccountPageVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultProviderAccountVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/ProviderAccountVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
       "ResultProviderDronePageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -4450,60 +4460,6 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/ProviderDronePageVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultProviderDroneVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/ProviderDroneVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultProviderLoginVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/ProviderLoginVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -6556,6 +6512,232 @@
         "tags" : [ "Admin Dispatch Order API" ]
       }
     },
+    "/admin/drones" : {
+      "get" : {
+        "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备。每行含在库/已借出、执飞中与最近订单",
+        "operationId" : "adminListDrones",
+        "parameters" : [ {
+          "description" : "机场名称，模糊匹配（最长 100 字）",
+          "in" : "query",
+          "name" : "airportName",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "无人机分页列表",
+        "tags" : [ "Admin Drone API" ]
+      },
+      "post" : {
+        "description" : "机型必选（aircraft_model 中存在且启用）；机身号必填、去空格转大写后全局唯一（重复 409）；机场名称与坐标必填",
+        "operationId" : "adminCreateDrone",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProviderDroneDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "登记无人机",
+        "tags" : [ "Admin Drone API" ]
+      }
+    },
+    "/admin/drones/{droneId}" : {
+      "get" : {
+        "operationId" : "adminGetDrone",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "droneId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "无人机详情",
+        "tags" : [ "Admin Drone API" ]
+      },
+      "put" : {
+        "description" : "机场名称与坐标随时可改；借出期间或已有借还记录后不能更改机身号或机型（409），以保留设备身份历史",
+        "operationId" : "adminUpdateDrone",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "droneId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProviderDroneDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "编辑无人机",
+        "tags" : [ "Admin Drone API" ]
+      }
+    },
+    "/admin/drones/{droneId}/borrows" : {
+      "get" : {
+        "description" : "按借出时间倒序；page 从 0 起，size 上限 100",
+        "operationId" : "adminListDroneBorrows",
+        "parameters" : [ {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "droneId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminDroneBorrowVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "无人机借还记录",
+        "tags" : [ "Admin Drone API" ]
+      }
+    },
+    "/admin/drones/{droneId}/enabled" : {
+      "post" : {
+        "description" : "停用后飞手不可借用；正被借出的仍保留借用记录并可由原飞手归还",
+        "operationId" : "adminSetDroneEnabled",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "droneId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EquipmentEnabledDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminDroneVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "启用/停用无人机",
+        "tags" : [ "Admin Drone API" ]
+      }
+    },
     "/admin/login" : {
       "post" : {
         "description" : "管理员登录接口",
@@ -6897,64 +7079,6 @@
         },
         "summary" : "飞手详情",
         "tags" : [ "Admin Query API" ]
-      }
-    },
-    "/admin/provider/drones" : {
-      "get" : {
-        "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备与服务商",
-        "operationId" : "adminListProviderDrones",
-        "parameters" : [ {
-          "description" : "服务商 ID（正整数，否则 400）",
-          "in" : "query",
-          "name" : "providerId",
-          "required" : false,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        }, {
-          "description" : "机场名称，模糊匹配（最长 100 字）",
-          "in" : "query",
-          "name" : "airportName",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "description" : "每页条数（默认 20，上限 100）",
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "default" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        }, {
-          "description" : "页码（从 0 起）",
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : 0,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminProviderDroneVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "服务商无人机/机场分页列表",
-        "tags" : [ "Admin Provider Drone API" ]
       }
     },
     "/admin/tasks" : {
@@ -9198,157 +9322,6 @@
         "tags" : [ "Dispatch Draft API" ]
       }
     },
-    "/equipment/admin/borrows" : {
-      "get" : {
-        "operationId" : "equipmentAdminBorrows",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : "0",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultDroneBorrowPageVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "监管查看全部借还登记",
-        "tags" : [ "Equipment Administration API" ]
-      }
-    },
-    "/equipment/admin/drones" : {
-      "get" : {
-        "operationId" : "equipmentAdminDrones",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : "0",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderDronePageVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "监管查看全部服务商设备登记",
-        "tags" : [ "Equipment Administration API" ]
-      }
-    },
-    "/equipment/admin/providers" : {
-      "get" : {
-        "operationId" : "equipmentProviders",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : "0",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderAccountPageVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "分页读取服务商账号",
-        "tags" : [ "Equipment Administration API" ]
-      },
-      "post" : {
-        "description" : "仅现有管理员；密码仅以BCrypt保存，响应不含密码或哈希；无公开注册入口",
-        "operationId" : "provisionProvider",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ProviderProvisionDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderAccountVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "平台开通服务商账号",
-        "tags" : [ "Equipment Administration API" ]
-      }
-    },
-    "/equipment/admin/providers/{providerId}/enabled" : {
-      "post" : {
-        "description" : "停用后既有令牌不能再管理设备；已借设备仍可由原飞手归还",
-        "operationId" : "providerEnabled",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "providerId",
-          "required" : true,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/EquipmentEnabledDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderAccountVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "启停服务商账号",
-        "tags" : [ "Equipment Administration API" ]
-      }
-    },
     "/equipment/pilot/borrows" : {
       "get" : {
         "operationId" : "pilotBorrows",
@@ -9407,7 +9380,7 @@
     },
     "/equipment/pilot/borrows/{borrowId}/return" : {
       "post" : {
-        "description" : "按原借用ID归还，重复请求幂等，旧归还重试不影响后续借用；设备或服务商停用不阻止本人归还",
+        "description" : "按原借用ID归还，重复请求幂等，旧归还重试不影响后续借用；设备停用不阻止本人归还",
         "operationId" : "returnDrone",
         "parameters" : [ {
           "in" : "path",
@@ -9435,7 +9408,7 @@
     },
     "/equipment/pilot/drones" : {
       "get" : {
-        "description" : "只列启用服务商、设备和机型；已借出显示不可借，不返回其他飞手的借用标识或身份",
+        "description" : "只列启用的设备和机型；已借出显示不可借，不返回其他飞手的借用标识或身份",
         "operationId" : "pilotEquipment",
         "parameters" : [ {
           "in" : "query",
@@ -9444,14 +9417,6 @@
           "schema" : {
             "default" : "0",
             "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "providerId",
-          "required" : false,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
           }
         } ],
         "responses" : {
@@ -9468,216 +9433,6 @@
         },
         "summary" : "分页读取可借设备目录",
         "tags" : [ "Drone Borrowing API" ]
-      }
-    },
-    "/equipment/provider/borrows" : {
-      "get" : {
-        "description" : "仅本人机构登记的设备；借还不关联订单、收费或押金",
-        "operationId" : "providerBorrows",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : "0",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultDroneBorrowPageVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "分页读取本机构借还记录",
-        "tags" : [ "Equipment Provider API" ]
-      }
-    },
-    "/equipment/provider/drones" : {
-      "get" : {
-        "operationId" : "providerDrones",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : "0",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderDronePageVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "分页读取本机构无人机",
-        "tags" : [ "Equipment Provider API" ]
-      },
-      "post" : {
-        "description" : "真实机身号全局唯一，选择现有启用机型并登记机场；不产生费用、不创建旧绑定记录",
-        "operationId" : "registerProviderDrone",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ProviderDroneDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderDroneVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "登记本机构无人机",
-        "tags" : [ "Equipment Provider API" ]
-      }
-    },
-    "/equipment/provider/drones/{droneId}" : {
-      "put" : {
-        "description" : "借出期间不可修改；产生借还记录后机身号和机型不可改写，以保留设备身份历史；可在归还后更新机场资料",
-        "operationId" : "updateProviderDrone",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "droneId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ProviderDroneDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderDroneVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "修改本机构无人机登记",
-        "tags" : [ "Equipment Provider API" ]
-      }
-    },
-    "/equipment/provider/drones/{droneId}/enabled" : {
-      "post" : {
-        "description" : "停用不替飞手归还已借设备，仍允许原飞手完成归还",
-        "operationId" : "providerDroneEnabled",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "droneId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/EquipmentEnabledDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderDroneVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "启停本机构无人机借用",
-        "tags" : [ "Equipment Provider API" ]
-      }
-    },
-    "/equipment/provider/login" : {
-      "post" : {
-        "description" : "账号由平台管理员开通，无自助注册；返回独立role=3访问令牌，不可用于旧用户、监管和飞控接口",
-        "operationId" : "providerLogin",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ProviderLoginDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderLoginVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "服务商登录",
-        "tags" : [ "Equipment Provider API" ]
-      }
-    },
-    "/equipment/provider/me" : {
-      "get" : {
-        "operationId" : "providerMe",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultProviderAccountVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "读取本人服务商资料",
-        "tags" : [ "Equipment Provider API" ]
       }
     },
     "/live/close" : {
@@ -11986,9 +11741,6 @@
     "description" : "会话相关接口",
     "name" : "chat session API"
   }, {
-    "description" : "平台开通的独立服务商账号，仅管理本机构设备及借还记录；不接单、不飞控",
-    "name" : "Equipment Provider API"
-  }, {
     "description" : "平台机型目录接口",
     "name" : "Aircraft Model API"
   }, {
@@ -12022,8 +11774,8 @@
     "description" : "管理端投诉处理",
     "name" : "Admin Complaint API"
   }, {
-    "description" : "管理端服务商无人机/机场查询（只读，仅管理员）",
-    "name" : "Admin Provider Drone API"
+    "description" : "管理端机场/无人机管理（仅管理员；无人机归平台所有）",
+    "name" : "Admin Drone API"
   }, {
     "description" : "管理端派单订单查询（只读，仅管理员）",
     "name" : "Admin Dispatch Order API"

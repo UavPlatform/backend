@@ -53,8 +53,11 @@ class TelemetryPartitionMysqlE2EIT {
 
         flyway("latest").migrate();
         var jdbc = new JdbcTemplate(new SingleConnectionDataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword(), true));
-        assertThat(partitions(jdbc)).contains("p_hist", TelemetryPartitions.name(month(old)), TelemetryPartitions.name(month(recent)),
-                TelemetryPartitions.MAX);
+        // Existing data months get their own partition up to BACKFILL_MONTHS back; older rows (1970, ~250 days) sit in p_hist.
+        YearMonth current = month(now);
+        assertThat(partitions(jdbc)).startsWith("p_hist", TelemetryPartitions.name(current.minusMonths(TelemetryPartitions.BACKFILL_MONTHS)))
+                .contains(TelemetryPartitions.name(month(recent)), TelemetryPartitions.name(current.plusMonths(2)))
+                .endsWith(TelemetryPartitions.MAX);
         assertThat(jdbc.queryForList("SELECT captured_at FROM dispatch_flight_sample WHERE serial_number = 'SN-1' ORDER BY captured_at",
                 Long.class)).containsExactly(0L, old, recent);
         // Keys widened with the partition column; device dedupe key still enforced.
@@ -62,7 +65,8 @@ class TelemetryPartitionMysqlE2EIT {
                 + " fingerprint, captured_at, received_at) VALUES ('c1', 'o1', 'SN-1', 99, 'x', ?, NOW(6))", recent)).isZero();
 
         var outcome = new TelemetryRetentionJob(jdbc, Clock.systemUTC(), 180, 2).maintain();
-        assertThat(outcome.dropped()).contains("p_hist", TelemetryPartitions.name(month(old)));
+        assertThat(outcome.dropped()).contains("p_hist", TelemetryPartitions.name(current.minusMonths(TelemetryPartitions.BACKFILL_MONTHS)));
+        assertThat(partitions(jdbc)).doesNotContain("p_hist").contains(TelemetryPartitions.name(month(recent)));
         assertThat(jdbc.queryForList("SELECT captured_at FROM dispatch_flight_sample", Long.class)).containsExactly(recent);
 
         var later = Clock.fixed(Instant.ofEpochMilli(now).plus(Duration.ofDays(95)), TelemetryPartitions.ZONE);

@@ -18,6 +18,7 @@ public final class WsMessageNames {
     public static final String PONG = "PONG";
     public static final String UAV_STATUS = "UAV_STATUS";
     public static final String UAV_STATUS_UPDATE = "UAV_STATUS_UPDATE";
+    public static final String FLIGHT_TELEMETRY = "FLIGHT_TELEMETRY";
     public static final String LIVE_STARTED = "LIVE_STARTED";
     public static final String LIVE_STOPPED = "LIVE_STOPPED";
     public static final String CONNECT_SUCCESS = "CONNECT_SUCCESS";

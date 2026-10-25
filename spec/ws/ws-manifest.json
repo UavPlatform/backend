@@ -82,7 +82,7 @@
       ]
     },
     "/ws/web": {
-      "description": "Supervision web client; receives live telemetry forwarded by the backend.",
+      "description": "Supervision/shipper web client. Supervisors (role 2) receive all orders' FLIGHT_TELEMETRY; ?orderId= restricts to one order (owner or supervisor, otherwise closed with 1008).",
       "inbound": [],
       "outbound": [
         {
@@ -90,6 +90,12 @@
           "name": "UAV_STATUS_UPDATE",
           "schema": "schemas/server/uav-status-update.schema.json",
           "example": "examples/outbound/uav-status-update.json"
+        },
+        {
+          "type": "event",
+          "name": "FLIGHT_TELEMETRY",
+          "schema": "schemas/server/flight-telemetry.schema.json",
+          "example": "examples/outbound/flight-telemetry.json"
         }
       ]
     }

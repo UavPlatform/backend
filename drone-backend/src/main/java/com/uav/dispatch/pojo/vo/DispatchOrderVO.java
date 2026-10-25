@@ -9,4 +9,5 @@ public record DispatchOrderVO(String orderId, String stage, String fundsStatus, 
                               String paymentReference, String refundReference, Map<String, String> fields,
                               LocalDateTime createdAt, LocalDateTime updatedAt,
                               Long assignedPilotId, long assignmentVersion, DispatchBillVO bill,
-                              LocalDateTime startedAt, LocalDateTime deliveredAt, LocalDateTime receiptAt) { }
+                              LocalDateTime startedAt, LocalDateTime deliveredAt, LocalDateTime receiptAt,
+                              DispatchExecutedDroneVO executedDrone) { }

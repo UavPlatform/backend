@@ -85,8 +85,11 @@ class DispatchFullFlowE2EIT extends RealProtocolTestBase {
             var version = Map.of("assignmentVersion", epoch);
             assertThat(response(client, pilot, base + "/start-transport", version).statusCode()).isEqualTo(409);
             send(client, pilot, pilotBase + "/arrive", version);
+            String serial = UniqueNames.djiId();
             var connection = send(client, pilot, pilotBase + "/flight-connections", Map.of("assignmentVersion", epoch,
-                    "requestKey", UUID.randomUUID().toString(), "serialNumber", UniqueNames.djiId(), "modelCode", "FC30", "modelName", "DJI FlyCart 30"));
+                    "requestKey", UUID.randomUUID().toString(), "serialNumber", serial, "modelCode", "FC30", "modelName", "DJI FlyCart 30"));
+            // ADR-0007 #6/#9: the order's drone is what djifly reported on connection.
+            assertThat(send(client, owner, base, null).path("executedDrone").path("serialNumber").asText()).isEqualTo(serial);
             String sampling = pilotBase + "/flight-connections/" + connection.path("connectionId").asText() + "/samples";
             send(client, pilot, sampling, Map.of("sequence", 0, "capturedAt", System.currentTimeMillis(), "latitude", 28.2, "longitude", 113.0));
             assertThat(send(client, owner, base + "/flight", null).path("latest").path("battery").isNull()).isTrue();

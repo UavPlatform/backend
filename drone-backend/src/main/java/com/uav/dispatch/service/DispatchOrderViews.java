@@ -5,6 +5,7 @@ import com.alibaba.fastjson.TypeReference;
 import com.uav.dispatch.pojo.entity.DispatchOrder;
 import com.uav.dispatch.pojo.vo.DispatchOrderVO;
 import com.uav.dispatch.pojo.vo.DispatchBillVO;
+import com.uav.dispatch.pojo.vo.DispatchExecutedDroneVO;
 import java.util.Map;
 
 final class DispatchOrderViews {
@@ -21,6 +22,8 @@ final class DispatchOrderViews {
                         order.getCompletedAt() == null ? null : DispatchPricingService.decode(order.getQuoteJson()).totalAmount(),
                         order.getBalanceAmount(), order.getSettlementReference(), order.getSettledAt(),
                         order.getReviewScore(), order.getReviewComment()),
-                order.getStartedAt(), order.getDeliveredAt(), order.getReceiptAt());
+                order.getStartedAt(), order.getDeliveredAt(), order.getReceiptAt(),
+                order.getExecutedSerialNumber() == null ? null : new DispatchExecutedDroneVO(order.getExecutedSerialNumber(),
+                        order.getExecutedModelCode(), order.getExecutedModelName(), order.getExecutedAircraftModelId()));
     }
 }

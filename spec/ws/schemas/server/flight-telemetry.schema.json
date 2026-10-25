@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Persisted flight telemetry pushed to web (ADR-0009)",
+  "type": "object",
+  "required": [
+    "type",
+    "name",
+    "deviceId",
+    "timestamp",
+    "data"
+  ],
+  "properties": {
+    "type": {
+      "const": "event"
+    },
+    "name": {
+      "const": "FLIGHT_TELEMETRY"
+    },
+    "deviceId": {
+      "type": "string",
+      "description": "aircraft serial number"
+    },
+    "timestamp": {
+      "type": "integer",
+      "description": "device capture time, epoch ms"
+    },
+    "data": {
+      "type": "object",
+      "required": [
+        "orderId",
+        "connectionId",
+        "sampleId",
+        "sequence",
+        "capturedAt"
+      ],
+      "properties": {
+        "orderId": {
+          "type": "string"
+        },
+        "connectionId": {
+          "type": "string"
+        },
+        "modelCode": {
+          "type": "string"
+        },
+        "modelName": {
+          "type": "string"
+        },
+        "sampleId": {
+          "type": "integer"
+        },
+        "sequence": {
+          "type": "integer"
+        },
+        "capturedAt": {
+          "type": "integer"
+        },
+        "latitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "longitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "altitude": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "speed": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "battery": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "payloadKg": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "flying": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

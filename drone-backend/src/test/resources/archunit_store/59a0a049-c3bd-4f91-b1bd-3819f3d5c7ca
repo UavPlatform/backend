@@ -31,7 +31,6 @@ Field <com.uav.pay.service.impl.WeChatPayServiceImpl.payRecordRepository> is ann
 Field <com.uav.pay.service.impl.WeChatPayServiceImpl.taskApplicationRepository> is annotated with @Autowired in (WeChatPayServiceImpl.java:0)
 Field <com.uav.pay.service.impl.WeChatPayServiceImpl.weChatPayConfig> is annotated with @Autowired in (WeChatPayServiceImpl.java:0)
 Field <com.uav.server.config.WebMvcConfig.jwtInterceptor> is annotated with @Autowired in (WebMvcConfig.java:0)
-Field <com.uav.server.handler.WebWebSocketHandler.liveWebSessionService> is annotated with @Autowired in (WebWebSocketHandler.java:0)
 Field <com.uav.server.interceptor.JwtInterceptor.jwtUtil> is annotated with @Autowired in (JwtInterceptor.java:0)
 Field <com.uav.server.interceptor.JwtInterceptor.riderUavRepository> is annotated with @Autowired in (JwtInterceptor.java:0)
 Field <com.uav.server.service.AmapService.amapConfig> is annotated with @Autowired in (AmapService.java:0)

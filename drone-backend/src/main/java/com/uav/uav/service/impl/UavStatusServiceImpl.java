@@ -190,7 +190,13 @@ public class UavStatusServiceImpl implements UavStatusService {
                 gpsRecordRepository.saveAll(batch);
                 log.debug("已批量写入 {} 条 GPS 记录", batch.size());
             } catch (Exception e) {
-                log.error("批量写入 GPS 记录失败，丢弃 {} 条: {}", batch.size(), e.getMessage());
+                // Do not drop telemetry on a transient DB failure: put the batch back (oldest first) for the next flush.
+                int requeued = 0;
+                for (UavGpsRecord record : batch) {
+                    if (gpsBuffer.offer(record)) requeued++;
+                }
+                log.error("批量写入 GPS 记录失败，已放回缓冲 {} 条（缓冲已满丢弃 {} 条），下次重试: {}",
+                        requeued, batch.size() - requeued, e.getMessage());
             }
         }
     }

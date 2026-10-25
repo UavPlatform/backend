@@ -1,6 +1,183 @@
 {
   "components" : {
     "schemas" : {
+      "AdminDispatchOrderAssignment" : {
+        "description" : "派单（接单）记录，每次重新派单 assignmentVersion 递增",
+        "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "arrivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "assignmentVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "endReason" : {
+            "type" : "string"
+          },
+          "endedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "pilot" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderParty"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDispatchOrderConnection" : {
+        "description" : "djifly 上报的连机记录",
+        "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "assignmentVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "connectionId" : {
+            "type" : "string"
+          },
+          "endReason" : {
+            "type" : "string"
+          },
+          "endedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
+          "modelName" : {
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "pilotId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "serialNumber" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDispatchOrderDetail" : {
+        "description" : "管理端派单订单详情：order 为与货主端一致的订单视图（含运单字段 fields、账单 bill、实际执行无人机）",
+        "properties" : {
+          "assignments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDispatchOrderAssignment"
+            },
+            "type" : "array"
+          },
+          "connections" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDispatchOrderConnection"
+            },
+            "type" : "array"
+          },
+          "order" : {
+            "$ref" : "#/components/schemas/DispatchOrderVO"
+          },
+          "pilot" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderParty"
+          },
+          "shipper" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderParty"
+          },
+          "timeline" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDispatchOrderTimelineEvent"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDispatchOrderParty" : {
+        "description" : "订单参与方（货主或飞手）",
+        "properties" : {
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDispatchOrderRow" : {
+        "description" : "管理端派单订单列表行",
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "depositAmount" : {
+            "type" : "number"
+          },
+          "executedModelName" : {
+            "type" : "string"
+          },
+          "executedSerialNumber" : {
+            "type" : "string"
+          },
+          "fundsStatus" : {
+            "type" : "string"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "pilot" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderParty"
+          },
+          "pilotServiceFee" : {
+            "type" : "number"
+          },
+          "shipper" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderParty"
+          },
+          "stage" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminDispatchOrderTimelineEvent" : {
+        "description" : "状态时间线节点（按时间升序）",
+        "properties" : {
+          "actorUserId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "event" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "结束原因，仅 ASSIGNMENT_ENDED 可能有值",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AdminDto" : {
         "properties" : {
           "name" : {
@@ -110,6 +287,39 @@
           "userId" : {
             "description" : "下单用户ID",
             "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminDispatchOrderRow" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminDispatchOrderRow"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
             "type" : "integer"
           }
         },
@@ -2351,6 +2561,33 @@
         },
         "type" : "object"
       },
+      "ResultAdminDispatchOrderDetail" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminDispatchOrderDetail",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultAdminLoginVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -2388,6 +2625,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/AdminOrderVo",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminDispatchOrderRow" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminDispatchOrderRow",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -5992,6 +6256,117 @@
         },
         "summary" : "驳回投诉",
         "tags" : [ "Admin Complaint API" ]
+      }
+    },
+    "/admin/dispatch/orders" : {
+      "get" : {
+        "description" : "按创建时间倒序；page 从 0 起，size 上限 100",
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "description" : "关键字：订单号、货主或飞手用户名模糊匹配",
+          "in" : "query",
+          "name" : "keyword",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "创建时间上限（不含），ISO-8601",
+          "in" : "query",
+          "name" : "createdTo",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "description" : "创建时间下限（含），ISO-8601",
+          "in" : "query",
+          "name" : "createdFrom",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "订单阶段：AWAITING_DEPOSIT / WAITING_ACCEPTANCE / PILOT_PREPARING / PILOT_ARRIVED / IN_TRANSIT / DELIVERY_CONFIRMATION / COMPLETED / CANCELLED；未知值 400",
+          "in" : "query",
+          "name" : "stage",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "资金状态：UNPAID / PAID / BALANCE_DUE / SETTLED / REFUNDED；未知值 400",
+          "in" : "query",
+          "name" : "fundsStatus",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminDispatchOrderRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "派单订单分页列表",
+        "tags" : [ "Admin Dispatch Order API" ]
+      }
+    },
+    "/admin/dispatch/orders/{orderId}" : {
+      "get" : {
+        "description" : "订单视图（含运单、账单、实际执行无人机）、参与方、状态时间线、派单记录、连机记录",
+        "operationId" : "detail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminDispatchOrderDetail"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "派单订单详情",
+        "tags" : [ "Admin Dispatch Order API" ]
       }
     },
     "/admin/login" : {
@@ -11381,6 +11756,9 @@
   }, {
     "description" : "管理端投诉处理",
     "name" : "Admin Complaint API"
+  }, {
+    "description" : "管理端派单订单查询（只读，仅管理员）",
+    "name" : "Admin Dispatch Order API"
   }, {
     "description" : "聊天消息接口",
     "name" : "chat message API"

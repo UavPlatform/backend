@@ -8,9 +8,14 @@ import com.uav.dispatch.pojo.entity.DispatchOrder;
 import com.uav.dispatch.pojo.entity.WaybillAssessment;
 import com.uav.flight.mapper.FlightConnectionRepository;
 import com.uav.flight.pojo.entity.FlightConnection;
+import com.uav.server.enums.ApplicationStatus;
+import com.uav.server.enums.TaskStatus;
 import com.uav.support.IntegrationTestBase;
 import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
+import com.uav.task.mapper.TaskApplicationRepository;
+import com.uav.task.pojo.entity.Task;
+import com.uav.task.pojo.entity.TaskApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -29,6 +34,7 @@ class AdminAircraftModelIT extends IntegrationTestBase {
     @Autowired DispatchOrderRepository orders;
     @Autowired WaybillAssessmentRepository assessments;
     @Autowired FlightConnectionRepository flights;
+    @Autowired TaskApplicationRepository applications;
 
     private Map<String, Object> body(String code, String name, String payload, boolean transport) {
         var m = new HashMap<String, Object>();
@@ -158,6 +164,40 @@ class AdminAircraftModelIT extends IntegrationTestBase {
                 .andExpect(status().isConflict());
     }
 
+    @Test void taskApplicationBlocksDelete() throws Exception {
+        var admin = accounts().adminLogin(); String auth = admin.authorization();
+        long modelId = send("POST", auth, "/admin/aircraft-models",
+                body(uniqueCode("A"), "应征机型", "3.00", true), 200).path("id").asLong();
+        var owner = accounts().registerUser();
+        var pilot = accounts().registerRider();
+        Task task = fixtures.task(TaskStatus.IDLE, 10.0, owner.id());
+        TaskApplication application = new TaskApplication();
+        application.setTaskId(task.getId());
+        application.setRiderId(pilot.id());
+        application.setAircraftModelId(modelId);
+        application.setQuotedAmount(new BigDecimal("99.00"));
+        application.setStatus(ApplicationStatus.ACTIVE);
+        applications.saveAndFlush(application);
+        var blocked = mockMvc.perform(delete("/admin/aircraft-models/" + modelId).header("Authorization", auth))
+                .andExpect(status().isConflict()).andReturn().getResponse().getContentAsString();
+        assertThat(blocked).contains("请改为停用");
+    }
+
+    @Test void executedAircraftModelOnOrderBlocksDelete() throws Exception {
+        var admin = accounts().adminLogin(); String auth = admin.authorization();
+        long modelId = send("POST", auth, "/admin/aircraft-models",
+                body(uniqueCode("E"), "订单执飞机型", "3.00", true), 200).path("id").asLong();
+        var owner = accounts().registerUser();
+        String orderId = order(owner.id());
+        DispatchOrder o = orders.findById(orderId).orElseThrow();
+        o.setExecutedAircraftModelId(modelId);
+        o.setExecutedModelName("订单执飞机型");
+        orders.saveAndFlush(o);
+        var blocked = mockMvc.perform(delete("/admin/aircraft-models/" + modelId).header("Authorization", auth))
+                .andExpect(status().isConflict()).andReturn().getResponse().getContentAsString();
+        assertThat(blocked).contains("请改为停用");
+    }
+
     @Test void nonAdminsForbiddenAndBadParamsRejected() throws Exception {
         var admin = accounts().adminLogin();
         var user = accounts().registerUser();
@@ -169,8 +209,8 @@ class AdminAircraftModelIT extends IntegrationTestBase {
                     .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isForbidden());
         }
         mockMvc.perform(get("/admin/aircraft-models")).andExpect(status().isUnauthorized());
-        // Service-level bounds (type-mismatch "abc"/"x" falls through to the global 500 handler).
-        for (String[] p : new String[][]{{"page", "-1"}, {"size", "0"}}) {
+        // Bounds + type-mismatch (Advice maps MethodArgumentTypeMismatchException → 400).
+        for (String[] p : new String[][]{{"page", "-1"}, {"page", "abc"}, {"size", "0"}, {"size", "x"}}) {
             mockMvc.perform(get("/admin/aircraft-models").header("Authorization", admin.authorization()).param(p[0], p[1]))
                     .andExpect(status().isBadRequest());
         }

@@ -5,6 +5,7 @@ import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.aircraft.pojo.dto.AdminAircraftModelDTO;
 import com.uav.aircraft.pojo.entity.AircraftModel;
 import com.uav.aircraft.pojo.vo.AdminAircraftModelVO;
+import com.uav.dispatch.mapper.DispatchOrderRepository;
 import com.uav.equipment.mapper.ProviderDroneRepository;
 import com.uav.flight.mapper.FlightConnectionRepository;
 import com.uav.rider.mapper.RiderQualificationRepository;
@@ -33,16 +34,19 @@ public class AdminAircraftModelService {
     private final RiderUavRepository riderUavs;
     private final RiderQualificationRepository qualifications;
     private final FlightConnectionRepository flights;
+    private final DispatchOrderRepository orders;
     private final TaskApplicationRepository applications;
 
     public AdminAircraftModelService(AircraftModelRepository models, ProviderDroneRepository drones,
                                      RiderUavRepository riderUavs, RiderQualificationRepository qualifications,
-                                     FlightConnectionRepository flights, TaskApplicationRepository applications) {
+                                     FlightConnectionRepository flights, DispatchOrderRepository orders,
+                                     TaskApplicationRepository applications) {
         this.models = models;
         this.drones = drones;
         this.riderUavs = riderUavs;
         this.qualifications = qualifications;
         this.flights = flights;
+        this.orders = orders;
         this.applications = applications;
     }
 
@@ -114,6 +118,7 @@ public class AdminAircraftModelService {
                 || riderUavs.existsByAircraftModelId(id)
                 || qualifications.existsByAircraftModelId(id)
                 || flights.existsByAircraftModelId(id)
+                || orders.existsByExecutedAircraftModelId(id)
                 || applications.existsByAircraftModelId(id);
     }
 

@@ -1,6 +1,5 @@
 package com.uav.live.controller;
 
-import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
 import com.uav.user.pojo.entity.UserRecord;
 import com.uav.server.enums.ApiErrorCode;
@@ -56,11 +55,12 @@ public class WebLiveController {
     @Autowired
     private LiveSessionService liveSessionService;
 
-    @Autowired
-    private RiderUavRepository riderUavRepository;
+    private com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
 
     @Autowired
-    private com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
+    void setPilotDeviceAccess(com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess) {
+        this.pilotDeviceAccess = pilotDeviceAccess;
+    }
 
     @OperationLog("请求开播")
     @RateLimiter(limit = 5, windowSeconds = 60)

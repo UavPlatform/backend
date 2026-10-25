@@ -2213,6 +2213,21 @@
         },
         "type" : "object"
       },
+      "MapConfigVO" : {
+        "description" : "地图配置（不含 securityKey）",
+        "properties" : {
+          "key" : {
+            "description" : "高德地图 key",
+            "type" : "string"
+          },
+          "serviceHost" : {
+            "description" : "Web 端高德安全代理地址（_AMapSecurityConfig.serviceHost）；未配置时为 null",
+            "type" : [ "null", "string" ]
+          }
+        },
+        "required" : [ "key" ],
+        "type" : "object"
+      },
       "MessageDTO" : {
         "properties" : {
           "content" : {
@@ -4135,6 +4150,33 @@
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
             "format" : "int64",
             "type" : "integer"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultMapConfigVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/MapConfigVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -7633,6 +7675,26 @@
         },
         "summary" : "列出会话",
         "tags" : [ "chat session API" ]
+      }
+    },
+    "/config/map" : {
+      "get" : {
+        "description" : "返回高德 key 与 Web 安全代理地址；不返回 securityKey。响应带 Cache-Control: private",
+        "operationId" : "getMapConfig",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultMapConfigVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "获取地图配置",
+        "tags" : [ "配置" ]
       }
     },
     "/dispatch/assessments" : {

@@ -13,4 +13,8 @@ public class AmapConfig {
 
     @Value("${amap.security-key}")
     private String securityKey;
+
+    /** Web 端高德安全代理地址（如 https://host/_AMapService），可为空。 */
+    @Value("${amap.service-host:}")
+    private String serviceHost;
 }

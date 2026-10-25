@@ -13,6 +13,22 @@
 		}
 	}
 
+	# 高德 JS API 安全代理（Web 端，GET /config/map 的 serviceHost 指向这里）：
+	# securityKey（jscode）只存在于 Caddy 进程环境变量 AMAP_SECURITY_KEY，不下发给任何客户端。
+	# 规则对应高德官方 nginx 示例：/_AMapService/v4/map/styles → webapi，/v3/vectormap → fmap01，其余 → restapi。
+	handle_path /_AMapService/v4/map/styles* {
+		rewrite * /v4/map/styles{path}?{query}&jscode={$AMAP_SECURITY_KEY}
+		reverse_proxy https://webapi.amap.com
+	}
+	handle_path /_AMapService/v3/vectormap* {
+		rewrite * /v3/vectormap{path}?{query}&jscode={$AMAP_SECURITY_KEY}
+		reverse_proxy https://fmap01.amap.com
+	}
+	handle_path /_AMapService/* {
+		rewrite * {path}?{query}&jscode={$AMAP_SECURITY_KEY}
+		reverse_proxy https://restapi.amap.com
+	}
+
 	handle /api/* {
 		reverse_proxy localhost:8081 {
 			flush_interval -1

@@ -93,6 +93,7 @@ minio:
 amap:
   key: ${drone.amap.key}
   security-key: ${drone.amap.security-key}
+  service-host: ${drone.amap.service-host:}
 
 # ---- 文件上传 ----
 file:

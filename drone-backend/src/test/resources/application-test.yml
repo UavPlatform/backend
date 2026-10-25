@@ -30,6 +30,7 @@ trtc:
 amap:
   key: amap-test-key
   security-key: amap-test-security-key
+  service-host: https://test.example/_AMapService
 
 logging:
   level:

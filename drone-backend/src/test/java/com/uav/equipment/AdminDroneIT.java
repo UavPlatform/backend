@@ -61,7 +61,9 @@ class AdminDroneIT extends IntegrationTestBase {
         String serial = UniqueNames.djiId();
         var created = send("POST", auth, "/admin/drones", drone(" " + serial.toLowerCase(Locale.ROOT) + " ", "岳麓机场" + tag), 200);
         String id = created.path("droneId").asText();
-        assertThat(created.path("serialNumber").asText()).isEqualTo(serial.toUpperCase(Locale.ROOT));
+        // Registration stores the canonical form (SerialNumbers.normalize); orders below use the stored value.
+        String stored = created.path("serialNumber").asText();
+        assertThat(stored).isEqualTo(com.uav.server.util.SerialNumbers.normalize(serial));
         assertThat(created.path("borrowStatus").asText()).isEqualTo("IN_STOCK");
         assertThat(created.path("executing").asBoolean()).isFalse();
         assertThat(created.path("latestOrder").isNull()).isTrue();
@@ -94,13 +96,17 @@ class AdminDroneIT extends IntegrationTestBase {
         // Identity cannot change while borrowed; airport still can.
         send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId(), "x"), 409);
 
-        // Orders flown with this serial: latest one wins, IN_TRANSIT marks executing.
+        // Orders flown with this serial: latest one wins; only PILOT_ARRIVED / IN_TRANSIT mark executing.
         LocalDateTime base = LocalDateTime.of(2031, 5, 1, 8, 0);
-        order(owner.id(), serial.toUpperCase(Locale.ROOT), "COMPLETED", base);
+        order(owner.id(), stored, "DELIVERY_CONFIRMATION", base.minusHours(1));
+        row = send("GET", auth, "/admin/drones/" + id, null, 200);
+        assertThat(row.path("executing").asBoolean()).isFalse();
+        assertThat(row.path("latestOrder").path("stage").asText()).isEqualTo("DELIVERY_CONFIRMATION");
+        order(owner.id(), stored, "COMPLETED", base);
         row = send("GET", auth, "/admin/drones/" + id, null, 200);
         assertThat(row.path("executing").asBoolean()).isFalse();
         assertThat(row.path("latestOrder").path("stage").asText()).isEqualTo("COMPLETED");
-        order(owner.id(), serial.toUpperCase(Locale.ROOT), "IN_TRANSIT", base.plusHours(1));
+        order(owner.id(), stored, "IN_TRANSIT", base.plusHours(1));
         row = send("GET", auth, "/admin/drones/" + id, null, 200);
         assertThat(row.path("executing").asBoolean()).isTrue();
         assertThat(row.path("latestOrder").path("stage").asText()).isEqualTo("IN_TRANSIT");
@@ -111,8 +117,10 @@ class AdminDroneIT extends IntegrationTestBase {
         var disabled = send("POST", auth, "/admin/drones/" + id + "/enabled", Map.of("enabled", false), 200);
         assertThat(disabled.path("enabled").asBoolean()).isFalse();
         assertThat(disabled.path("borrowStatus").asText()).isEqualTo("BORROWED");
+        var otherPilot = accounts().registerRider(UniqueNames.userName("adrother"), null);
         send("POST", pilot.authorization(), "/equipment/pilot/borrows/" + loan.path("borrowId").asText() + "/return", Map.of(), 200);
         send("POST", pilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
+        send("POST", otherPilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
         assertThat(send("GET", auth, "/admin/drones/" + id, null, 200).path("borrowStatus").asText()).isEqualTo("IN_STOCK");
 
         // Borrow history.
@@ -130,6 +138,21 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(list.path("content").get(0).path("droneId").asText()).isEqualTo(id);
         assertThat(send("GET", auth, "/admin/drones?size=500", null, 200).path("size").asInt()).isEqualTo(100);
         assertThat(send("GET", auth, "/admin/drones?airportName=100%25_" + tag, null, 200).path("totalElements").asLong()).isZero();
+    }
+
+    @Test void pilotArrivedCountsAsExecutingButDeliveryConfirmationDoesNot() throws Exception {
+        var admin = accounts().adminLogin(); var owner = accounts().registerUser();
+        String a = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId(), "x"), 200).path("serialNumber").asText();
+        String b = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId(), "x"), 200).path("serialNumber").asText();
+        order(owner.id(), a, "PILOT_ARRIVED", LocalDateTime.of(2031, 6, 1, 8, 0));
+        order(owner.id(), b, "DELIVERY_CONFIRMATION", LocalDateTime.of(2031, 6, 1, 8, 0));
+        var rows = send("GET", admin.authorization(), "/admin/drones?size=100", null, 200).path("content");
+        Map<String, JsonNode> bySerial = new HashMap<>();
+        for (var r : rows) bySerial.put(r.path("serialNumber").asText(), r);
+        assertThat(bySerial.get(a).path("executing").asBoolean()).isTrue();
+        assertThat(bySerial.get(a).path("latestOrder").path("stage").asText()).isEqualTo("PILOT_ARRIVED");
+        assertThat(bySerial.get(b).path("executing").asBoolean()).isFalse();
+        assertThat(bySerial.get(b).path("latestOrder").path("stage").asText()).isEqualTo("DELIVERY_CONFIRMATION");
     }
 
     @Test void badParamsAreRejected() throws Exception {

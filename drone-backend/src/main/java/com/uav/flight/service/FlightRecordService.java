@@ -1,5 +1,7 @@
 package com.uav.flight.service;
 
+import com.uav.server.util.SerialNumbers;
+
 import com.alibaba.fastjson.JSON;
 import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.dispatch.mapper.DispatchOrderRepository;
@@ -44,7 +46,7 @@ public class FlightRecordService {
         if (old.isPresent()) {
             var c = old.get();
             if (!id.equals(c.getOrderId()) || c.getAssignmentVersion() != input.assignmentVersion()
-                    || !input.serialNumber().equals(c.getSerialNumber()) || !input.modelCode().equals(c.getModelCode())
+                    || !SerialNumbers.normalize(input.serialNumber()).equals(c.getSerialNumber()) || !input.modelCode().equals(c.getModelCode())
                     || !input.modelName().equals(c.getModelName())) throw conflict();
             return view(c, order);
         }
@@ -53,16 +55,17 @@ public class FlightRecordService {
         // cached samples can be backfilled, and it never replaces live connections or takes the device.
         boolean late = !OPEN_STAGES.contains(order.getStage());
         if (late && (!BACKFILL_STAGES.contains(order.getStage()) || input.startedAt() == null)) throw conflict();
-        if (List.of(input.serialNumber(), input.modelCode(), input.modelName()).stream().anyMatch(this::unknown))
+        if (List.of(input.serialNumber(), input.modelCode(), input.modelName()).stream().anyMatch(this::unknown)
+                || SerialNumbers.normalize(input.serialNumber()).length() > SerialNumbers.MAX_LENGTH)
             throw new BusinessException(ApiErrorCode.INVALID_PARAM);
         if (late) return lateConnection(pilot, order, input);
         closeOrder(id, "REPLACED");
         var c = newConnection(pilot, id, input);
-        c.setOpenedAt(openedAt(input.startedAt())); c.setActiveOrderId(id); c.setActiveSerial(input.serialNumber().trim().toUpperCase(Locale.ROOT));
+        c.setOpenedAt(openedAt(input.startedAt())); c.setActiveOrderId(id); c.setActiveSerial(c.getSerialNumber());
         try { connections.saveAndFlush(c); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
         // ADR-0007 #6/#9: the order's drone is what djifly reported, never a manually entered number.
-        order.setExecutedSerialNumber(c.getSerialNumber()); order.setExecutedModelCode(c.getModelCode());
+        order.setExecutedSerialNumber(SerialNumbers.normalize(c.getSerialNumber())); order.setExecutedModelCode(c.getModelCode());
         order.setExecutedModelName(c.getModelName()); order.setExecutedAircraftModelId(c.getAircraftModelId());
         orders.save(order);
         return view(c, order);
@@ -77,7 +80,7 @@ public class FlightRecordService {
         try { connections.saveAndFlush(c); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw conflict(); }
         if (order.getExecutedSerialNumber() == null) {
-            order.setExecutedSerialNumber(c.getSerialNumber()); order.setExecutedModelCode(c.getModelCode());
+            order.setExecutedSerialNumber(SerialNumbers.normalize(c.getSerialNumber())); order.setExecutedModelCode(c.getModelCode());
             order.setExecutedModelName(c.getModelName()); order.setExecutedAircraftModelId(c.getAircraftModelId());
             orders.save(order);
         }
@@ -88,7 +91,7 @@ public class FlightRecordService {
         var c = new FlightConnection();
         c.setId(UUID.randomUUID().toString()); c.setOrderId(id); c.setPilotId(pilot);
         c.setAssignmentVersion(input.assignmentVersion()); c.setRequestKey(input.requestKey());
-        c.setSerialNumber(input.serialNumber()); c.setModelCode(input.modelCode()); c.setModelName(input.modelName());
+        c.setSerialNumber(SerialNumbers.normalize(input.serialNumber())); c.setModelCode(input.modelCode()); c.setModelName(input.modelName());
         var matches = models.findAll().stream().filter(m -> m.getModelCode().equalsIgnoreCase(input.modelCode())
                 || m.getDisplayName().equalsIgnoreCase(input.modelName())).toList();
         if (matches.size() == 1) c.setAircraftModelId(matches.getFirst().getId());

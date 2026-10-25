@@ -128,7 +128,7 @@ class DispatchFlightIT extends IntegrationTestBase {
         String id = prepare(owner, pilot); String endpoint = path(id) + "/flight-connections";
         String serial = UniqueNames.djiId();
         String cid = send(pilot, endpoint, connect(serial), 200).path("connectionId").asText();
-        assertThat(read(owner, "/dispatch/orders/" + id).path("executedDrone").path("serialNumber").asText()).isEqualTo(serial);
+        assertThat(read(owner, "/dispatch/orders/" + id).path("executedDrone").path("serialNumber").asText()).isEqualTo(com.uav.server.util.SerialNumbers.normalize(serial));
         long now = System.currentTimeMillis();
         var items = new ArrayList<Map<String, Object>>();
         for (int i = 0; i < 3; i++) items.add(Map.of("sequence", i, "capturedAt", now - 3000 + i * 1000L, "latitude", 28.2 + i * 0.001,

@@ -1930,7 +1930,7 @@
             "type" : "string"
           },
           "serialNumber" : {
-            "maxLength" : 64,
+            "maxLength" : 128,
             "minLength" : 0,
             "type" : "string"
           },
@@ -2562,7 +2562,7 @@
             "type" : "number"
           },
           "serialNumber" : {
-            "maxLength" : 64,
+            "maxLength" : 128,
             "minLength" : 0,
             "type" : "string"
           }

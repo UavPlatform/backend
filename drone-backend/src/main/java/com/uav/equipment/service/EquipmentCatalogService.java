@@ -49,8 +49,8 @@ public class EquipmentCatalogService {
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw EquipmentAccess.conflict("机身号已登记"); }
     }
     private String serial(ProviderDroneDTO input) {
-        String value = input.serialNumber().trim().toUpperCase(Locale.ROOT);
-        if (value.isBlank() || value.length() > 64) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        String value = com.uav.server.util.SerialNumbers.normalize(input.serialNumber());
+        if (value == null || value.isBlank() || value.length() > com.uav.server.util.SerialNumbers.MAX_LENGTH) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
         return value;
     }
     @Transactional

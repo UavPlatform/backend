@@ -92,19 +92,24 @@ public class AdminDroneService {
         Map<String, DroneBorrow> current = borrows.findAllById(rows.stream().map(ProviderDrone::getCurrentBorrowId)
                 .filter(Objects::nonNull).toList()).stream().collect(Collectors.toMap(DroneBorrow::getId, Function.identity()));
         Map<Long, User> pilots = pilots(current.values().stream().map(DroneBorrow::getPilotId).toList());
+        // Serials are stored canonical (SerialNumbers.normalize) on both sides; one batched query each per page.
+        List<String> serials = rows.stream().map(ProviderDrone::getSerialNumber).distinct().toList();
+        Map<String, com.uav.dispatch.pojo.entity.DispatchOrder> latest = serials.isEmpty() ? Map.of()
+                : orders.latestByExecutedSerials(serials).stream().collect(Collectors.toMap(
+                        com.uav.dispatch.pojo.entity.DispatchOrder::getExecutedSerialNumber, Function.identity(), (a, b) -> a));
+        Set<String> executingSerials = serials.isEmpty() ? Set.of() : new HashSet<>(orders.executingSerials(serials, EXECUTING_STAGES));
         return rows.stream().map(d -> {
             AircraftModel m = byModel.get(d.getAircraftModelId());
             DroneBorrow b = d.getCurrentBorrowId() == null ? null : current.get(d.getCurrentBorrowId());
-            var latest = orders.findFirstByExecutedSerialNumberOrderByCreatedAtDescIdDesc(d.getSerialNumber())
-                    .map(o -> new AdminDroneVO.LatestOrder(o.getId(), o.getStage(), o.getCreatedAt())).orElse(null);
-            boolean executing = latest != null
-                    && orders.existsByExecutedSerialNumberAndStageIn(d.getSerialNumber(), EXECUTING_STAGES);
+            var o = latest.get(d.getSerialNumber());
+            var latestOrder = o == null ? null : new AdminDroneVO.LatestOrder(o.getId(), o.getStage(), o.getCreatedAt());
+            boolean executing = executingSerials.contains(d.getSerialNumber());
             return new AdminDroneVO(d.getId(),
                     new AdminDroneVO.Model(d.getAircraftModelId(), m == null ? null : m.getModelCode(), m == null ? null : m.getDisplayName()),
                     d.getSerialNumber(), d.getAirportName(), d.getLatitude(), d.getLongitude(), d.isEnabled(),
                     b == null ? "IN_STOCK" : "BORROWED",
                     b == null ? null : new AdminDroneVO.CurrentBorrow(b.getId(), b.getPilotId(), name(pilots.get(b.getPilotId())), b.getBorrowedAt()),
-                    executing, latest, d.getCreatedAt());
+                    executing, latestOrder, d.getCreatedAt());
         }).toList();
     }
 

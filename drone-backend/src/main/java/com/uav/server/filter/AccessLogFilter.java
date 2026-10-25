@@ -10,7 +10,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
 
@@ -23,16 +22,15 @@ public class AccessLogFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         long start = System.currentTimeMillis();
-        ContentCachingResponseWrapper wrapper = new ContentCachingResponseWrapper(response);
 
         try {
-            filterChain.doFilter(request, wrapper);
+            filterChain.doFilter(request, response);
         } finally {
             long duration = System.currentTimeMillis() - start;
-            int status = wrapper.getStatus();
+            int status = response.getStatus();
             String method = request.getMethod();
             String path = request.getRequestURI();
-            String query = request.getQueryString();
+            String query = "/dispatch/events".equals(request.getServletPath()) ? null : request.getQueryString();
             String url = query != null ? path + "?" + query : path;
 
             String traceId = MDC.get("traceId");
@@ -46,7 +44,6 @@ public class AccessLogFilter extends OncePerRequestFilter {
                 log.info("{}{} {} {} {}ms", traceInfo, method, url, status, duration);
             }
 
-            wrapper.copyBodyToResponse();
             MDC.clear();
         }
     }

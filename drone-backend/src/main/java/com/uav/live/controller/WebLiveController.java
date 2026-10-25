@@ -82,9 +82,8 @@ public class WebLiveController {
     }
 
     /**
-     * 飞手主动开播（1B-4b，裁决 Q3=C）：飞手仅可对「本人绑定（rider_uav）且在线」的设备开播。
-     * 复用 START_LIVE 下发/ACK 与 /live/get 凭证链路，直播态并入 LiveSessionSnapshot，
-     * 停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路（/live/close 对所有发起方生效）。
+     * 飞手主动开播（1B-4b / ADR-0007）：设备须在线，且为本人派单任务当前连机的无人机，或旧流程 rider_uav 绑定。
+     * 复用 START_LIVE 下发/ACK 与 /live/get 凭证链路；停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路。
      */
     @RequireRole(1)
     @RequireDrone

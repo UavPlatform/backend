@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<argLine></argLine>
 	</properties>
 	<repositories>
 		<repository>
@@ -222,6 +223,7 @@
 				<configuration>
 					<!-- CI runs the unit layer separately; allow verify to run only Failsafe. -->
 					<skipTests>${skip.surefire.tests}</skipTests>
+					<argLine>@{argLine}</argLine>
 					<includes>
 						<include>**/*Test.java</include>
 					</includes>
@@ -234,6 +236,9 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<argLine>@{argLine}</argLine>
+				</configuration>
 				<executions>
 					<execution>
 						<goals>
@@ -273,6 +278,7 @@
 				<configuration>
 					<!-- Keep Surefire data when Failsafe appends its own coverage. -->
 					<append>true</append>
+					<outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
 				</configuration>
 				<executions>
 					<execution>

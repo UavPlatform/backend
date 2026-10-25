@@ -53,6 +53,8 @@ ssh root@drone.fuwaki.icu "mkdir -p /opt/drone/.ssh && ssh-keygen -t ed25519 -f 
 ssh root@drone.fuwaki.icu "mkdir -p /etc/containers && cp /run/user/0/containers/auth.json /etc/containers/auth.json && chmod 644 /etc/containers/auth.json"
 
 # 9. 配置 Caddy 反向代理
+# 高德安全代理（/_AMapService）需要 Caddy 进程能读到 AMAP_SECURITY_KEY（securityKey 只留在服务端）：
+#   systemctl edit caddy  →  [Service] Environment=AMAP_SECURITY_KEY=<高德安全密钥>
 scp Caddyfile root@drone.fuwaki.icu:/etc/caddy/Caddyfile
 ssh root@drone.fuwaki.icu "systemctl restart caddy"
 

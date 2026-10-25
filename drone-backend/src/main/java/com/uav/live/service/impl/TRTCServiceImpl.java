@@ -36,6 +36,12 @@ public class TRTCServiceImpl implements TRTCService {
         return TRTCSignatureUtil.generateUserSig(sdkAppId, userId, secretKey, roomExpire);
     }
 
+    @Override
+    public String generatePrivateMapKey(String userId, String roomId, boolean publisher) {
+        return new com.tencentyun.TLSSigAPIv2(sdkAppId, secretKey)
+                .genPrivateMapKeyWithStringRoomID(userId, roomExpire, roomId, publisher ? 255 : 42);
+    }
+
     /**
      * 生成房间ID
      * @param deviceId 设备ID

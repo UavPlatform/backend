@@ -104,6 +104,17 @@ class DroneCommandServiceTest {
     }
 
     @Test
+    void startLiveCommandCarriesServerApplicationAndRoomTicket() {
+        AtomicReference<String> sent = new AtomicReference<>();
+        when(registry.send(eq(DEVICE), anyString())).thenAnswer(invocation -> { sent.set(invocation.getArgument(1)); return false; });
+        service.sendStartLiveCommand(DEVICE, "room", "u", "sig", 101L, "test-room-ticket", 1_000, 5_000);
+        var data = JSON.parseObject(sent.get()).getJSONObject("data");
+        assertThat(data.getLongValue("sdkAppId")).isEqualTo(101);
+        assertThat(data.getString("privateMapKey")).isEqualTo("test-room-ticket");
+        assertThat(data.getString("roomId")).isEqualTo("room");
+    }
+
+    @Test
     void startLiveSendFailureMarksLiveSessionFailed() {
         when(registry.send(eq(DEVICE), anyString())).thenReturn(false);
 

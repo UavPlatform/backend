@@ -7,6 +7,8 @@
   "data": {
     "roomId": "room-1",
     "userId": "user-1",
-    "userSig": "sig"
+    "userSig": "example-user-signature",
+    "sdkAppId": 1400000001,
+    "privateMapKey": "example-room-ticket"
   }
 }

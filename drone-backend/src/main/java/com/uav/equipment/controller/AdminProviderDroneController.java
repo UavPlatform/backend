@@ -25,7 +25,7 @@ public class AdminProviderDroneController {
         this.service = service;
     }
 
-    @Operation(summary = "服务商无人机/机场分页列表", description = "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备与服务商")
+    @Operation(operationId = "adminListProviderDrones", summary = "服务商无人机/机场分页列表", description = "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备与服务商")
     @GetMapping
     public Result<AdminPageVo<AdminProviderDroneVO>> list(
             @Parameter(description = "页码（从 0 起）") @RequestParam(defaultValue = "0") int page,

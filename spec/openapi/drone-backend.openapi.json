@@ -6406,7 +6406,7 @@
     "/admin/dispatch/orders" : {
       "get" : {
         "description" : "按创建时间倒序；page 从 0 起，size 上限 100",
-        "operationId" : "list_2",
+        "operationId" : "adminListDispatchOrders",
         "parameters" : [ {
           "description" : "关键字：订单号、货主或飞手用户名模糊匹配",
           "in" : "query",
@@ -6489,7 +6489,7 @@
     "/admin/dispatch/orders/{orderId}" : {
       "get" : {
         "description" : "订单视图（含运单、账单、实际执行无人机）、参与方、状态时间线、派单记录、连机记录",
-        "operationId" : "detail",
+        "operationId" : "adminGetDispatchOrder",
         "parameters" : [ {
           "in" : "path",
           "name" : "orderId",
@@ -6860,7 +6860,7 @@
     "/admin/provider/drones" : {
       "get" : {
         "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备与服务商",
-        "operationId" : "list_1",
+        "operationId" : "adminListProviderDrones",
         "parameters" : [ {
           "description" : "服务商 ID（正整数，否则 400）",
           "in" : "query",

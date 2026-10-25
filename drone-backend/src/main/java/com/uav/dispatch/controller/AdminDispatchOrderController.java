@@ -29,7 +29,7 @@ public class AdminDispatchOrderController {
         this.service = service;
     }
 
-    @Operation(summary = "派单订单分页列表", description = "按创建时间倒序；page 从 0 起，size 上限 100")
+    @Operation(operationId = "adminListDispatchOrders", summary = "派单订单分页列表", description = "按创建时间倒序；page 从 0 起，size 上限 100")
     @GetMapping
     public Result<AdminPageVo<AdminDispatchOrderVO.Row>> list(
             @Parameter(description = "页码（从 0 起）") @RequestParam(defaultValue = "0") int page,
@@ -44,7 +44,7 @@ public class AdminDispatchOrderController {
         return Result.success(service.list(page, size, stage, fundsStatus, createdFrom, createdTo, keyword));
     }
 
-    @Operation(summary = "派单订单详情", description = "订单视图（含运单、账单、实际执行无人机）、参与方、状态时间线、派单记录、连机记录")
+    @Operation(operationId = "adminGetDispatchOrder", summary = "派单订单详情", description = "订单视图（含运单、账单、实际执行无人机）、参与方、状态时间线、派单记录、连机记录")
     @GetMapping("/{orderId}")
     public Result<AdminDispatchOrderVO.Detail> detail(@PathVariable String orderId) {
         return Result.success(service.detail(orderId));

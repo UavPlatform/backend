@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import org.springframework.http.MediaType;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -107,5 +109,21 @@ class AdminProviderDroneIT extends IntegrationTestBase {
                     .andExpect(status().isForbidden());
         }
         mockMvc.perform(get("/admin/provider/drones")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void providerRoleIsForbidden() throws Exception {
+        var admin = accounts().adminLogin();
+        String name = UniqueNames.userName("provider");
+        mockMvc.perform(post("/equipment/admin/providers").header("Authorization", admin.authorization())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + name + "\",\"password\":\"equipment-test-pass\",\"displayName\":\"p\"}"))
+                .andExpect(status().isOk());
+        String body = mockMvc.perform(post("/equipment/provider/login").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"" + name + "\",\"password\":\"equipment-test-pass\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String token = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("data").path("token").asText();
+        org.assertj.core.api.Assertions.assertThat(com.uav.support.TestAccounts.claims(token).path("role").asInt()).isEqualTo(3);
+        mockMvc.perform(get("/admin/provider/drones").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
     }
 }

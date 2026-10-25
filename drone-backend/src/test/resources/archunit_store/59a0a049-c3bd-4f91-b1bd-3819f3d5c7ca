@@ -11,7 +11,6 @@ Field <com.uav.live.controller.AppWebSocketController.riderUavRepository> is ann
 Field <com.uav.live.controller.WebLiveController.appWebSocketService> is annotated with @Autowired in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.commandService> is annotated with @Autowired in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.liveSessionService> is annotated with @Autowired in (WebLiveController.java:0)
-Field <com.uav.live.controller.WebLiveController.riderUavRepository> is annotated with @Autowired in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.trtcService> is annotated with @Autowired in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.userRecordRepository> is annotated with @Autowired in (WebLiveController.java:0)
 Field <com.uav.live.controller.WebLiveController.webUavService> is annotated with @Autowired in (WebLiveController.java:0)

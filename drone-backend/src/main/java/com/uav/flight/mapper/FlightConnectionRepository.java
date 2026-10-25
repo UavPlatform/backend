@@ -7,4 +7,6 @@ public interface FlightConnectionRepository extends JpaRepository<FlightConnecti
  Optional<FlightConnection> findByPilotIdAndRequestKey(Long pilot, String key);
  Optional<FlightConnection> findByActiveOrderId(String order);
  Optional<FlightConnection> findTopByOrderIdOrderByOpenedAtDescIdDesc(String order);
+ /** Active dispatch connection of a device (active_serial is upper-cased and cleared when the connection ends). */
+ Optional<FlightConnection> findByActiveSerial(String serial);
 }

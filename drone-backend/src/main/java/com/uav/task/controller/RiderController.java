@@ -1,6 +1,5 @@
 package com.uav.task.controller;
 
-import com.uav.server.annotation.RequireDrone;
 import com.uav.server.annotation.RequireRole;
 import com.uav.task.pojo.dto.RiderApplyDto;
 import com.uav.task.pojo.entity.Task;
@@ -137,7 +136,6 @@ public class RiderController {
         return Result.success("确认成功，任务开始执行", taskVoAssembler.assembleForRider(task, riderId));
     }
 
-    @RequireDrone
     @OperationLog("取消接单")
     @Operation(summary = "取消接单", description = "骑手取消执行中的任务，任务回到待撮合（重新开放撮合）",
             parameters = {@Parameter(name = "taskNum", description = "任务编号", required = true)})
@@ -148,7 +146,6 @@ public class RiderController {
         return Result.success("已取消接单");
     }
 
-    @RequireDrone
     @OperationLog("完成任务")
     @Operation(summary = "完成任务",
             description = "骑手交付任务；必须先上传履约证据（attachment），否则 DELIVERY_EVIDENCE_REQUIRED；"

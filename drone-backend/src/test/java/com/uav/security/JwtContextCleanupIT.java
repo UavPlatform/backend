@@ -25,10 +25,12 @@ class JwtContextCleanupIT extends IntegrationTestBase {
         mockMvc.perform(get("/admin/uav")).andExpect(status().isUnauthorized());
         assertAnonymousContext();
     }
-    @Test void unboundPilotRejectionClearsAllIdentityFields() throws Exception {
+    @Test void pilotBusinessRejectionClearsAllIdentityFields() throws Exception {
+        // The bind-drone gate is gone (start live no longer requires a bound drone); an unknown device is rejected
+        // by the business layer instead, and the identity must still be cleared afterwards.
         var pilot = accounts().registerRider(UniqueNames.userName("ctx"), null);
         mockMvc.perform(post("/live/rider/req").param("deviceId", UniqueNames.djiId())
-                .header("Authorization", pilot.authorization())).andExpect(status().isForbidden());
+                .header("Authorization", pilot.authorization())).andExpect(status().is4xxClientError());
         assertAnonymousContext();
     }
     @Test void anonymousRequestDiscardsAnIdentityLeftOnTheThread() throws Exception {

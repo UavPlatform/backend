@@ -24,17 +24,20 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final JwtUtil jwtUtil;
 
     private final RiderUavRepository riderUavRepository;
+    private final com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
 
     public WebSocketConfig(DroneWebSocketHandler droneWebSocketHandler,
                            WebWebSocketHandler webWebSocketHandler,
                            ChatWebSocketHandler chatWebSocketHandler,
                            JwtUtil jwtUtil,
-                           RiderUavRepository riderUavRepository) {
+                           RiderUavRepository riderUavRepository,
+                           com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess) {
         this.droneWebSocketHandler = droneWebSocketHandler;
         this.webWebSocketHandler = webWebSocketHandler;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.jwtUtil = jwtUtil;
         this.riderUavRepository = riderUavRepository;
+        this.pilotDeviceAccess = pilotDeviceAccess;
     }
 
     @Override
@@ -42,7 +45,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
         // App端WebSocket端点（P0-1：握手需 JWT + 飞手角色 + 设备归属校验）
         registry.addHandler(droneWebSocketHandler, "/ws/drone")
                 .addInterceptors(new WsAuthHandshakeInterceptor(
-                        jwtUtil, riderUavRepository, WsAuthHandshakeInterceptor.Mode.DEVICE_CHANNEL))
+                        jwtUtil, riderUavRepository, WsAuthHandshakeInterceptor.Mode.DEVICE_CHANNEL, pilotDeviceAccess::mayUse))
                 .setAllowedOrigins("*");
 
         // Web端WebSocket端点（P0-1：握手需登录）

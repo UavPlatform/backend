@@ -17,13 +17,12 @@ import java.util.UUID;
 public class DroneBorrowService {
     private final ProviderDroneRepository drones;
     private final DroneBorrowRepository borrows;
-    private final EquipmentProviderService providers;
     private final AircraftModelService models;
     private final EquipmentViews views;
     private final EntityManager em;
-    public DroneBorrowService(ProviderDroneRepository drones, DroneBorrowRepository borrows, EquipmentProviderService providers,
+    public DroneBorrowService(ProviderDroneRepository drones, DroneBorrowRepository borrows,
             AircraftModelService models, EquipmentViews views, EntityManager em) {
-        this.drones = drones; this.borrows = borrows; this.providers = providers; this.models = models; this.views = views; this.em = em;
+        this.drones = drones; this.borrows = borrows; this.models = models; this.views = views; this.em = em;
     }
     @Transactional
     public DroneBorrowVO borrow(Long pilot, DroneBorrowDTO input) {
@@ -34,8 +33,6 @@ public class DroneBorrowService {
             if (!existing.get().getDroneId().equals(input.droneId())) throw EquipmentAccess.conflict("借用标识已用于其他设备");
             return views.borrow(existing.get());
         }
-        var snapshot = drones.findById(input.droneId()).orElseThrow(EquipmentAccess::missing);
-        providers.lockEnabled(snapshot.getProviderId());
         var d = drones.lockDrone(input.droneId()).orElseThrow(EquipmentAccess::missing);
         em.refresh(d, LockModeType.PESSIMISTIC_WRITE);
         models.requireSelectable(d.getAircraftModelId());
@@ -60,17 +57,6 @@ public class DroneBorrowService {
     @Transactional(readOnly = true)
     public DroneBorrowPageVO mine(Long pilot, int page) {
         var rows = borrows.findByPilotId(pilot, EquipmentAccess.page(page, "borrowedAt"));
-        return new DroneBorrowPageVO(rows.stream().map(views::borrow).toList(), page, rows.hasNext());
-    }
-    @Transactional(readOnly = true)
-    public DroneBorrowPageVO provider(Long provider, int page) {
-        providers.requireEnabled(provider);
-        var rows = borrows.providerHistory(provider, EquipmentAccess.page(page, "borrowedAt"));
-        return new DroneBorrowPageVO(rows.stream().map(views::borrow).toList(), page, rows.hasNext());
-    }
-    @Transactional(readOnly = true)
-    public DroneBorrowPageVO admin(int page) {
-        var rows = borrows.findAll(EquipmentAccess.page(page, "borrowedAt"));
         return new DroneBorrowPageVO(rows.stream().map(views::borrow).toList(), page, rows.hasNext());
     }
 }

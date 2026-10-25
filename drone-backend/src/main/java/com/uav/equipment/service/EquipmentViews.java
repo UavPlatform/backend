@@ -8,16 +8,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class EquipmentViews {
-    private final EquipmentProviderRepository providers;
     private final ProviderDroneRepository drones;
     private final DroneBorrowRepository borrows;
     private final AircraftModelRepository models;
-    public EquipmentViews(EquipmentProviderRepository providers, ProviderDroneRepository drones, DroneBorrowRepository borrows, AircraftModelRepository models) {
-        this.providers = providers; this.drones = drones; this.borrows = borrows; this.models = models;
+    public EquipmentViews(ProviderDroneRepository drones, DroneBorrowRepository borrows, AircraftModelRepository models) {
+        this.drones = drones; this.borrows = borrows; this.models = models;
     }
     ProviderDroneVO drone(ProviderDrone d, Long pilot, boolean management) {
         boolean mine = d.getCurrentBorrowId() != null && borrows.findById(d.getCurrentBorrowId()).map(b -> b.getPilotId().equals(pilot)).orElse(false);
-        return new ProviderDroneVO(d.getId(), d.getProviderId(), providers.findById(d.getProviderId()).orElseThrow(EquipmentAccess::missing).getDisplayName(),
+        return new ProviderDroneVO(d.getId(),
                 d.getAircraftModelId(), models.findById(d.getAircraftModelId()).orElseThrow(EquipmentAccess::missing).getDisplayName(),
                 d.getSerialNumber(), d.getAirportName(), d.getLatitude(), d.getLongitude(), d.isEnabled(), d.getCurrentBorrowId() != null,
                 mine, management || mine ? d.getCurrentBorrowId() : null);

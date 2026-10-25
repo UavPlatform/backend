@@ -24,7 +24,7 @@ public class PilotDeviceAccess {
     public boolean mayUse(Long pilot, String deviceId) {
         if (pilot == null || deviceId == null || deviceId.isBlank()) return false;
         if (riderUav.existsByUserIdAndDjiId(pilot, deviceId)) return true;
-        return connections.findByActiveSerial(deviceId.trim().toUpperCase(Locale.ROOT))
+        return connections.findByActiveSerial(com.uav.server.util.SerialNumbers.normalize(deviceId))
                 .filter(c -> pilot.equals(c.getPilotId())).isPresent();
     }
 }

@@ -53,7 +53,7 @@ class FlightRecordServiceTest {
     }
     private FlightConnection existing(String id, LocalDateTime ended) {
         var c = new FlightConnection(); c.setId(id); c.setOrderId("o1"); c.setPilotId(7L); c.setAssignmentVersion(2);
-        c.setRequestKey("rk"); c.setSerialNumber("sn1"); c.setModelCode("M30"); c.setModelName("Matrice 30");
+        c.setRequestKey("rk"); c.setSerialNumber("SN1"); c.setModelCode("M30"); c.setModelName("Matrice 30");
         c.setOpenedAt(LocalDateTime.now()); c.setEndedAt(ended);
         when(connections.findById(id)).thenReturn(Optional.of(c));
         return c;

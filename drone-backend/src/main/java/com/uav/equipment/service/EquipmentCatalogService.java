@@ -1,6 +1,7 @@
 package com.uav.equipment.service;
 
 import com.uav.aircraft.service.AircraftModelService;
+import com.uav.airport.service.AirportService;
 import com.uav.equipment.mapper.*;
 import com.uav.equipment.pojo.dto.ProviderDroneDTO;
 import com.uav.equipment.pojo.entity.ProviderDrone;
@@ -10,27 +11,29 @@ import com.uav.server.exception.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
-import java.util.Locale;
 import java.util.UUID;
 
-/** REQ-SUP-GOV-005 / REQ-PILOT-EXEC-005: platform-owned rental drones registered by admins (ADR-0011). */
+/** REQ-SUP-GOV-005 / REQ-PILOT-EXEC-005: platform-owned rental drones; ADR-0012 binds default airport. */
 @Service
 public class EquipmentCatalogService {
     private final ProviderDroneRepository drones;
     private final AircraftModelService models;
+    private final AirportService airports;
     private final EquipmentViews views;
     private final DroneBorrowRepository borrows;
-    public EquipmentCatalogService(ProviderDroneRepository drones, AircraftModelService models, EquipmentViews views, DroneBorrowRepository borrows) {
-        this.drones = drones; this.models = models; this.views = views; this.borrows = borrows;
+    public EquipmentCatalogService(ProviderDroneRepository drones, AircraftModelService models, AirportService airports,
+                                   EquipmentViews views, DroneBorrowRepository borrows) {
+        this.drones = drones; this.models = models; this.airports = airports; this.views = views; this.borrows = borrows;
     }
     @Transactional
     public ProviderDrone register(ProviderDroneDTO input) {
         models.requireSelectable(input.aircraftModelId());
+        var airport = airports.requireDefault();
         String serial = serial(input);
         if (drones.existsBySerialNumber(serial)) throw EquipmentAccess.conflict("机身号已登记");
         var d = new ProviderDrone(); d.setId(UUID.randomUUID().toString());
-        d.setAircraftModelId(input.aircraftModelId()); d.setSerialNumber(serial); d.setAirportName(input.airportName().trim());
-        d.setLatitude(input.latitude()); d.setLongitude(input.longitude()); d.setCreatedAt(LocalDateTime.now());
+        d.setAircraftModelId(input.aircraftModelId()); d.setSerialNumber(serial);
+        d.setAirportId(airport.getId()); d.setCreatedAt(LocalDateTime.now());
         try { return drones.saveAndFlush(d); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw EquipmentAccess.conflict("机身号已登记"); }
     }
@@ -43,8 +46,9 @@ public class EquipmentCatalogService {
         if (identityChanged && borrows.existsByDroneId(id)) throw EquipmentAccess.conflict("设备已有借还记录，不能更改机身号或机型");
         if (!serial.equals(d.getSerialNumber()) && drones.existsBySerialNumber(serial)) throw EquipmentAccess.conflict("机身号已登记");
         if (!input.aircraftModelId().equals(d.getAircraftModelId())) models.requireSelectable(input.aircraftModelId());
-        d.setSerialNumber(serial); d.setAircraftModelId(input.aircraftModelId()); d.setAirportName(input.airportName().trim());
-        d.setLatitude(input.latitude()); d.setLongitude(input.longitude());
+        d.setSerialNumber(serial); d.setAircraftModelId(input.aircraftModelId());
+        // Airport stays as bound; this version has a single default airport and no reassignment UI.
+        if (d.getAirportId() == null) d.setAirportId(airports.requireDefault().getId());
         try { return drones.saveAndFlush(d); }
         catch (org.springframework.dao.DataIntegrityViolationException e) { throw EquipmentAccess.conflict("机身号已登记"); }
     }

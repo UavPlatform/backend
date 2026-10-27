@@ -24,7 +24,7 @@ class EquipmentIT extends IntegrationTestBase {
         return json.readTree(response).path("data");
     }
     private Map<String, Object> drone(String serial) {
-        return Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "serialNumber", serial, "airportName", "测试机场", "latitude", 28.2, "longitude", 113.0);
+        return Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "serialNumber", serial);
     }
     @Test void providerEndpointsAreGone() throws Exception {
         var admin = accounts().adminLogin();

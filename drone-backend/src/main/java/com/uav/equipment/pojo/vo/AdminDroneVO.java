@@ -2,18 +2,15 @@ package com.uav.equipment.pojo.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** 管理端平台租借无人机行（ADR-0011 / REQ-SUP-GOV-005）。 */
+/** 管理端平台租借无人机行（ADR-0011 / ADR-0012 / REQ-SUP-GOV-005）。 */
 @Schema(description = "管理端平台租借无人机")
 public record AdminDroneVO(
         @Schema(description = "无人机登记 ID") String droneId,
         @Schema(description = "机型（引用 aircraft_model）") Model model,
         @Schema(description = "机身号（全局唯一，大写）") String serialNumber,
-        @Schema(description = "机场名称") String airportName,
-        @Schema(description = "机场纬度") BigDecimal latitude,
-        @Schema(description = "机场经度") BigDecimal longitude,
+        @Schema(description = "所属机场") Airport airport,
         @Schema(description = "是否启用（停用后飞手不可借）") boolean enabled,
         @Schema(description = "借用状态：IN_STOCK 在库，BORROWED 已借出", allowableValues = {"IN_STOCK", "BORROWED"}) String borrowStatus,
         @Schema(description = "当前借用（仅 BORROWED 时有值）", nullable = true) CurrentBorrow currentBorrow,
@@ -25,6 +22,10 @@ public record AdminDroneVO(
     public record Model(@Schema(description = "机型 ID") Long aircraftModelId,
                         @Schema(description = "机型编码") String modelCode,
                         @Schema(description = "机型名称") String displayName) { }
+
+    @Schema(description = "所属机场（坐标在机场实体上，本版登记不暴露）")
+    public record Airport(@Schema(description = "机场 ID") Long airportId,
+                          @Schema(description = "机场名称") String name) { }
 
     @Schema(description = "当前借用")
     public record CurrentBorrow(@Schema(description = "借用记录 ID") String borrowId,

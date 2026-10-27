@@ -99,8 +99,7 @@ class AdminAircraftModelIT extends IntegrationTestBase {
 
         // Disabled model cannot be selected when registering a drone.
         send("POST", auth, "/admin/drones", Map.of(
-                "aircraftModelId", id, "serialNumber", UniqueNames.djiId(),
-                "airportName", "x", "latitude", 28.2, "longitude", 113.0), 400);
+                "aircraftModelId", id, "serialNumber", UniqueNames.djiId()), 400);
 
         // Re-enable and delete unused.
         send("POST", auth, "/admin/aircraft-models/" + id + "/enabled", Map.of("enabled", true), 200);
@@ -118,8 +117,7 @@ class AdminAircraftModelIT extends IntegrationTestBase {
 
         // Referenced by a platform drone.
         send("POST", auth, "/admin/drones", Map.of(
-                "aircraftModelId", id, "serialNumber", UniqueNames.djiId(),
-                "airportName", "机场" + tag, "latitude", 28.2, "longitude", 113.0), 200);
+                "aircraftModelId", id, "serialNumber", UniqueNames.djiId()), 200);
         var blocked = mockMvc.perform(delete("/admin/aircraft-models/" + id).header("Authorization", auth))
                 .andExpect(status().isConflict()).andReturn().getResponse().getContentAsString();
         assertThat(blocked).contains("请改为停用");

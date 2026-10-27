@@ -3,6 +3,8 @@ package com.uav.equipment.service;
 import com.uav.admin.pojo.vo.AdminPageVo;
 import com.uav.aircraft.mapper.AircraftModelRepository;
 import com.uav.aircraft.pojo.entity.AircraftModel;
+import com.uav.airport.mapper.AirportRepository;
+import com.uav.airport.pojo.entity.Airport;
 import com.uav.dispatch.mapper.DispatchOrderRepository;
 import com.uav.equipment.mapper.DroneBorrowRepository;
 import com.uav.equipment.mapper.ProviderDroneRepository;
@@ -25,24 +27,25 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** ADR-0011 / REQ-SUP-GOV-005: admin manages platform-owned rental drones; borrow status + latest order. */
+/** ADR-0011 / ADR-0012 / REQ-SUP-GOV-005: admin manages platform drones; airport is default-bound. */
 @Service
 public class AdminDroneService {
     static final int MAX_SIZE = 100;
     static final int MAX_AIRPORT_LENGTH = 100;
-    /** Stages in which djifly may be connected and the order is being flown (same set as FlightRecordService OPEN_STAGES). */
     public static final Set<String> EXECUTING_STAGES = Set.of("PILOT_ARRIVED", "IN_TRANSIT");
 
     private final ProviderDroneRepository drones;
     private final DroneBorrowRepository borrows;
     private final AircraftModelRepository models;
+    private final AirportRepository airports;
     private final DispatchOrderRepository orders;
     private final UserRepository users;
     private final EquipmentCatalogService catalog;
 
     public AdminDroneService(ProviderDroneRepository drones, DroneBorrowRepository borrows, AircraftModelRepository models,
-                             DispatchOrderRepository orders, UserRepository users, EquipmentCatalogService catalog) {
-        this.drones = drones; this.borrows = borrows; this.models = models;
+                             AirportRepository airports, DispatchOrderRepository orders, UserRepository users,
+                             EquipmentCatalogService catalog) {
+        this.drones = drones; this.borrows = borrows; this.models = models; this.airports = airports;
         this.orders = orders; this.users = users; this.catalog = catalog;
     }
 
@@ -89,10 +92,11 @@ public class AdminDroneService {
     private List<AdminDroneVO> views(List<ProviderDrone> rows) {
         Map<Long, AircraftModel> byModel = models.findAllById(rows.stream().map(ProviderDrone::getAircraftModelId).distinct().toList())
                 .stream().collect(Collectors.toMap(AircraftModel::getId, Function.identity()));
+        Map<Long, Airport> byAirport = airports.findAllById(rows.stream().map(ProviderDrone::getAirportId).distinct().toList())
+                .stream().collect(Collectors.toMap(Airport::getId, Function.identity()));
         Map<String, DroneBorrow> current = borrows.findAllById(rows.stream().map(ProviderDrone::getCurrentBorrowId)
                 .filter(Objects::nonNull).toList()).stream().collect(Collectors.toMap(DroneBorrow::getId, Function.identity()));
         Map<Long, User> pilots = pilots(current.values().stream().map(DroneBorrow::getPilotId).toList());
-        // Serials are stored canonical (SerialNumbers.normalize) on both sides; one batched query each per page.
         List<String> serials = rows.stream().map(ProviderDrone::getSerialNumber).distinct().toList();
         Map<String, com.uav.dispatch.pojo.entity.DispatchOrder> latest = serials.isEmpty() ? Map.of()
                 : orders.latestByExecutedSerials(serials).stream().collect(Collectors.toMap(
@@ -100,13 +104,16 @@ public class AdminDroneService {
         Set<String> executingSerials = serials.isEmpty() ? Set.of() : new HashSet<>(orders.executingSerials(serials, EXECUTING_STAGES));
         return rows.stream().map(d -> {
             AircraftModel m = byModel.get(d.getAircraftModelId());
+            Airport a = byAirport.get(d.getAirportId());
             DroneBorrow b = d.getCurrentBorrowId() == null ? null : current.get(d.getCurrentBorrowId());
             var o = latest.get(d.getSerialNumber());
             var latestOrder = o == null ? null : new AdminDroneVO.LatestOrder(o.getId(), o.getStage(), o.getCreatedAt());
             boolean executing = executingSerials.contains(d.getSerialNumber());
             return new AdminDroneVO(d.getId(),
                     new AdminDroneVO.Model(d.getAircraftModelId(), m == null ? null : m.getModelCode(), m == null ? null : m.getDisplayName()),
-                    d.getSerialNumber(), d.getAirportName(), d.getLatitude(), d.getLongitude(), d.isEnabled(),
+                    d.getSerialNumber(),
+                    new AdminDroneVO.Airport(d.getAirportId(), a == null ? null : a.getName()),
+                    d.isEnabled(),
                     b == null ? "IN_STOCK" : "BORROWED",
                     b == null ? null : new AdminDroneVO.CurrentBorrow(b.getId(), b.getPilotId(), name(pilots.get(b.getPilotId())), b.getBorrowedAt()),
                     executing, latestOrder, d.getCreatedAt());

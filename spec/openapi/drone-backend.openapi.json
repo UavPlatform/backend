@@ -280,9 +280,9 @@
       "AdminDroneVO" : {
         "description" : "管理端平台租借无人机",
         "properties" : {
-          "airportName" : {
-            "description" : "机场名称",
-            "type" : "string"
+          "airport" : {
+            "$ref" : "#/components/schemas/Airport",
+            "description" : "所属机场"
           },
           "borrowStatus" : {
             "description" : "借用状态：IN_STOCK 在库，BORROWED 已借出",
@@ -315,14 +315,6 @@
             "$ref" : "#/components/schemas/LatestOrder",
             "description" : "最近一笔使用本机的派单订单（按 executed_serial_number 匹配）；从未执飞为 null",
             "type" : "null"
-          },
-          "latitude" : {
-            "description" : "机场纬度",
-            "type" : "number"
-          },
-          "longitude" : {
-            "description" : "机场经度",
-            "type" : "number"
           },
           "model" : {
             "$ref" : "#/components/schemas/Model",
@@ -1146,6 +1138,21 @@
           "transportEnabled" : {
             "description" : "是否可承接吊运",
             "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "Airport" : {
+        "description" : "所属机场（坐标在机场实体上，本版登记不暴露）",
+        "properties" : {
+          "airportId" : {
+            "description" : "机场 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "description" : "机场名称",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -2656,28 +2663,13 @@
             "format" : "int64",
             "type" : "integer"
           },
-          "airportName" : {
-            "maxLength" : 100,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "latitude" : {
-            "maximum" : 90,
-            "minimum" : -90,
-            "type" : "number"
-          },
-          "longitude" : {
-            "maximum" : 180,
-            "minimum" : -180,
-            "type" : "number"
-          },
           "serialNumber" : {
             "maxLength" : 128,
             "minLength" : 0,
             "type" : "string"
           }
         },
-        "required" : [ "aircraftModelId", "airportName", "latitude", "longitude", "serialNumber" ],
+        "required" : [ "aircraftModelId", "serialNumber" ],
         "type" : "object"
       },
       "ProviderDronePageVO" : {
@@ -2704,6 +2696,10 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "airportId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
           "airportName" : {
             "type" : "string"
           },
@@ -2721,12 +2717,6 @@
           },
           "enabled" : {
             "type" : "boolean"
-          },
-          "latitude" : {
-            "type" : "number"
-          },
-          "longitude" : {
-            "type" : "number"
           },
           "modelName" : {
             "type" : "string"
@@ -6878,7 +6868,7 @@
     },
     "/admin/drones" : {
       "get" : {
-        "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备。每行含在库/已借出、执飞中与最近订单",
+        "description" : "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备。每行含所属机场名、在库/已借出、执飞中与最近订单",
         "operationId" : "adminListDrones",
         "parameters" : [ {
           "description" : "机场名称，模糊匹配（最长 100 字）",
@@ -6925,7 +6915,7 @@
         "tags" : [ "Admin Drone API" ]
       },
       "post" : {
-        "description" : "机型必选（aircraft_model 中存在且启用）；机身号必填、去空格转大写后全局唯一（重复 409）；机场名称与坐标必填",
+        "description" : "机型必选（aircraft_model 中存在且启用）；机身号必填、去空格转大写后全局唯一（重复 409）；所属机场隐式绑定平台默认机场（ADR-0012），请求体不含机场字段",
         "operationId" : "adminCreateDrone",
         "requestBody" : {
           "content" : {
@@ -6980,7 +6970,7 @@
         "tags" : [ "Admin Drone API" ]
       },
       "put" : {
-        "description" : "机场名称与坐标随时可改；借出期间或已有借还记录后不能更改机身号或机型（409），以保留设备身份历史",
+        "description" : "可改机型与机身号（借出期间或已有借还记录后不能改身份，409）；机场绑定不变（本版无机场管理）",
         "operationId" : "adminUpdateDrone",
         "parameters" : [ {
           "in" : "path",
@@ -12138,7 +12128,7 @@
     "description" : "管理端投诉处理",
     "name" : "Admin Complaint API"
   }, {
-    "description" : "管理端机场/无人机管理（仅管理员；无人机归平台所有）",
+    "description" : "管理端机场/无人机管理（仅管理员；无人机归平台所有，隐式绑定默认机场）",
     "name" : "Admin Drone API"
   }, {
     "description" : "管理端机型管理（仅管理员）",

@@ -28,10 +28,9 @@ class AdminDroneIT extends IntegrationTestBase {
     @Autowired DispatchOrderRepository orders;
     @Autowired WaybillAssessmentRepository assessments;
 
-    private Map<String, Object> drone(String serial, String airport) {
+    private Map<String, Object> drone(String serial) {
         var m = new HashMap<String, Object>();
         m.put("aircraftModelId", fixtures.defaultAircraftModelId()); m.put("serialNumber", serial);
-        m.put("airportName", airport); m.put("latitude", 28.2); m.put("longitude", 113.0);
         return m;
     }
     private JsonNode send(String method, String auth, String path, Object body, int expected) throws Exception {
@@ -57,9 +56,8 @@ class AdminDroneIT extends IntegrationTestBase {
         var admin = accounts().adminLogin(); String auth = admin.authorization();
         var pilot = accounts().registerRider(UniqueNames.userName("adrpilot"), null);
         var owner = accounts().registerUser();
-        String tag = UUID.randomUUID().toString().substring(0, 8);
         String serial = UniqueNames.djiId();
-        var created = send("POST", auth, "/admin/drones", drone(" " + serial.toLowerCase(Locale.ROOT) + " ", "岳麓机场" + tag), 200);
+        var created = send("POST", auth, "/admin/drones", drone(" " + serial.toLowerCase(Locale.ROOT) + " "), 200);
         String id = created.path("droneId").asText();
         // Registration stores the canonical form (SerialNumbers.normalize); orders below use the stored value.
         String stored = created.path("serialNumber").asText();
@@ -68,22 +66,29 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(created.path("executing").asBoolean()).isFalse();
         assertThat(created.path("latestOrder").isNull()).isTrue();
         assertThat(created.path("model").path("aircraftModelId").asLong()).isEqualTo(fixtures.defaultAircraftModelId());
+        assertThat(created.path("airport").path("airportId").asLong()).isEqualTo(1L);
+        assertThat(created.path("airport").path("name").asText()).isEqualTo("默认机场");
         assertThat(created.has("provider")).isFalse();
+        assertThat(created.has("latitude")).isFalse();
+        assertThat(created.has("longitude")).isFalse();
+        assertThat(created.has("airportName")).isFalse();
 
         // Duplicate serial (case/whitespace-insensitive) is rejected.
-        send("POST", auth, "/admin/drones", drone(serial, "x"), 409);
+        send("POST", auth, "/admin/drones", drone(serial), 409);
         // Required fields / format.
-        var noModel = drone(UniqueNames.djiId(), "x"); noModel.remove("aircraftModelId");
+        var noModel = drone(UniqueNames.djiId()); noModel.remove("aircraftModelId");
         send("POST", auth, "/admin/drones", noModel, 400);
-        send("POST", auth, "/admin/drones", drone("   ", "x"), 400);
-        var badLat = drone(UniqueNames.djiId(), "x"); badLat.put("latitude", 91);
-        send("POST", auth, "/admin/drones", badLat, 400);
-        var missingModel = drone(UniqueNames.djiId(), "x"); missingModel.put("aircraftModelId", 987654321L);
+        send("POST", auth, "/admin/drones", drone("   "), 400);
+        var missingModel = drone(UniqueNames.djiId()); missingModel.put("aircraftModelId", 987654321L);
         send("POST", auth, "/admin/drones", missingModel, 400);
 
-        // Edit airport.
-        var edit = drone(serial, "橘子洲机场" + tag);
-        assertThat(send("PUT", auth, "/admin/drones/" + id, edit, 200).path("airportName").asText()).isEqualTo("橘子洲机场" + tag);
+        // Edit serial/model identity when in stock; airport stays default-bound.
+        var edit = drone(serial);
+        var edited = send("PUT", auth, "/admin/drones/" + id, edit, 200);
+        assertThat(edited.path("airport").path("airportId").asLong()).isEqualTo(1L);
+        assertThat(edited.path("airport").path("name").asText()).isEqualTo("默认机场");
+        assertThat(edited.has("airportName")).isFalse();
+        assertThat(edited.has("latitude")).isFalse();
         send("PUT", auth, "/admin/drones/not-a-drone", edit, 404);
 
         // Pilot borrows: list shows BORROWED with pilot and time.
@@ -93,8 +98,8 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(row.path("currentBorrow").path("pilotId").asLong()).isEqualTo(pilot.id());
         assertThat(row.path("currentBorrow").path("pilotName").asText()).isNotBlank();
         assertThat(row.path("currentBorrow").path("borrowedAt").isNull()).isFalse();
-        // Identity cannot change while borrowed; airport still can.
-        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId(), "x"), 409);
+        // Identity cannot change while borrowed.
+        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId()), 409);
 
         // Orders flown with this serial: latest one wins; only PILOT_ARRIVED / IN_TRANSIT mark executing.
         LocalDateTime base = LocalDateTime.of(2031, 5, 1, 8, 0);
@@ -130,20 +135,19 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(history.path("content").get(0).path("pilotId").asLong()).isEqualTo(pilot.id());
         send("GET", auth, "/admin/drones/nope/borrows", null, 404);
         // Identity is frozen once borrow history exists.
-        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId(), "x"), 409);
+        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId()), 409);
 
-        // List with airport filter, LIKE wildcards escaped.
-        var list = send("GET", auth, "/admin/drones?airportName=" + "橘子洲机场" + tag, null, 200);
-        assertThat(list.path("totalElements").asLong()).isEqualTo(1);
-        assertThat(list.path("content").get(0).path("droneId").asText()).isEqualTo(id);
+        // List with airport-name filter (matches seed 默认机场), LIKE wildcards escaped.
+        var list = send("GET", auth, "/admin/drones?airportName=" + "默认机场", null, 200);
+        assertThat(list.path("content").toString()).contains(id);
         assertThat(send("GET", auth, "/admin/drones?size=500", null, 200).path("size").asInt()).isEqualTo(100);
-        assertThat(send("GET", auth, "/admin/drones?airportName=100%25_" + tag, null, 200).path("totalElements").asLong()).isZero();
+        assertThat(send("GET", auth, "/admin/drones?airportName=100%25_none", null, 200).path("totalElements").asLong()).isZero();
     }
 
     @Test void pilotArrivedCountsAsExecutingButDeliveryConfirmationDoesNot() throws Exception {
         var admin = accounts().adminLogin(); var owner = accounts().registerUser();
-        String a = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId(), "x"), 200).path("serialNumber").asText();
-        String b = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId(), "x"), 200).path("serialNumber").asText();
+        String a = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId()), 200).path("serialNumber").asText();
+        String b = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId()), 200).path("serialNumber").asText();
         order(owner.id(), a, "PILOT_ARRIVED", LocalDateTime.of(2031, 6, 1, 8, 0));
         order(owner.id(), b, "DELIVERY_CONFIRMATION", LocalDateTime.of(2031, 6, 1, 8, 0));
         var rows = send("GET", admin.authorization(), "/admin/drones?size=100", null, 200).path("content");

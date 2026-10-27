@@ -44,8 +44,7 @@ class AdminDroneFlightIT extends IntegrationTestBase {
         var admin = accounts().adminLogin(); var owner = accounts().registerUser();
         var pilot = accounts().registerRider(UniqueNames.userName("adrflight"), null);
         String serial = UniqueNames.djiId().toUpperCase(Locale.ROOT);
-        String droneId = send(admin.token(), "/admin/drones", Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "serialNumber", serial,
-                "airportName", "测试机场", "latitude", 28.2, "longitude", 113.0), 200).path("droneId").asText();
+        String droneId = send(admin.token(), "/admin/drones", Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "serialNumber", serial), 200).path("droneId").asText();
         assertThat(read(admin.token(), "/admin/drones/" + droneId).path("latestOrder").isNull()).isTrue();
 
         String orderId = arrivedOrder(owner, pilot);

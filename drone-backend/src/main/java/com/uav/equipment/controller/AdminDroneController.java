@@ -14,8 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-/** ADR-0011 / REQ-SUP-GOV-005: 管理员登记、编辑、启停平台租借无人机，查看借用状态、最近订单与借还记录。 */
-@Tag(name = "Admin Drone API", description = "管理端机场/无人机管理（仅管理员；无人机归平台所有）")
+/** ADR-0011 / ADR-0012 / REQ-SUP-GOV-005: admin drone CRUD; airport is seeded default (no airport admin UI). */
+@Tag(name = "Admin Drone API", description = "管理端机场/无人机管理（仅管理员；无人机归平台所有，隐式绑定默认机场）")
 @RestController
 @RequestMapping("/admin/drones")
 @RequireRole(2)
@@ -25,7 +25,7 @@ public class AdminDroneController {
     public AdminDroneController(AdminDroneService service) { this.service = service; }
 
     @Operation(operationId = "adminListDrones", summary = "无人机分页列表",
-            description = "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备。每行含在库/已借出、执飞中与最近订单")
+            description = "按登记时间倒序；page 从 0 起，size 上限 100；含已停用设备。每行含所属机场名、在库/已借出、执飞中与最近订单")
     @GetMapping
     public Result<AdminPageVo<AdminDroneVO>> list(
             @Parameter(description = "页码（从 0 起）") @RequestParam(defaultValue = "0") int page,
@@ -35,7 +35,7 @@ public class AdminDroneController {
     }
 
     @Operation(operationId = "adminCreateDrone", summary = "登记无人机",
-            description = "机型必选（aircraft_model 中存在且启用）；机身号必填、去空格转大写后全局唯一（重复 409）；机场名称与坐标必填")
+            description = "机型必选（aircraft_model 中存在且启用）；机身号必填、去空格转大写后全局唯一（重复 409）；所属机场隐式绑定平台默认机场（ADR-0012），请求体不含机场字段")
     @PostMapping
     public Result<AdminDroneVO> create(@Valid @RequestBody ProviderDroneDTO input) {
         return Result.success(service.create(input));
@@ -48,7 +48,7 @@ public class AdminDroneController {
     }
 
     @Operation(operationId = "adminUpdateDrone", summary = "编辑无人机",
-            description = "机场名称与坐标随时可改；借出期间或已有借还记录后不能更改机身号或机型（409），以保留设备身份历史")
+            description = "可改机型与机身号（借出期间或已有借还记录后不能改身份，409）；机场绑定不变（本版无机场管理）")
     @PutMapping("/{droneId}")
     public Result<AdminDroneVO> update(@PathVariable String droneId, @Valid @RequestBody ProviderDroneDTO input) {
         return Result.success(service.update(droneId, input));

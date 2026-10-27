@@ -35,7 +35,7 @@ class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
         try (var client = HttpClient.newHttpClient()) {
             String token = admin.token();
             String id = send(client, token, "/admin/drones", Map.of("aircraftModelId", fixtures.defaultAircraftModelId(),
-                    "serialNumber", UniqueNames.djiId(), "airportName", "测试机场", "latitude", 28.2, "longitude", 113.0)).path("droneId").asText();
+                    "serialNumber", UniqueNames.djiId())).path("droneId").asText();
             var inputA = Map.of("droneId", id, "requestKey", UUID.randomUUID().toString());
             var inputB = Map.of("droneId", id, "requestKey", UUID.randomUUID().toString());
             var first = client.sendAsync(request(a.token(), "/equipment/pilot/borrows", inputA), HttpResponse.BodyHandlers.ofString());

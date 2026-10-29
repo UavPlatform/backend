@@ -49,6 +49,20 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 30
+      # V24 历史回填与空库迁移使用独立实例，避免污染既有 E2E 数据库。
+      timeline-mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: timeline-ci-only
+          MYSQL_DATABASE: timeline_v24
+          TZ: Asia/Shanghai
+        ports:
+          - 13316:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
 
     steps:
       - name: Checkout repository
@@ -61,6 +75,15 @@ jobs:
           java-version: "21"
           cache: maven
 
+      - name: Prepare isolated timeline migration databases
+        env:
+          TIMELINE_CONTAINER: ${{ job.services.timeline-mysql.id }}
+          MYSQL_PWD: timeline-ci-only
+        run: |
+          set -euo pipefail
+          docker exec -e MYSQL_PWD "$TIMELINE_CONTAINER" \
+            mysql --user=root --execute='CREATE DATABASE timeline_full'
+
       - name: Run unit + integration + E2E tests (mvnw clean verify)
         working-directory: ./drone-backend
         env:
@@ -69,6 +92,9 @@ jobs:
           T4_DB_NAME: drone_ci
           T4_DB_USER: drone_ci
           T4_DB_PASSWORD: ci-only-password
+          TIMELINE_MYSQL_URL: jdbc:mysql://127.0.0.1:13316/timeline_v24
+          TIMELINE_MYSQL_FULL_URL: jdbc:mysql://127.0.0.1:13316/timeline_full
+          TIMELINE_MYSQL_PASSWORD: timeline-ci-only
         run: sh mvnw -B clean verify
 
       - name: Assert tests actually ran (no zero-run, no skips)

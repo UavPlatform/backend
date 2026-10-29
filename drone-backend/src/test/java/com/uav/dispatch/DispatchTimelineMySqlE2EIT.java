@@ -17,15 +17,18 @@ class DispatchTimelineMySqlE2EIT extends RealProtocolTestBase {
     }
 
     @Test void historicalBackfillUsesTheSameVerifiedEventsOnMySql() throws Exception {
-        TimelineMigrationFixture.verify(isolatedUrl("TIMELINE_MYSQL_URL"), "root");
+        TimelineMigrationFixture.verify(isolatedUrl("TIMELINE_MYSQL_URL"), "root", password());
     }
 
     @Test void allMigrationsRunOnAnEmptyMySqlDatabase() {
-        var flyway = Flyway.configure().dataSource(isolatedUrl("TIMELINE_MYSQL_FULL_URL"), "root", "")
+        var flyway = Flyway.configure().dataSource(isolatedUrl("TIMELINE_MYSQL_FULL_URL"), "root", password())
                 .locations("classpath:db/migration").load();
         var result = flyway.migrate();
         assertThat(result.success).isTrue();
         assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("24");
         assertThat(flyway.info().pending()).isEmpty();
+    }
+    private String password() {
+        return System.getenv().getOrDefault("TIMELINE_MYSQL_PASSWORD", "");
     }
 }

@@ -10,7 +10,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 public final class TimelineMigrationFixture {
     private TimelineMigrationFixture() { }
     public static void verify(String url, String user) throws Exception {
-        try (var connection = DriverManager.getConnection(url, user, "")) {
+        verify(url, user, "");
+    }
+    public static void verify(String url, String user, String password) throws Exception {
+        try (var connection = DriverManager.getConnection(url, user, password)) {
             try (var sql = connection.createStatement()) {
                 sql.execute("CREATE TABLE dispatch_order (id VARCHAR(36) PRIMARY KEY, user_id BIGINT, assignment_version BIGINT, "
                         + "assigned_pilot_id BIGINT, payment_reference VARCHAR(64), created_at TIMESTAMP(6), updated_at TIMESTAMP(6), nearby_waiting_since TIMESTAMP(6))");
@@ -33,7 +36,7 @@ public final class TimelineMigrationFixture {
                         + "('second',2,8,'2026-10-24 15:00:00',NULL,NULL,NULL),"
                         + "('released',1,7,'2026-10-24 12:00:00','2026-10-24 13:00:00','2026-10-24 14:00:00','PILOT_RELEASED')");
             }
-            var result = Flyway.configure().dataSource(url, user, "").locations("filesystem:src/main/resources/db/migration")
+            var result = Flyway.configure().dataSource(url, user, password).locations("filesystem:src/main/resources/db/migration")
                     .baselineOnMigrate(true).baselineVersion("23").load().migrate();
             assertThat(result.migrationsExecuted).isEqualTo(1);
             assertTime(connection, "first", "deposit_paid_at", "2026-10-24T11:00:00");

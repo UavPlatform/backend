@@ -4,3 +4,9 @@ drone-backend/.localdb/
 __pycache__/
 *.pyc
 .claude/settings.local.json
+
+# IT runtime
+tools/it/.backend.pid
+tools/it/backend.log
+tools/it/.env
+

@@ -56,13 +56,15 @@ public class DispatchMatchingService {
         order.setAssignedPilotId(pilot);
         order.setAssignmentVersion(order.getAssignmentVersion() + 1);
         order.setStage("PILOT_PREPARING");
-        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
         DispatchAssignment assignment = new DispatchAssignment();
         assignment.setOrderId(id);
         assignment.setPilotId(pilot);
         assignment.setAssignmentVersion(order.getAssignmentVersion());
         assignment.setOfferRevision(offerRevision);
         assignment.setAcceptedAt(order.getUpdatedAt());
+        order.setAcceptedAt(assignment.getAcceptedAt());
+        order.setArrivedAt(null);
         notifications.owner(order, "CLAIMED", "飞手已接单", "飞手正在准备前往起点，请保持联系人电话畅通。");
         assignments.save(assignment);
         return DispatchOrderViews.view(orders.saveAndFlush(order));
@@ -74,7 +76,8 @@ public class DispatchMatchingService {
         if (order.getStage().equals("PILOT_ARRIVED")) return DispatchOrderViews.view(order);
         if (!order.getStage().equals("PILOT_PREPARING")) throw stale();
         var assignment = assignments.findByOrderIdAndAssignmentVersion(id, version).orElseThrow(this::stale);
-        assignment.setArrivedAt(LocalDateTime.now());
+        assignment.setArrivedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        order.setArrivedAt(assignment.getArrivedAt());
         assignments.save(assignment);
         order.setStage("PILOT_ARRIVED");
         order.setUpdatedAt(assignment.getArrivedAt());
@@ -91,13 +94,16 @@ public class DispatchMatchingService {
         requireAssignment(order, pilot, version);
         if (!List.of("PILOT_PREPARING", "PILOT_ARRIVED").contains(order.getStage()) || assignment.getEndedAt() != null) throw stale();
         flight.closeOrder(id, "PILOT_RELEASED");
-        assignment.setEndedAt(LocalDateTime.now());
+        assignment.setEndedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
         assignment.setEndReason("PILOT_RELEASED");
         assignments.save(assignment);
         notifications.owner(order, "REDISPATCHED", "飞手已取消，重新派单中", "本单已返回大厅，已付定金保持不变。");
         order.setAssignedPilotId(null);
         order.setStage("WAITING_ACCEPTANCE");
-        order.setNearbyWaitingSince(LocalDateTime.now());
+        order.setAcceptedAt(null);
+        order.setArrivedAt(null);
+        order.setWaitingSince(assignment.getEndedAt());
+        order.setNearbyWaitingSince(assignment.getEndedAt());
         order.setUpdatedAt(assignment.getEndedAt());
         orders.saveAndFlush(order);
     }

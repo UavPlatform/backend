@@ -5,13 +5,14 @@ import lombok.Getter;
 import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.uav.server.persistence.AuditedEntity;
 
 /** REQ-SHIP-PUB-003: separate dispatch state and deposit state; never an old quoted order. */
 @Entity
 @Table(name = "dispatch_order", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "request_key"}))
 @Getter
 @Setter
-public class DispatchOrder {
+public class DispatchOrder extends AuditedEntity {
     @Id @Column(length = 36) private String id;
     @Version private Long revision;
     @Column(nullable = false) private Long userId;
@@ -25,8 +26,10 @@ public class DispatchOrder {
     @Column(nullable = false, length = 32) private String fundsStatus;
     @Column(length = 64) private String paymentReference;
     @Column(length = 64) private String refundReference;
-    @Column(nullable = false) private LocalDateTime createdAt;
-    @Column(nullable = false) private LocalDateTime updatedAt;
+    @Column private LocalDateTime depositPaidAt;
+    @Column private LocalDateTime waitingSince;
+    @Column private LocalDateTime acceptedAt;
+    @Column private LocalDateTime arrivedAt;
     @Column private LocalDateTime nearbyWaitingSince;
     @Column private Long assignedPilotId;
     @Column(nullable = false) private long assignmentVersion;

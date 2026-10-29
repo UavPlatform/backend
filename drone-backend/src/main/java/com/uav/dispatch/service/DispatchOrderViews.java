@@ -24,6 +24,7 @@ final class DispatchOrderViews {
                         order.getReviewScore(), order.getReviewComment()),
                 order.getStartedAt(), order.getDeliveredAt(), order.getReceiptAt(),
                 order.getExecutedSerialNumber() == null ? null : new DispatchExecutedDroneVO(order.getExecutedSerialNumber(),
-                        order.getExecutedModelCode(), order.getExecutedModelName(), order.getExecutedAircraftModelId()));
+                        order.getExecutedModelCode(), order.getExecutedModelName(), order.getExecutedAircraftModelId()),
+                order.getDepositPaidAt(), order.getWaitingSince(), order.getAcceptedAt(), order.getArrivedAt());
     }
 }

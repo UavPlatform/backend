@@ -80,8 +80,6 @@ public class DispatchOrderService {
         order.setPilotServiceFee(quote.pilotServiceFee());
         order.setStage("AWAITING_DEPOSIT");
         order.setFundsStatus("UNPAID");
-        order.setCreatedAt(LocalDateTime.now());
-        order.setUpdatedAt(order.getCreatedAt());
         notifications.changed(order);
         return view(orders.saveAndFlush(order));
     }
@@ -109,7 +107,10 @@ public class DispatchOrderService {
         order.setPaymentReference("sim-pay-" + order.getId());
         order.setFundsStatus("PAID");
         order.setStage("WAITING_ACCEPTANCE");
-        order.setNearbyWaitingSince(LocalDateTime.now());
+        var paidAt = LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        order.setDepositPaidAt(paidAt);
+        order.setWaitingSince(paidAt);
+        order.setNearbyWaitingSince(paidAt);
         notifications.owner(order, "DEPOSIT_PAID", "定金模拟支付成功", "订单已进入大厅等待接单，无真实资金变动。");
         order.setUpdatedAt(LocalDateTime.now());
         return view(orders.saveAndFlush(order));

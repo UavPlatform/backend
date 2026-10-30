@@ -1724,6 +1724,14 @@
       },
       "DispatchOrderVO" : {
         "properties" : {
+          "acceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "arrivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "assignedPilotId" : {
             "format" : "int64",
             "type" : "integer"
@@ -1748,6 +1756,10 @@
           },
           "depositAmount" : {
             "type" : "number"
+          },
+          "depositPaidAt" : {
+            "format" : "date-time",
+            "type" : "string"
           },
           "executedDrone" : {
             "$ref" : "#/components/schemas/DispatchExecutedDroneVO"
@@ -1788,6 +1800,10 @@
             "type" : "string"
           },
           "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "waitingSince" : {
             "format" : "date-time",
             "type" : "string"
           }

@@ -6,12 +6,14 @@ import com.uav.server.exception.BusinessException;
 import com.uav.server.exception.PayNotifyException;
 import com.uav.server.exception.UnauthorizedException;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,6 +21,13 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /** REQ-ALL-XC-004: the container owns an unusable async response; never write JSON to it. */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncResponseNotUsable(AsyncRequestNotUsableException e, HttpServletResponse response) {
+        // Resolving the response parameter marks this exception handled without a return body.
+        log.debug("异步响应已不可用，结束连接: {}", e.getClass().getSimpleName());
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Result<Void>> handleValidation(MethodArgumentNotValidException e) {

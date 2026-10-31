@@ -45,3 +45,12 @@ logging:
 dispatch:
   nearby:
     scheduler-enabled: false
+
+# CORS IT：显式列出断言用 Origin（含通配与本地）
+cors:
+  allowed-origin-patterns:
+    - http://localhost:5173
+    - http://127.0.0.1:5173
+    - http://localhost:4173
+    - http://127.0.0.1:4173
+    - https://*.fuwaki.icu

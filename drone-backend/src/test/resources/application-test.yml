@@ -36,3 +36,12 @@ logging:
   level:
     root: warn
     com.uav: info
+
+# Shared jdbc:h2:mem:drone_backend_test is visible across Spring contexts in one JVM.
+# RealProtocol E2E tests commit WAITING_ACCEPTANCE+PAID dispatch orders; if this scheduler
+# stays on (matchIfMissing=true), its 5s scan prepares statements on every IntegrationTestBase
+# SessionFactory and flakes Hibernate Statistics assertions (e.g. RiderMyTasksViewIT N+1).
+# Nearby ITs that need the job call DispatchNearbyService.process directly and already set false.
+dispatch:
+  nearby:
+    scheduler-enabled: false

@@ -212,6 +212,10 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
     @Test
     @DisplayName("列表批量装配：SQL 语句数与列表长度无关（无 N+1）")
     void listAssemblyHasNoNPlusOne() throws Exception {
+        // Counts SessionFactory prepareStatementCount for one MockMvc call. Background
+        // @Scheduled jobs that hit the shared H2 (see application-test.yml
+        // dispatch.nearby.scheduler-enabled=false) would otherwise inflate the tally and
+        // flake this assertion after dispatch E2E tests leave WAITING_ACCEPTANCE rows.
         TestAccounts.Account owner = accounts().registerUser();
         TestAccounts.Account rider = accounts().registerRider();
         fixtures.bindDrone(rider.id(), UniqueNames.djiId(), fc30());
@@ -228,13 +232,19 @@ class RiderMyTasksViewIT extends IntegrationTestBase {
                 taskService.riderConfirmOrder(more.getTaskNum(), rider.id());
             }
             long withFour = statementsFor("/rider/my-tasks/history", rider, stats, 4);
-            assertThat(withFour).as("1 单 %d 条 SQL，4 单不应更多", withOne).isEqualTo(withOne);
+            assertThat(withFour)
+                    .as("history: 1 单 %d 条 SQL，4 单不应更多（queries=%d）",
+                            withOne, stats.getQueryExecutionCount())
+                    .isEqualTo(withOne);
 
             long activeWithFour = statementsFor("/rider/my-tasks", rider, stats, 4);
             Task applying = publish(accounts().registerUser());
             taskApplicationService.apply(applying.getTaskNum(), rider.id(), fc30());
-            assertThat(statementsFor("/rider/my-tasks", rider, stats, 5))
-                    .as("进行中多一张应征中卡片不应多出 SQL").isEqualTo(activeWithFour);
+            long activeWithApplying = statementsFor("/rider/my-tasks", rider, stats, 5);
+            assertThat(activeWithApplying)
+                    .as("进行中多一张应征中卡片不应多出 SQL（baseline=%d, queries=%d）",
+                            activeWithFour, stats.getQueryExecutionCount())
+                    .isEqualTo(activeWithFour);
         } finally {
             stats.setStatisticsEnabled(wasEnabled);
         }

@@ -28,10 +28,23 @@ class AdminDroneIT extends IntegrationTestBase {
     @Autowired DispatchOrderRepository orders;
     @Autowired WaybillAssessmentRepository assessments;
 
-    private Map<String, Object> drone(String serial) {
+    /** Dedicated model — shared H2 default FC30 stock is polluted by other IT classes. */
+    private long newModel(String auth) throws Exception {
+        String code = UniqueNames.unique("ADM").replace('_', 'X');
+        return send("POST", auth, "/admin/aircraft-models", Map.of(
+                "modelCode", code, "displayName", "管理测-" + code,
+                "maxPayloadKg", new BigDecimal("10.00"), "transportEnabled", true), 200).path("id").asLong();
+    }
+    private Map<String, Object> drone(long modelId, String serial) {
         var m = new HashMap<String, Object>();
-        m.put("aircraftModelId", fixtures.defaultAircraftModelId()); m.put("serialNumber", serial);
+        m.put("aircraftModelId", modelId); m.put("serialNumber", serial);
         return m;
+    }
+    private JsonNode loanOut(String adminAuth, String pilotAuth, long modelId, String droneId) throws Exception {
+        var pending = send("POST", pilotAuth, "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", modelId, "requestKey", UUID.randomUUID().toString()), 200);
+        return send("POST", adminAuth, "/admin/borrow-applications/" + pending.path("borrowId").asText() + "/approve",
+                Map.of("droneId", droneId), 200);
     }
     private JsonNode send(String method, String auth, String path, Object body, int expected) throws Exception {
         var req = request(org.springframework.http.HttpMethod.valueOf(method), path).header("Authorization", auth);
@@ -56,8 +69,9 @@ class AdminDroneIT extends IntegrationTestBase {
         var admin = accounts().adminLogin(); String auth = admin.authorization();
         var pilot = accounts().registerRider(UniqueNames.userName("adrpilot"), null);
         var owner = accounts().registerUser();
+        long modelId = newModel(auth);
         String serial = UniqueNames.djiId();
-        var created = send("POST", auth, "/admin/drones", drone(" " + serial.toLowerCase(Locale.ROOT) + " "), 200);
+        var created = send("POST", auth, "/admin/drones", drone(modelId, " " + serial.toLowerCase(Locale.ROOT) + " "), 200);
         String id = created.path("droneId").asText();
         // Registration stores the canonical form (SerialNumbers.normalize); orders below use the stored value.
         String stored = created.path("serialNumber").asText();
@@ -65,7 +79,7 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(created.path("borrowStatus").asText()).isEqualTo("IN_STOCK");
         assertThat(created.path("executing").asBoolean()).isFalse();
         assertThat(created.path("latestOrder").isNull()).isTrue();
-        assertThat(created.path("model").path("aircraftModelId").asLong()).isEqualTo(fixtures.defaultAircraftModelId());
+        assertThat(created.path("model").path("aircraftModelId").asLong()).isEqualTo(modelId);
         assertThat(created.path("airport").path("airportId").asLong()).isEqualTo(1L);
         assertThat(created.path("airport").path("name").asText()).isEqualTo("默认机场");
         assertThat(created.has("provider")).isFalse();
@@ -74,16 +88,16 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(created.has("airportName")).isFalse();
 
         // Duplicate serial (case/whitespace-insensitive) is rejected.
-        send("POST", auth, "/admin/drones", drone(serial), 409);
+        send("POST", auth, "/admin/drones", drone(modelId, serial), 409);
         // Required fields / format.
-        var noModel = drone(UniqueNames.djiId()); noModel.remove("aircraftModelId");
+        var noModel = drone(modelId, UniqueNames.djiId()); noModel.remove("aircraftModelId");
         send("POST", auth, "/admin/drones", noModel, 400);
-        send("POST", auth, "/admin/drones", drone("   "), 400);
-        var missingModel = drone(UniqueNames.djiId()); missingModel.put("aircraftModelId", 987654321L);
+        send("POST", auth, "/admin/drones", drone(modelId, "   "), 400);
+        var missingModel = drone(modelId, UniqueNames.djiId()); missingModel.put("aircraftModelId", 987654321L);
         send("POST", auth, "/admin/drones", missingModel, 400);
 
         // Edit serial/model identity when in stock; airport stays default-bound.
-        var edit = drone(serial);
+        var edit = drone(modelId, serial);
         var edited = send("PUT", auth, "/admin/drones/" + id, edit, 200);
         assertThat(edited.path("airport").path("airportId").asLong()).isEqualTo(1L);
         assertThat(edited.path("airport").path("name").asText()).isEqualTo("默认机场");
@@ -91,15 +105,15 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(edited.has("latitude")).isFalse();
         send("PUT", auth, "/admin/drones/not-a-drone", edit, 404);
 
-        // Pilot borrows: list shows BORROWED with pilot and time.
-        var loan = send("POST", pilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 200);
+        // Pilot applies + admin assigns SN: list shows BORROWED with pilot and time.
+        var loan = loanOut(auth, pilot.authorization(), modelId, id);
         var row = send("GET", auth, "/admin/drones/" + id, null, 200);
         assertThat(row.path("borrowStatus").asText()).isEqualTo("BORROWED");
         assertThat(row.path("currentBorrow").path("pilotId").asLong()).isEqualTo(pilot.id());
         assertThat(row.path("currentBorrow").path("pilotName").asText()).isNotBlank();
         assertThat(row.path("currentBorrow").path("borrowedAt").isNull()).isFalse();
         // Identity cannot change while borrowed.
-        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId()), 409);
+        send("PUT", auth, "/admin/drones/" + id, drone(modelId, UniqueNames.djiId()), 409);
 
         // Orders flown with this serial: latest one wins; only PILOT_ARRIVED / IN_TRANSIT mark executing.
         LocalDateTime base = LocalDateTime.of(2031, 5, 1, 8, 0);
@@ -124,8 +138,11 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(disabled.path("borrowStatus").asText()).isEqualTo("BORROWED");
         var otherPilot = accounts().registerRider(UniqueNames.userName("adrother"), null);
         send("POST", pilot.authorization(), "/equipment/pilot/borrows/" + loan.path("borrowId").asText() + "/return", Map.of(), 200);
-        send("POST", pilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
-        send("POST", otherPilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
+        // Only this dedicated model's airframe remains and it is disabled → apply 409.
+        send("POST", pilot.authorization(), "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", modelId, "requestKey", UUID.randomUUID().toString()), 409);
+        send("POST", otherPilot.authorization(), "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", modelId, "requestKey", UUID.randomUUID().toString()), 409);
         assertThat(send("GET", auth, "/admin/drones/" + id, null, 200).path("borrowStatus").asText()).isEqualTo("IN_STOCK");
 
         // Borrow history.
@@ -135,7 +152,7 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(history.path("content").get(0).path("pilotId").asLong()).isEqualTo(pilot.id());
         send("GET", auth, "/admin/drones/nope/borrows", null, 404);
         // Identity is frozen once borrow history exists.
-        send("PUT", auth, "/admin/drones/" + id, drone(UniqueNames.djiId()), 409);
+        send("PUT", auth, "/admin/drones/" + id, drone(modelId, UniqueNames.djiId()), 409);
 
         // List with airport-name filter (matches seed 默认机场), LIKE wildcards escaped.
         var list = send("GET", auth, "/admin/drones?airportName=" + "默认机场", null, 200);
@@ -146,8 +163,9 @@ class AdminDroneIT extends IntegrationTestBase {
 
     @Test void pilotArrivedCountsAsExecutingButDeliveryConfirmationDoesNot() throws Exception {
         var admin = accounts().adminLogin(); var owner = accounts().registerUser();
-        String a = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId()), 200).path("serialNumber").asText();
-        String b = send("POST", admin.authorization(), "/admin/drones", drone(UniqueNames.djiId()), 200).path("serialNumber").asText();
+        long modelId = newModel(admin.authorization());
+        String a = send("POST", admin.authorization(), "/admin/drones", drone(modelId, UniqueNames.djiId()), 200).path("serialNumber").asText();
+        String b = send("POST", admin.authorization(), "/admin/drones", drone(modelId, UniqueNames.djiId()), 200).path("serialNumber").asText();
         order(owner.id(), a, "PILOT_ARRIVED", LocalDateTime.of(2031, 6, 1, 8, 0));
         order(owner.id(), b, "DELIVERY_CONFIRMATION", LocalDateTime.of(2031, 6, 1, 8, 0));
         var rows = send("GET", admin.authorization(), "/admin/drones?size=100", null, 200).path("content");

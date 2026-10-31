@@ -67,6 +67,78 @@
         },
         "type" : "object"
       },
+      "AdminBorrowApplicationVO" : {
+        "description" : "管理端借机申请",
+        "properties" : {
+          "aircraftModelId" : {
+            "description" : "申请机型 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "appliedAt" : {
+            "description" : "申请时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "borrowId" : {
+            "description" : "申请/借用 ID",
+            "type" : "string"
+          },
+          "borrowedAt" : {
+            "description" : "借出时间",
+            "format" : "date-time",
+            "type" : [ "null", "string" ]
+          },
+          "droneId" : {
+            "description" : "出借机身（通过后）",
+            "type" : [ "null", "string" ]
+          },
+          "inStockCount" : {
+            "description" : "该机型当前在库启用飞机数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelName" : {
+            "description" : "申请机型名称",
+            "type" : "string"
+          },
+          "orderId" : {
+            "description" : "可选关联订单 ID",
+            "type" : [ "null", "string" ]
+          },
+          "pilotHasActiveLoan" : {
+            "description" : "飞手当前是否已有已借出飞机（特批参考）",
+            "type" : "boolean"
+          },
+          "pilotId" : {
+            "description" : "飞手 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pilotName" : {
+            "description" : "飞手用户名",
+            "type" : "string"
+          },
+          "rejectReason" : {
+            "description" : "驳回原因",
+            "type" : [ "null", "string" ]
+          },
+          "returnedAt" : {
+            "description" : "归还时间",
+            "format" : "date-time",
+            "type" : [ "null", "string" ]
+          },
+          "serialNumber" : {
+            "description" : "机身号（通过后）",
+            "type" : [ "null", "string" ]
+          },
+          "status" : {
+            "description" : "状态 PENDING/APPROVED/REJECTED/RETURNED",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AdminDispatchOrderAssignment" : {
         "description" : "派单（接单）记录，每次重新派单 assignmentVersion 递增",
         "properties" : {
@@ -247,18 +319,23 @@
       "AdminDroneBorrowVO" : {
         "description" : "管理端无人机借还记录",
         "properties" : {
+          "appliedAt" : {
+            "description" : "申请时间",
+            "format" : "date-time",
+            "type" : "string"
+          },
           "borrowId" : {
             "description" : "借用记录 ID",
             "type" : "string"
           },
           "borrowedAt" : {
-            "description" : "借出时间",
+            "description" : "借出时间；待审批/驳回为 null",
             "format" : "date-time",
-            "type" : "string"
+            "type" : [ "null", "string" ]
           },
           "droneId" : {
             "description" : "无人机登记 ID",
-            "type" : "string"
+            "type" : [ "null", "string" ]
           },
           "pilotId" : {
             "description" : "借用飞手 ID",
@@ -269,10 +346,18 @@
             "description" : "借用飞手用户名",
             "type" : "string"
           },
+          "rejectReason" : {
+            "description" : "驳回原因",
+            "type" : [ "null", "string" ]
+          },
           "returnedAt" : {
             "description" : "归还时间；未归还为 null",
             "format" : "date-time",
             "type" : [ "null", "string" ]
+          },
+          "status" : {
+            "description" : "状态",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -448,6 +533,39 @@
             "description" : "当前页数据列表",
             "items" : {
               "$ref" : "#/components/schemas/AdminAircraftModelVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "description" : "当前页码（从 0 开始）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "description" : "每页条数",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalElements" : {
+            "description" : "总记录数",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "description" : "总页数（由总记录数与每页条数计算）",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AdminPageVoAdminBorrowApplicationVO" : {
+        "description" : "管理端分页信封（page 从 0 开始）",
+        "properties" : {
+          "content" : {
+            "description" : "当前页数据列表",
+            "items" : {
+              "$ref" : "#/components/schemas/AdminBorrowApplicationVO"
             },
             "type" : "array"
           },
@@ -1184,6 +1302,30 @@
           }
         },
         "required" : [ "fileIds", "orderNum" ],
+        "type" : "object"
+      },
+      "BorrowApproveDTO" : {
+        "properties" : {
+          "droneId" : {
+            "maxLength" : 36,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "random" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "BorrowRejectDTO" : {
+        "properties" : {
+          "reason" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason" ],
         "type" : "object"
       },
       "ComplaintListVO" : {
@@ -1976,7 +2118,11 @@
       },
       "DroneBorrowDTO" : {
         "properties" : {
-          "droneId" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "orderId" : {
             "maxLength" : 36,
             "minLength" : 0,
             "type" : "string"
@@ -1987,7 +2133,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "droneId", "requestKey" ],
+        "required" : [ "aircraftModelId", "requestKey" ],
         "type" : "object"
       },
       "DroneBorrowPageVO" : {
@@ -2010,6 +2156,17 @@
       },
       "DroneBorrowVO" : {
         "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "alreadyHasActiveLoan" : {
+            "type" : "boolean"
+          },
+          "appliedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "borrowId" : {
             "type" : "string"
           },
@@ -2020,12 +2177,24 @@
           "drone" : {
             "$ref" : "#/components/schemas/ProviderDroneVO"
           },
+          "modelName" : {
+            "type" : "string"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
           "pilotId" : {
             "format" : "int64",
             "type" : "integer"
           },
+          "rejectReason" : {
+            "type" : "string"
+          },
           "returnedAt" : {
             "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
             "type" : "string"
           }
         },
@@ -2038,6 +2207,59 @@
           }
         },
         "required" : [ "enabled" ],
+        "type" : "object"
+      },
+      "EquipmentNotificationPageVO" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EquipmentNotificationVO"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "unreadCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EquipmentNotificationVO" : {
+        "properties" : {
+          "audience" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "borrowId" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "notificationId" : {
+            "type" : "string"
+          },
+          "readAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "FlightConnectDTO" : {
@@ -2360,6 +2582,25 @@
         },
         "type" : "object"
       },
+      "Item" : {
+        "properties" : {
+          "aircraftModelId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "inStockCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
+          "modelName" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "LatestOrder" : {
         "description" : "最近使用订单（跳管理端派单订单详情 GET /admin/dispatch/orders/{orderId}）",
         "properties" : {
@@ -2520,6 +2761,17 @@
           "modelCode" : {
             "description" : "机型编码",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ModelStockVO" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -2965,6 +3217,33 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/AdminPageVoAdminAircraftModelVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultAdminPageVoAdminBorrowApplicationVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/AdminPageVoAdminBorrowApplicationVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -3738,6 +4017,33 @@
         },
         "type" : "object"
       },
+      "ResultEquipmentNotificationPageVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/EquipmentNotificationPageVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ResultFlightConnectionVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
@@ -4469,6 +4775,33 @@
             },
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
             "type" : "object"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultModelStockVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/ModelStockVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -6646,6 +6979,159 @@
         },
         "summary" : "启用/停用机型",
         "tags" : [ "Admin Aircraft Model API" ]
+      }
+    },
+    "/admin/borrow-applications" : {
+      "get" : {
+        "description" : "可按 status=PENDING|APPROVED|REJECTED|RETURNED 过滤；默认全量，按申请时间倒序",
+        "operationId" : "adminListBorrowApplications",
+        "parameters" : [ {
+          "description" : "每页条数（默认 20，上限 100）",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "description" : "状态过滤",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "页码（从 0 起）",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultAdminPageVoAdminBorrowApplicationVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "借机申请列表",
+        "tags" : [ "Admin Borrow Application API" ]
+      }
+    },
+    "/admin/borrow-applications/{borrowId}/approve" : {
+      "post" : {
+        "description" : "body 二选一：droneId=手选该机型在库启用飞机，或 random=true 随机一台；未指定不能通过；无在库时 409",
+        "operationId" : "adminApproveBorrowApplication",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "borrowId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BorrowApproveDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDroneBorrowVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "通过申请并指定机身号",
+        "tags" : [ "Admin Borrow Application API" ]
+      }
+    },
+    "/admin/borrow-applications/{borrowId}/reject" : {
+      "post" : {
+        "description" : "必须填写原因",
+        "operationId" : "adminRejectBorrowApplication",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "borrowId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BorrowRejectDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDroneBorrowVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "驳回申请",
+        "tags" : [ "Admin Borrow Application API" ]
+      }
+    },
+    "/admin/borrow-applications/{borrowId}/restore" : {
+      "post" : {
+        "description" : "飞机仍在库时可把已归还记录改回已借出（REQ-SUP-GOV-007）",
+        "operationId" : "adminRestoreBorrowApplication",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "borrowId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDroneBorrowVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "误归还改回已借出",
+        "tags" : [ "Admin Borrow Application API" ]
       }
     },
     "/admin/complaint/list" : {
@@ -9692,6 +10178,63 @@
         "tags" : [ "Dispatch Draft API" ]
       }
     },
+    "/equipment/notifications" : {
+      "get" : {
+        "description" : "按当前登录角色过滤：飞手只见 PILOT，管理员只见 ADMIN（同数字 id 互不可见）",
+        "operationId" : "listEquipmentNotifications",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : "0",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultEquipmentNotificationPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "借机通知列表",
+        "tags" : [ "Equipment Notification API" ]
+      }
+    },
+    "/equipment/notifications/{notificationId}/read" : {
+      "post" : {
+        "description" : "仅能标记本角色 audience 下、属于自己的通知",
+        "operationId" : "readEquipmentNotification",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "notificationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultVoid"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "标记借机通知已读",
+        "tags" : [ "Equipment Notification API" ]
+      }
+    },
     "/equipment/pilot/borrows" : {
       "get" : {
         "operationId" : "pilotBorrows",
@@ -9716,11 +10259,11 @@
             "description" : "OK"
           }
         },
-        "summary" : "分页读取本人借还记录",
+        "summary" : "分页读取本人申请/借还记录",
         "tags" : [ "Drone Borrowing API" ]
       },
       "post" : {
-        "description" : "请求标识按当前飞手幂等；同一设备并发只能借出一次，不接收用户ID、订单或金额",
+        "description" : "只选机型；订单可选关联（不绑死）；不选机身号。requestKey 按飞手幂等。已有已借出时可再提交（alreadyHasActiveLoan=true），由管理员决定是否特批。该机型无在库启用飞机时 409。",
         "operationId" : "borrowDrone",
         "requestBody" : {
           "content" : {
@@ -9744,13 +10287,33 @@
             "description" : "OK"
           }
         },
-        "summary" : "登记借用无人机",
+        "summary" : "提交借机申请",
+        "tags" : [ "Drone Borrowing API" ]
+      }
+    },
+    "/equipment/pilot/borrows/current" : {
+      "get" : {
+        "description" : "默认一人一台；管理员特批后可能多于一台",
+        "operationId" : "pilotCurrentBorrows",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultDroneBorrowPageVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "当前已借出的飞机",
         "tags" : [ "Drone Borrowing API" ]
       }
     },
     "/equipment/pilot/borrows/{borrowId}/return" : {
       "post" : {
-        "description" : "按原借用ID归还，重复请求幂等，旧归还重试不影响后续借用；设备停用不阻止本人归还",
+        "description" : "立即生效，不需管理员再批；重复请求幂等；设备停用不阻止本人归还",
         "operationId" : "returnDrone",
         "parameters" : [ {
           "in" : "path",
@@ -9772,13 +10335,13 @@
             "description" : "OK"
           }
         },
-        "summary" : "登记归还本人借用设备",
+        "summary" : "确认归还本人已借出设备",
         "tags" : [ "Drone Borrowing API" ]
       }
     },
     "/equipment/pilot/drones" : {
       "get" : {
-        "description" : "只列启用的设备和机型；已借出显示不可借，不返回其他飞手的借用标识或身份",
+        "description" : "只列启用的设备和机型；已借出显示不可借。主路径请用机型在库概况 + 申请接口。",
         "operationId" : "pilotEquipment",
         "parameters" : [ {
           "in" : "query",
@@ -9802,6 +10365,26 @@
           }
         },
         "summary" : "分页读取可借设备目录",
+        "tags" : [ "Drone Borrowing API" ]
+      }
+    },
+    "/equipment/pilot/model-stock" : {
+      "get" : {
+        "description" : "启用机型及其当前在库启用飞机数量；数量为 0 的机型不能申请",
+        "operationId" : "pilotModelStock",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultModelStockVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "机型在库概况",
         "tags" : [ "Drone Borrowing API" ]
       }
     },
@@ -12111,6 +12694,9 @@
     "description" : "会话相关接口",
     "name" : "chat session API"
   }, {
+    "description" : "借机相关站内通知（落库）；按角色 audience 隔离；手机推送尚未接入",
+    "name" : "Equipment Notification API"
+  }, {
     "description" : "平台机型目录接口",
     "name" : "Aircraft Model API"
   }, {
@@ -12129,9 +12715,6 @@
     "description" : "派单固定配置与账号运单草稿，不创建订单或收款",
     "name" : "Dispatch Draft API"
   }, {
-    "description" : "真实借还登记；不绑定飞手、不关联订单、不收费、不收押金",
-    "name" : "Drone Borrowing API"
-  }, {
     "description" : "真实先接者得和准备/到场状态，不要求绑定设备；付款与环境评估仍沿用当前标注的模拟通道",
     "name" : "Dispatch Pilot API"
   }, {
@@ -12140,6 +12723,9 @@
   }, {
     "description" : "管理端业务查询（只读）",
     "name" : "Admin Query API"
+  }, {
+    "description" : "管理端借机申请审批（指定机身号或随机选一台；驳回写原因；误归还可改回）",
+    "name" : "Admin Borrow Application API"
   }, {
     "description" : "管理端投诉处理",
     "name" : "Admin Complaint API"
@@ -12167,6 +12753,9 @@
   }, {
     "description" : "订单评价",
     "name" : "Review API"
+  }, {
+    "description" : "飞手借机申请与归还；选机型申请，管理员指定机身号后借出；归还不需审批",
+    "name" : "Drone Borrowing API"
   }, {
     "description" : "飞手注册接口",
     "name" : "Rider Register API"

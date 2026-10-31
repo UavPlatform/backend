@@ -25,7 +25,7 @@ class DispatchTimelineMySqlE2EIT extends RealProtocolTestBase {
                 .locations("classpath:db/migration").load();
         var result = flyway.migrate();
         assertThat(result.success).isTrue();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("24");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("25");
         assertThat(flyway.info().pending()).isEmpty();
     }
     private String password() {

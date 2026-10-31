@@ -25,8 +25,14 @@ public class EquipmentViews {
                 d.getSerialNumber(), d.getAirportId(), airport == null ? null : airport.getName(), d.isEnabled(), d.getCurrentBorrowId() != null,
                 mine, management || mine ? d.getCurrentBorrowId() : null);
     }
-    DroneBorrowVO borrow(DroneBorrow b) {
-        return new DroneBorrowVO(b.getId(), drone(drones.findById(b.getDroneId()).orElseThrow(EquipmentAccess::missing), b.getPilotId(), false),
-                b.getPilotId(), b.getBorrowedAt(), b.getReturnedAt());
+    DroneBorrowVO borrow(DroneBorrow b, boolean alreadyHasActiveLoan) {
+        String modelName = models.findById(b.getAircraftModelId()).orElseThrow(EquipmentAccess::missing).getDisplayName();
+        ProviderDroneVO droneVo = null;
+        if (b.getDroneId() != null) {
+            droneVo = drone(drones.findById(b.getDroneId()).orElseThrow(EquipmentAccess::missing), b.getPilotId(), false);
+        }
+        return new DroneBorrowVO(b.getId(), b.getStatus(), b.getAircraftModelId(), modelName, droneVo, b.getOrderId(),
+                b.getPilotId(), b.getAppliedAt(), b.getBorrowedAt(), b.getReturnedAt(), b.getRejectReason(), alreadyHasActiveLoan);
     }
+    DroneBorrowVO borrow(DroneBorrow b) { return borrow(b, false); }
 }

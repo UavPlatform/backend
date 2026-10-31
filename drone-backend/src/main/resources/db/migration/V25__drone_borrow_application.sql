@@ -42,7 +42,7 @@ CREATE TABLE equipment_notification (
     borrow_id VARCHAR(36),
     created_at TIMESTAMP(6) NOT NULL,
     read_at TIMESTAMP(6),
-    CONSTRAINT uk_equipment_notice_event UNIQUE (recipient_id, event_key),
+    CONSTRAINT uk_equipment_notice_event UNIQUE (recipient_id, audience, event_key),
     CONSTRAINT fk_equipment_notice_borrow FOREIGN KEY (borrow_id) REFERENCES drone_borrow(id)
 );
 CREATE INDEX idx_equipment_notice_inbox ON equipment_notification(recipient_id, created_at, id);

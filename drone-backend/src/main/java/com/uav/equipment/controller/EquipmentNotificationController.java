@@ -14,21 +14,23 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/equipment/notifications")
 @RequireRole({1, 2})
-@Tag(name = "Equipment Notification API", description = "借机相关站内通知（落库）；手机推送尚未接入")
+@Tag(name = "Equipment Notification API", description = "借机相关站内通知（落库）；按角色 audience 隔离；手机推送尚未接入")
 public class EquipmentNotificationController {
     private final EquipmentNotificationService service;
     public EquipmentNotificationController(EquipmentNotificationService service) { this.service = service; }
 
     @GetMapping
-    @Operation(operationId = "listEquipmentNotifications", summary = "借机通知列表")
+    @Operation(operationId = "listEquipmentNotifications", summary = "借机通知列表",
+            description = "按当前登录角色过滤：飞手只见 PILOT，管理员只见 ADMIN（同数字 id 互不可见）")
     public Result<EquipmentNotificationPageVO> list(@RequestParam(defaultValue = "0") String page) {
-        return Result.success(service.list(UserContext.getUserId(), EquipmentAccess.parse(page)));
+        return Result.success(service.list(UserContext.getUserId(), UserContext.getRole(), EquipmentAccess.parse(page)));
     }
 
     @PostMapping("/{notificationId}/read")
-    @Operation(operationId = "readEquipmentNotification", summary = "标记借机通知已读")
+    @Operation(operationId = "readEquipmentNotification", summary = "标记借机通知已读",
+            description = "仅能标记本角色 audience 下、属于自己的通知")
     public Result<Void> read(@PathVariable String notificationId) {
-        service.read(UserContext.getUserId(), notificationId);
+        service.read(UserContext.getUserId(), UserContext.getRole(), notificationId);
         return Result.success();
     }
 }

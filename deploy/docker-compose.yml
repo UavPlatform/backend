@@ -77,6 +77,8 @@ services:
       DRONE_AMAP_SECURITY_KEY: ${AMAP_SECURITY_KEY:-}
       DRONE_AMAP_SERVICE_HOST: ${AMAP_SERVICE_HOST:-}
       SERVER_SERVLET_CONTEXT_PATH: /api
+      # 可选：覆盖 CORS 允许源（默认 application.yml：localhost + https://*.fuwaki.icu）
+      # CORS_ALLOWED_ORIGIN_PATTERNS_0: https://www.fuwaki.icu
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}

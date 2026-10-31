@@ -1,0 +1,30 @@
+# ===== IT / 端到端集成测试专用 profile =====
+# 激活方式：SPRING_PROFILES_ACTIVE=it（切勿与 prod 同开）。
+# 永不被 default/dev/prod 自动加载；仅在显式激活 it 时生效。
+# 固定种子账号见 ItSeedInitializer / admin.seed；密码仅用于一次性测试库。
+
+admin:
+  seed:
+    name: it-admin
+    password: It@123456
+
+wechat:
+  pay:
+    mock-enabled: true
+
+dispatch:
+  demo:
+    enabled: true
+
+it:
+  seed:
+    password: It@123456
+    pilot-username: it-pilot
+    customer-username: it-customer
+    drone-serial: IT-DRONE-001
+    aircraft-model-code: FC30
+
+logging:
+  level:
+    root: warn
+    com.uav: info

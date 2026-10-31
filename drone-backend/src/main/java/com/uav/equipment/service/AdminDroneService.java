@@ -82,8 +82,8 @@ public class AdminDroneService {
         Page<DroneBorrow> rows = borrows.findByDroneId(droneId, PageRequest.of(page, pageSize,
                 Sort.by(Sort.Order.desc("borrowedAt"), Sort.Order.desc("id"))));
         Map<Long, User> pilots = pilots(rows.stream().map(DroneBorrow::getPilotId).toList());
-        return AdminPageVo.of(rows.stream().map(b -> new AdminDroneBorrowVO(b.getId(), b.getDroneId(), b.getPilotId(),
-                name(pilots.get(b.getPilotId())), b.getBorrowedAt(), b.getReturnedAt())).toList(),
+        return AdminPageVo.of(rows.stream().map(b -> new AdminDroneBorrowVO(b.getId(), b.getDroneId(), b.getStatus(), b.getPilotId(),
+                name(pilots.get(b.getPilotId())), b.getAppliedAt(), b.getBorrowedAt(), b.getReturnedAt(), b.getRejectReason())).toList(),
                 page, pageSize, rows.getTotalElements());
     }
 

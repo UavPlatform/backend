@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-/** Non-numeric page/size on the admin drone endpoints is a 400, not the legacy generic 500. */
-@RestControllerAdvice(assignableTypes = AdminDroneController.class)
+/** Non-numeric page/size on admin equipment endpoints is a 400, not the legacy generic 500. */
+@RestControllerAdvice(assignableTypes = {AdminDroneController.class, AdminBorrowApplicationController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AdminDroneValidationAdvice {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)

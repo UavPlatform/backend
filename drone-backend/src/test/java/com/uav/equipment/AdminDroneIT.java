@@ -33,6 +33,12 @@ class AdminDroneIT extends IntegrationTestBase {
         m.put("aircraftModelId", fixtures.defaultAircraftModelId()); m.put("serialNumber", serial);
         return m;
     }
+    private JsonNode loanOut(String adminAuth, String pilotAuth, String droneId) throws Exception {
+        var pending = send("POST", pilotAuth, "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "requestKey", UUID.randomUUID().toString()), 200);
+        return send("POST", adminAuth, "/admin/borrow-applications/" + pending.path("borrowId").asText() + "/approve",
+                Map.of("droneId", droneId), 200);
+    }
     private JsonNode send(String method, String auth, String path, Object body, int expected) throws Exception {
         var req = request(org.springframework.http.HttpMethod.valueOf(method), path).header("Authorization", auth);
         if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body));
@@ -91,8 +97,8 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(edited.has("latitude")).isFalse();
         send("PUT", auth, "/admin/drones/not-a-drone", edit, 404);
 
-        // Pilot borrows: list shows BORROWED with pilot and time.
-        var loan = send("POST", pilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 200);
+        // Pilot applies + admin assigns SN: list shows BORROWED with pilot and time.
+        var loan = loanOut(auth, pilot.authorization(), id);
         var row = send("GET", auth, "/admin/drones/" + id, null, 200);
         assertThat(row.path("borrowStatus").asText()).isEqualTo("BORROWED");
         assertThat(row.path("currentBorrow").path("pilotId").asLong()).isEqualTo(pilot.id());
@@ -124,8 +130,11 @@ class AdminDroneIT extends IntegrationTestBase {
         assertThat(disabled.path("borrowStatus").asText()).isEqualTo("BORROWED");
         var otherPilot = accounts().registerRider(UniqueNames.userName("adrother"), null);
         send("POST", pilot.authorization(), "/equipment/pilot/borrows/" + loan.path("borrowId").asText() + "/return", Map.of(), 200);
-        send("POST", pilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
-        send("POST", otherPilot.authorization(), "/equipment/pilot/borrows", Map.of("droneId", id, "requestKey", UUID.randomUUID().toString()), 409);
+        // Only disabled airframe remains → model in-stock is 0 → apply rejected.
+        send("POST", pilot.authorization(), "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "requestKey", UUID.randomUUID().toString()), 409);
+        send("POST", otherPilot.authorization(), "/equipment/pilot/borrows",
+                Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "requestKey", UUID.randomUUID().toString()), 409);
         assertThat(send("GET", auth, "/admin/drones/" + id, null, 200).path("borrowStatus").asText()).isEqualTo("IN_STOCK");
 
         // Borrow history.

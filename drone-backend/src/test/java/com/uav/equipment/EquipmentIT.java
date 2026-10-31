@@ -6,6 +6,7 @@ import com.uav.support.IntegrationTestBase;
 import com.uav.support.UniqueNames;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import java.math.BigDecimal;
 import java.util.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -23,10 +24,17 @@ class EquipmentIT extends IntegrationTestBase {
         var response = mockMvc.perform(get(path).header("Authorization", "Bearer " + token)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         return json.readTree(response).path("data");
     }
-    private Map<String, Object> drone(String serial) {
-        return Map.of("aircraftModelId", fixtures.defaultAircraftModelId(), "serialNumber", serial);
+    /** Dedicated model per case — shared H2 keeps default FC30 stock polluted across IT classes. */
+    private long newModel(String adminToken) throws Exception {
+        String code = UniqueNames.unique("EQM").replace('_', 'X');
+        return postData(adminToken, "/admin/aircraft-models", Map.of(
+                "modelCode", code, "displayName", "借机测-" + code,
+                "maxPayloadKg", new BigDecimal("10.00"), "transportEnabled", true)).path("id").asLong();
     }
-    private JsonNode apply(String pilotToken, Long modelId, String requestKey) throws Exception {
+    private Map<String, Object> drone(long modelId, String serial) {
+        return Map.of("aircraftModelId", modelId, "serialNumber", serial);
+    }
+    private JsonNode apply(String pilotToken, long modelId, String requestKey) throws Exception {
         return postData(pilotToken, "/equipment/pilot/borrows", Map.of("aircraftModelId", modelId, "requestKey", requestKey));
     }
     private JsonNode approve(String adminToken, String borrowId, String droneId) throws Exception {
@@ -48,8 +56,8 @@ class EquipmentIT extends IntegrationTestBase {
         var admin = accounts().adminLogin();
         var pilot = accounts().registerRider(UniqueNames.userName("borrowpilot"), null);
         var other = accounts().registerRider(UniqueNames.userName("borrowpilot"), null);
-        Long modelId = fixtures.defaultAircraftModelId();
-        String id = postData(admin.token(), "/admin/drones", drone(UniqueNames.djiId())).path("droneId").asText();
+        long modelId = newModel(admin.token());
+        String id = postData(admin.token(), "/admin/drones", drone(modelId, UniqueNames.djiId())).path("droneId").asText();
 
         var stock = getData(pilot.token(), "/equipment/pilot/model-stock");
         assertThat(stock.path("items").isArray()).isTrue();
@@ -62,7 +70,6 @@ class EquipmentIT extends IntegrationTestBase {
         assertThat(pending.path("alreadyHasActiveLoan").asBoolean()).isFalse();
         assertThat(apply(pilot.token(), modelId, key).path("borrowId").asText()).isEqualTo(pending.path("borrowId").asText());
 
-        // Pending does not occupy the airframe.
         JsonNode card = null;
         for (var item : getData(other.token(), "/equipment/pilot/drones").path("items")) if (item.path("droneId").asText().equals(id)) card = item;
         assertThat(card).isNotNull();
@@ -73,7 +80,6 @@ class EquipmentIT extends IntegrationTestBase {
         assertThat(loan.path("drone").path("droneId").asText()).isEqualTo(id);
         assertThat(getData(pilot.token(), "/equipment/pilot/borrows/current").path("items")).hasSize(1);
 
-        // Other pilot cannot return; owner can return even after disable; return is idempotent.
         mockMvc.perform(post("/equipment/pilot/borrows/" + loan.path("borrowId").asText() + "/return")
                 .header("Authorization", "Bearer " + other.token())).andExpect(status().isNotFound());
         postData(admin.token(), "/admin/drones/" + id + "/enabled", Map.of("enabled", false));
@@ -85,7 +91,6 @@ class EquipmentIT extends IntegrationTestBase {
         assertThat(getData(pilot.token(), "/dispatch/pilot/orders").size()).isZero();
         assertThat(getData(admin.token(), "/admin/drones/" + id + "/borrows").path("totalElements").asLong()).isEqualTo(1);
 
-        // Notices for admin (pending/out/returned) and pilot (approved).
         assertThat(getData(admin.token(), "/equipment/notifications").path("items").size()).isGreaterThanOrEqualTo(1);
         assertThat(getData(pilot.token(), "/equipment/notifications").path("items").size()).isGreaterThanOrEqualTo(1);
 
@@ -96,14 +101,15 @@ class EquipmentIT extends IntegrationTestBase {
     @Test void cannotApplyWhenModelHasNoInStockAndSecondLoanWarnsButAllowed() throws Exception {
         var admin = accounts().adminLogin();
         var pilot = accounts().registerRider(UniqueNames.userName("warnpilot"), null);
-        Long modelId = fixtures.defaultAircraftModelId();
+        long modelId = newModel(admin.token());
+        // Fresh model: zero in-stock → apply must 409 (independent of shared FC30 pollution).
         mockMvc.perform(post("/equipment/pilot/borrows").header("Authorization", "Bearer " + pilot.token())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("aircraftModelId", modelId, "requestKey", UUID.randomUUID().toString()))))
                 .andExpect(status().isConflict());
 
-        String droneId = postData(admin.token(), "/admin/drones", drone(UniqueNames.djiId())).path("droneId").asText();
-        String droneId2 = postData(admin.token(), "/admin/drones", drone(UniqueNames.djiId())).path("droneId").asText();
+        String droneId = postData(admin.token(), "/admin/drones", drone(modelId, UniqueNames.djiId())).path("droneId").asText();
+        String droneId2 = postData(admin.token(), "/admin/drones", drone(modelId, UniqueNames.djiId())).path("droneId").asText();
         var first = apply(pilot.token(), modelId, UUID.randomUUID().toString());
         approve(admin.token(), first.path("borrowId").asText(), droneId);
 
@@ -116,7 +122,6 @@ class EquipmentIT extends IntegrationTestBase {
         assertThat(tree.path("data").path("alreadyHasActiveLoan").asBoolean()).isTrue();
         assertThat(tree.path("data").path("status").asText()).isEqualTo("PENDING");
 
-        // Admin may specially approve a second airframe.
         approve(admin.token(), tree.path("data").path("borrowId").asText(), droneId2);
         assertThat(getData(pilot.token(), "/equipment/pilot/borrows/current").path("items")).hasSize(2);
     }
@@ -124,21 +129,21 @@ class EquipmentIT extends IntegrationTestBase {
     @Test void rejectShowsReasonAndRandomApproveWorks() throws Exception {
         var admin = accounts().adminLogin();
         var pilot = accounts().registerRider(UniqueNames.userName("rejpilot"), null);
-        Long modelId = fixtures.defaultAircraftModelId();
-        String droneId = postData(admin.token(), "/admin/drones", drone(UniqueNames.djiId())).path("droneId").asText();
+        long modelId = newModel(admin.token());
+        String droneId = postData(admin.token(), "/admin/drones", drone(modelId, UniqueNames.djiId())).path("droneId").asText();
         var pending = apply(pilot.token(), modelId, UUID.randomUUID().toString());
         var rejected = postData(admin.token(), "/admin/borrow-applications/" + pending.path("borrowId").asText() + "/reject",
                 Map.of("reason", "机队维保中"));
         assertThat(rejected.path("status").asText()).isEqualTo("REJECTED");
         assertThat(rejected.path("rejectReason").asText()).isEqualTo("机队维保中");
 
+        // Only this model's single in-stock airframe → random must pick it.
         var next = apply(pilot.token(), modelId, UUID.randomUUID().toString());
         var approved = postData(admin.token(), "/admin/borrow-applications/" + next.path("borrowId").asText() + "/approve",
                 Map.of("random", true));
         assertThat(approved.path("status").asText()).isEqualTo("APPROVED");
         assertThat(approved.path("drone").path("droneId").asText()).isEqualTo(droneId);
 
-        // Mistaken return can be restored by admin.
         postData(pilot.token(), "/equipment/pilot/borrows/" + approved.path("borrowId").asText() + "/return", Map.of());
         var restored = postData(admin.token(), "/admin/borrow-applications/" + approved.path("borrowId").asText() + "/restore", Map.of());
         assertThat(restored.path("status").asText()).isEqualTo("APPROVED");

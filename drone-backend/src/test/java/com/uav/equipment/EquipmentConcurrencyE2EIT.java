@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.net.URI;
 import java.net.http.*;
 import java.time.Duration;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -31,13 +32,20 @@ class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
         assertThat(response.statusCode()).as("HTTP %s", path).isEqualTo(200);
         return json.readTree(response.body()).path("data");
     }
+    
+    private long newModel(HttpClient client, String adminToken) throws Exception {
+        String code = UniqueNames.unique("CQM").replace('_', 'X');
+        return send(client, adminToken, "/admin/aircraft-models", Map.of(
+                "modelCode", code, "displayName", "并发测-" + code,
+                "maxPayloadKg", new BigDecimal("10.00"), "transportEnabled", true)).path("id").asLong();
+    }
     @Test void onePhysicalDroneCanOnlyBeApprovedOnceAndOldReturnCannotEndNewLoan() throws Exception {
         var admin = accounts().adminLogin();
         var a = accounts().registerRider(UniqueNames.userName("loana"), null);
         var b = accounts().registerRider(UniqueNames.userName("loanb"), null);
-        Long modelId = fixtures.defaultAircraftModelId();
         try (var client = HttpClient.newHttpClient()) {
             String token = admin.token();
+            long modelId = newModel(client, token);
             String id = send(client, token, "/admin/drones", Map.of("aircraftModelId", modelId,
                     "serialNumber", UniqueNames.djiId())).path("droneId").asText();
             String appA = send(client, a.token(), "/equipment/pilot/borrows",

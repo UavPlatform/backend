@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -72,7 +73,13 @@ class EquipmentNotificationIT extends IntegrationTestBase {
     @Test void httpInboxOnlyReturnsOwnAudience() throws Exception {
         var admin = accounts().adminLogin();
         var pilot = accounts().registerRider(UniqueNames.userName("noticollide"), null);
-        Long modelId = fixtures.defaultAircraftModelId();
+        String code = UniqueNames.unique("NTM").replace('_', 'X');
+        long modelId = json.readTree(mockMvc.perform(post("/admin/aircraft-models").header("Authorization", admin.authorization())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "modelCode", code, "displayName", "通知测-" + code,
+                                "maxPayloadKg", new BigDecimal("10.00"), "transportEnabled", true))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data").path("id").asLong();
         String droneId = mockMvc.perform(post("/admin/drones").header("Authorization", admin.authorization())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("aircraftModelId", modelId, "serialNumber", UniqueNames.djiId()))))

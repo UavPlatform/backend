@@ -25,40 +25,34 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final RiderUavRepository riderUavRepository;
     private final com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess;
-    private final CorsProperties corsProperties;
 
     public WebSocketConfig(DroneWebSocketHandler droneWebSocketHandler,
                            WebWebSocketHandler webWebSocketHandler,
                            ChatWebSocketHandler chatWebSocketHandler,
                            JwtUtil jwtUtil,
                            RiderUavRepository riderUavRepository,
-                           com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess,
-                           CorsProperties corsProperties) {
+                           com.uav.flight.service.PilotDeviceAccess pilotDeviceAccess) {
         this.droneWebSocketHandler = droneWebSocketHandler;
         this.webWebSocketHandler = webWebSocketHandler;
         this.chatWebSocketHandler = chatWebSocketHandler;
         this.jwtUtil = jwtUtil;
         this.riderUavRepository = riderUavRepository;
         this.pilotDeviceAccess = pilotDeviceAccess;
-        this.corsProperties = corsProperties;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        // 与 HTTP CORS 同一批 Origin 模式；无 Origin 头的原生客户端仍可握手（同站判定）。
-        String[] originPatterns = corsProperties.allowedOriginPatternsArray();
-
         // App端WebSocket端点（P0-1：握手需 JWT + 飞手角色 + 设备归属校验）
         registry.addHandler(droneWebSocketHandler, "/ws/drone")
                 .addInterceptors(new WsAuthHandshakeInterceptor(
                         jwtUtil, riderUavRepository, WsAuthHandshakeInterceptor.Mode.DEVICE_CHANNEL, pilotDeviceAccess::mayUse))
-                .setAllowedOriginPatterns(originPatterns);
+                .setAllowedOrigins("*");
 
         // Web端WebSocket端点（P0-1：握手需登录）
         registry.addHandler(webWebSocketHandler, "/ws/web")
                 .addInterceptors(new WsAuthHandshakeInterceptor(
                         jwtUtil, riderUavRepository, WsAuthHandshakeInterceptor.Mode.WEB_CHANNEL))
-                .setAllowedOriginPatterns(originPatterns);
+                .setAllowedOrigins("*");
 
         // 聊天通道（P0-1：握手需 JWT 且令牌 userId == 路径 sid）。
         // 原为 Jakarta @ServerEndpoint，因 WsFilter 模板匹配会遮蔽上面两个通道，迁移至此；
@@ -66,6 +60,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(chatWebSocketHandler, "/ws/{sid}")
                 .addInterceptors(new WsAuthHandshakeInterceptor(
                         jwtUtil, riderUavRepository, WsAuthHandshakeInterceptor.Mode.CHAT))
-                .setAllowedOriginPatterns(originPatterns);
+                .setAllowedOrigins("*");
     }
 }

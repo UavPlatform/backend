@@ -12,10 +12,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private JwtInterceptor jwtInterceptor;
 
-    /**
-     * HTTP CORS 由 {@link CorsConfig} / {@link CorsProperties} 负责（CorsFilter 优先于本拦截器）。
-     * JWT 拦截器对 OPTIONS 另有兜底放行。
-     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(jwtInterceptor)

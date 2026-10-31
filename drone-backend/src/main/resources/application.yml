@@ -110,15 +110,3 @@ file:
       bucket: ${alioss.bucket-name:drone-uploads}
       access-key-id: ${alioss.access-key-id:placeholder}
       access-key-secret: ${alioss.access-key-secret:placeholder}
-
-# ---- CORS（子域 API：浏览器从前端 Origin 访问本服务）----
-# 生产 API 主机示例：https://droneapi.fuwaki.icu（部署侧 SERVER_SERVLET_CONTEXT_PATH=/api）
-# 本列表是「页面 Origin」，不是 API 主机；通配 https://*.fuwaki.icu 覆盖同域前端。
-# 环境变量覆盖（按索引）：CORS_ALLOWED_ORIGIN_PATTERNS_0=https://www.fuwaki.icu
-cors:
-  allowed-origin-patterns:
-    - http://localhost:5173
-    - http://127.0.0.1:5173
-    - http://localhost:4173
-    - http://127.0.0.1:4173
-    - https://*.fuwaki.icu

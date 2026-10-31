@@ -58,11 +58,6 @@ public class JwtInterceptor implements AsyncHandlerInterceptor {
         MDC.put("traceId", traceId);
         response.setHeader("X-Trace-Id", traceId);
 
-        // CORS 预检：不鉴权（CorsFilter 已优先处理；此处兜底避免误 401）
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            return true;
-        }
-
         if (handler instanceof HandlerMethod) {
             HandlerMethod handlerMethod = (HandlerMethod) handler;
             if (handlerMethod.hasMethodAnnotation(SkipJwt.class)) {

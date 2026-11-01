@@ -67,7 +67,7 @@ class AdminPilotQualificationIT extends IntegrationTestBase {
         assertThat(quals.get(0).path("licenseGradeLabel").asText()).isEqualTo("视距内");
         // 既有字段不回归
         assertThat(data.path("userId").asLong()).isEqualTo(rider.id());
-        assertThat(data.path("drones").isArray()).isTrue();
+        assertThat(data.path("borrows").isArray()).isTrue();
         assertThat(data.path("orders").isArray()).isTrue();
     }
 

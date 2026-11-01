@@ -26,8 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * 不发真实 HTTP、不起真实容器；不再用 {@code MockMvcBuilders.webAppContextSetup} 手工搭建。
  *
  * <p>身份来源（R3）：所有者与飞手均通过 {@link TestAccounts} 走真实
- * {@code /user/register} + {@code /user/login}、{@code /rider/register}（带 djiId 同时完成绑定），
- * 令牌由服务端签发，不再自签 JWT 绕过认证链路（R3）。
+ * {@code /user/register} + {@code /user/login}、{@code /rider/register}，设备使用权经
+ * {@code TestFixtures#bindDrone} 批准借用；令牌由服务端签发（R3）。
  *
  * <p>隔离与造数（R5/R7/R8）：事务回滚隔离；任务 DTO 与订单状态迁移走共享工厂
  * （{@code fixtures.twoWaypointTask()}、{@code fixtures.awaitingRiderConfirm(task, rider.id())}）；
@@ -48,8 +48,8 @@ class OrderLiveMappingIT extends IntegrationTestBase {
     @DisplayName("/order/detail 返回 deviceId 与 liveState（接单+设备在线场景）")
     void orderDetailCarriesDeviceMapping() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
-        String deviceId = UniqueNames.djiId();
-        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("odm-rider"), deviceId);
+        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("odm-rider"), null);
+        String deviceId = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
 
         UserContext.setUser(owner.id(), owner.userName(), owner.role());
         Task task = taskService.createTask(fixtures.twoWaypointTask());
@@ -74,8 +74,7 @@ class OrderLiveMappingIT extends IntegrationTestBase {
     @DisplayName("/order/detail 设备离线 → deviceId=null、liveState=IDLE")
     void orderDetailOfflineYieldsNullDeviceId() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
-        String deviceId = UniqueNames.djiId();
-        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("odm-rider"), deviceId);
+        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("odm-rider"), null);
 
         UserContext.setUser(owner.id(), owner.userName(), owner.role());
         Task task = taskService.createTask(fixtures.twoWaypointTask());

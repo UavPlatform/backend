@@ -68,7 +68,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
             .build();
 
     @Test
-    @DisplayName("飞手对本人绑定且在线设备开播：START_LIVE 下发、设备确认后 RUNNING，停止链路生效")
+    @DisplayName("飞手对本人可用且在线设备开播：START_LIVE 下发、设备确认后 RUNNING，停止链路生效")
     void riderStartLiveFullFlow() throws Exception {
         DeviceFixture fixture = connectDevice(true);
         String deviceId = fixture.deviceId;
@@ -99,7 +99,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("未绑定设备：飞手开播被拒（403 NO_PERMISSION，语义明确）")
+    @DisplayName("无使用权设备：飞手开播被拒（403 NO_PERMISSION，语义明确）")
     void riderStartUnboundDeviceRejected() throws Exception {
         String deviceId = UniqueNames.unique("rs-unbound");
         registerUav(deviceId);
@@ -109,7 +109,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
         assertThat(rider.djiId()).isNotEqualTo(deviceId);
 
         String body = post("/live/rider/req?deviceId=" + deviceId, rider.authorization());
-        assertThat(body).contains("设备未绑定到当前飞手");
+        assertThat(body).contains("设备不是当前飞手可用的连机或借用机");
         assertThat(body).contains("NO_PERMISSION");
     }
 
@@ -118,7 +118,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
     void riderStartOfflineDeviceRejected() throws Exception {
         // 飞手真实注册时已绑定唯一设备：该设备已注册但从未建立 WS 连接 → 离线
         TestAccounts.Account rider = accounts().registerRider();
-        String deviceId = rider.djiId();
+        String deviceId = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
         registerUav(deviceId);
 
         String body = post("/live/rider/req?deviceId=" + deviceId, rider.authorization());
@@ -171,7 +171,7 @@ class LiveRiderStartE2EIT extends RealProtocolTestBase {
     /** 绑定+pending+WS 连接一台设备（自动回 START_LIVE/STOP_LIVE 的同步 ACK）。 */
     private DeviceFixture connectDevice(boolean autoAck) throws Exception {
         TestAccounts.Account rider = accounts().registerRider();
-        String deviceId = rider.djiId();
+        String deviceId = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
         registerUav(deviceId);
         appWebSocketService.requestConnection(deviceId);
 

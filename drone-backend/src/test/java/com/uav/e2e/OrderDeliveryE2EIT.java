@@ -201,16 +201,14 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("ADR-0001：Flyway baseline 声明的 fk_rider_uav_user 已落地")
-    void flywayBaselineForeignKeyIsPresent() throws Exception {
-        try (Connection c = dataSource.getConnection()) {
-            int declaredFk = scalarInt(c,
-                    "select count(*) from information_schema.table_constraints"
-                            + " where table_schema = database()"
-                            + " and constraint_name = 'fk_rider_uav_user'");
-            assertThat(declaredFk)
-                    .as("fk_rider_uav_user 应由 Flyway baseline 创建")
-                    .isEqualTo(1);
+    @DisplayName("V26：rider_uav 表已删除")
+    void riderUavTableDropped() throws Exception {
+        try (var c = dataSource.getConnection();
+             var st = c.createStatement();
+             var rs = st.executeQuery(
+                     "SELECT COUNT(*) FROM information_schema.tables WHERE lower(table_name) = 'rider_uav'")) {
+            assertThat(rs.next()).isTrue();
+            assertThat(rs.getInt(1)).as("rider_uav 应由 V26 删除").isZero();
         }
     }
 
@@ -530,9 +528,6 @@ class OrderDeliveryE2EIT extends RealProtocolTestBase {
         assertThat(riderReg.path("success").asBoolean()).as("rider register resp=%s", riderReg).isTrue();
         String token = riderReg.path("data").path("token").asText();
         assertThat(token).as("rider register token, resp=%s", riderReg).isNotBlank();
-        JsonNode bound = post("/rider/drone/bind?djiId=" + djiId
-                + "&aircraftModelId=" + modelIdByCode(token, "FC30"), token, null);
-        assertThat(bound.path("success").asBoolean()).as("bind resp=%s", bound).isTrue();
         return token;
     }
 

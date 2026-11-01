@@ -167,6 +167,7 @@ class AdminQueryApiIT extends IntegrationTestBase {
     void adminCarriesDeviceMapping() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         TestAccounts.Account rider = accounts().registerRider();
+        String deviceId = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
         UserContext.setUser(owner.id(), owner.userName(), owner.role());
         Task task = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("adm-dev")));
         Task unassigned = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("adm-none")));
@@ -174,18 +175,18 @@ class AdminQueryApiIT extends IntegrationTestBase {
         UserContext.setUser(rider.id(), rider.userName(), rider.role());
         MissionOrder order = fixtures.awaitingRiderConfirm(task, rider.id());
         taskService.riderConfirmOrder(task.getTaskNum(), rider.id());
-        appWebSocketService.requestConnection(rider.djiId());
-        appWebSocketService.markAsConnected(rider.djiId());
+        appWebSocketService.requestConnection(deviceId);
+        appWebSocketService.markAsConnected(deviceId);
 
         UserContext.clear();
         TestAccounts.AdminAccount admin = accounts().adminLogin();
 
-        // 正态：task → task_assignment → rider_uav → 在线设备；
+        // 正态：task → task_assignment → 已批准借用机 → 在线设备；
         // 同一响应断言双确认时间与 paidAt（无支付流水 → 订单状态迁移时间回退口径）非空
         mockMvc.perform(get("/admin/tasks/" + task.getTaskNum())
                         .header("Authorization", admin.authorization()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.deviceId").value(rider.djiId()))
+                .andExpect(jsonPath("$.data.deviceId").value(deviceId))
                 .andExpect(jsonPath("$.data.userConfirmedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.riderConfirmedAt").isNotEmpty())
                 .andExpect(jsonPath("$.data.paidAt").isNotEmpty());
@@ -193,7 +194,7 @@ class AdminQueryApiIT extends IntegrationTestBase {
         mockMvc.perform(get("/admin/orders/" + order.getOrderNum())
                         .header("Authorization", admin.authorization()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.deviceId").value(rider.djiId()));
+                .andExpect(jsonPath("$.data.deviceId").value(deviceId));
 
         // 空态：任务未接单 → deviceId 为 null（schema 已文档化）
         mockMvc.perform(get("/admin/tasks/" + unassigned.getTaskNum())

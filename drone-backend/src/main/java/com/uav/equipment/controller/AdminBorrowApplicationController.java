@@ -25,13 +25,14 @@ public class AdminBorrowApplicationController {
     public AdminBorrowApplicationController(AdminBorrowApplicationService service) { this.service = service; }
 
     @Operation(operationId = "adminListBorrowApplications", summary = "借机申请列表",
-            description = "可按 status=PENDING|APPROVED|REJECTED|RETURNED 过滤；默认全量，按申请时间倒序")
+            description = "可按 status、pilotId 过滤；默认全量，按申请时间倒序")
     @GetMapping
     public Result<AdminPageVo<AdminBorrowApplicationVO>> list(
             @Parameter(description = "状态过滤") @RequestParam(required = false) String status,
+            @Parameter(description = "飞手 ID 过滤") @RequestParam(required = false) Long pilotId,
             @Parameter(description = "页码（从 0 起）") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "每页条数（默认 20，上限 100）") @RequestParam(defaultValue = "20") int size) {
-        return Result.success(service.list(status, page, size));
+        return Result.success(service.list(status, pilotId, page, size));
     }
 
     @Operation(operationId = "adminApproveBorrowApplication", summary = "通过申请并指定机身号",

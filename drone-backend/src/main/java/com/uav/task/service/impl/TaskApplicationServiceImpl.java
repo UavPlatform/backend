@@ -22,7 +22,7 @@ import com.uav.task.service.TaskReadAccess;
 import com.uav.task.service.TaskService;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.entity.User;
-import com.uav.user.service.RiderUavService;
+import com.uav.aircraft.service.AircraftModelService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,7 +66,7 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
     private UserRepository userRepository;
 
     @Autowired
-    private RiderUavService riderUavService;
+    private AircraftModelService aircraftModelService;
 
     @Autowired
     private TransportPriceCalculator priceCalculator;
@@ -101,10 +101,8 @@ public class TaskApplicationServiceImpl implements TaskApplicationService {
                     "任务当前撮合状态不接受新应征: " + task.getMatchStatus());
         }
 
-        // 门禁：绑定设备 + 设备映射到该机型 + 机型可吊运
-        // （UAV_NOT_FOUND / AIRCRAFT_MODEL_REQUIRED / AIRCRAFT_MODEL_NOT_FOUND /
-        //  AIRCRAFT_MODEL_NOT_TRANSPORTABLE / AIRCRAFT_MODEL_MISMATCH）
-        AircraftModel model = riderUavService.requireTransportDevice(riderId, aircraftModelId);
+        // 门禁：机型可吊运（不再要求飞手自有机绑定）
+        AircraftModel model = aircraftModelService.requireTransportCapable(aircraftModelId);
 
         if (task.getCargoWeightKg() == null) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,

@@ -49,4 +49,5 @@ public class DispatchOrder extends AuditedEntity {
     @Column private Long executedAircraftModelId;
     @Column private Integer reviewScore;
     @Column(length = 500) private String reviewComment;
+    @Column(length = 500) private String deliveryNote;
 }

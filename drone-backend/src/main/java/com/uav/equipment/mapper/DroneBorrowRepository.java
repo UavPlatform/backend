@@ -14,8 +14,8 @@ public interface DroneBorrowRepository extends JpaRepository<DroneBorrow, String
     long countByPilotIdAndStatus(Long pilotId, String status);
     List<DroneBorrow> findByPilotIdAndStatusOrderByBorrowedAtDesc(Long pilotId, String status);
 
-    @Query("select b from DroneBorrow b where (:status is null or b.status = :status)")
-    Page<DroneBorrow> adminSearch(@Param("status") String status, Pageable page);
+    @Query("select b from DroneBorrow b where (:status is null or b.status = :status) and (:pilotId is null or b.pilotId = :pilotId)")
+    Page<DroneBorrow> adminSearch(@Param("status") String status, @Param("pilotId") Long pilotId, Pageable page);
 
     @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select b from DroneBorrow b where b.id = :id")

@@ -69,11 +69,12 @@ class AccountAuthIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("飞手注册直接返回 token")
+    @DisplayName("飞手注册直接返回 token（不再附带绑机 djiId）")
     void riderRegisterReturnsToken() {
         TestAccounts.Account rider = accounts().registerRider();
         assertThat(rider.role()).isEqualTo(1);
-        assertThat(rider.djiId()).isNotBlank();
+        assertThat(rider.token()).isNotBlank();
+        assertThat(rider.djiId()).isNull();
     }
 
     @Test

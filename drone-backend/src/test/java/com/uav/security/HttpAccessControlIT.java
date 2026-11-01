@@ -12,9 +12,7 @@ import com.uav.support.TestAccounts;
 import com.uav.support.UniqueNames;
 import com.uav.uav.mapper.UavRepository;
 import com.uav.uav.pojo.entity.Uav;
-import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRecordRepository;
-import com.uav.user.pojo.entity.RiderUav;
 import com.uav.user.pojo.entity.UserRecord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,8 +43,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class HttpAccessControlIT extends IntegrationTestBase {
 
-    @Autowired
-    RiderUavRepository riderUavRepository;
 
     @Autowired
     UavRepository uavRepository;
@@ -297,7 +293,7 @@ class HttpAccessControlIT extends IntegrationTestBase {
     // ---------- /api/ws/request 需登录 + 设备归属 ----------
 
     @Test
-    @DisplayName("/api/ws/request：匿名 401、未绑定飞手 403、绑定飞手 200")
+    @DisplayName("/api/ws/request：匿名 401、无借用飞手 403、已批准借用飞手 200")
     void wsRequestRequiresLoginAndOwnership() throws Exception {
         mockMvc.perform(post("/api/ws/request").param("deviceId", UniqueNames.unique("req-a")))
                 .andExpect(status().isUnauthorized());
@@ -309,11 +305,7 @@ class HttpAccessControlIT extends IntegrationTestBase {
                 .andExpect(status().isForbidden());
 
         TestAccounts.Account boundRider = accounts().registerRider(UniqueNames.userName("rq2"), null);
-        String boundDevice = UniqueNames.unique("req-c");
-        RiderUav binding = new RiderUav();
-        binding.setUserId(boundRider.id());
-        binding.setDjiId(boundDevice);
-        riderUavRepository.save(binding);
+        String boundDevice = fixtures.bindDrone(boundRider.id(), UniqueNames.djiId());
 
         mockMvc.perform(post("/api/ws/request")
                         .param("deviceId", boundDevice)

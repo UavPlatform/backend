@@ -1,10 +1,8 @@
 package com.uav.admin.service;
 
 import com.uav.admin.pojo.vo.AdminOrderVo;
-import com.uav.admin.pojo.vo.AdminPilotDroneVo;
 import com.uav.admin.pojo.vo.AdminTaskVo;
 import com.uav.admin.pojo.vo.AdminUserComplaintVo;
-import com.uav.aircraft.pojo.entity.AircraftModel;
 import com.uav.live.service.impl.LiveDeviceResolver;
 import com.uav.order.pojo.entity.OrderComplaint;
 import com.uav.pay.mapper.PayRecordRepository;
@@ -14,9 +12,7 @@ import com.uav.server.enums.OrderStatus;
 import com.uav.server.enums.TaskStatus;
 import com.uav.server.exception.BusinessException;
 import com.uav.task.mapper.TaskAssignmentRepository;
-import com.uav.uav.pojo.entity.Uav;
 import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.RiderUav;
 import com.uav.user.pojo.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -138,37 +134,6 @@ public class AdminQuerySupport {
                 pilot ? "飞手不存在: " + userId : "用户不存在: " + userId);
     }
 
-    public List<AdminPilotDroneVo> toDroneVos(List<RiderUav> bindings) {
-        if (bindings.isEmpty()) {
-            return List.of();
-        }
-        Set<Long> modelIds = bindings.stream()
-                .map(RiderUav::getAircraftModelId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, AircraftModel> models = modelIds.isEmpty() ? Map.of()
-                : em.createQuery("SELECT m FROM AircraftModel m WHERE m.id IN :ids", AircraftModel.class)
-                        .setParameter("ids", modelIds)
-                        .getResultList().stream()
-                        .collect(Collectors.toMap(AircraftModel::getId, m -> m));
-        Map<String, Uav> uavs = em.createQuery("SELECT u FROM Uav u WHERE u.djiId IN :djiIds", Uav.class)
-                .setParameter("djiIds", bindings.stream().map(RiderUav::getDjiId).collect(Collectors.toList()))
-                .getResultList().stream()
-                .collect(Collectors.toMap(Uav::getDjiId, u -> u, (a, b) -> a));
-
-        return bindings.stream().map(binding -> {
-            Uav uav = uavs.get(binding.getDjiId());
-            AircraftModel model = binding.getAircraftModelId() == null
-                    ? null : models.get(binding.getAircraftModelId());
-            return new AdminPilotDroneVo(
-                    binding.getDjiId(),
-                    binding.getAircraftModelId(),
-                    model != null ? model.getDisplayName() : null,
-                    uav != null && uav.getOnlineStatus() != null && uav.getOnlineStatus() == FLAG_ON,
-                    uav == null ? null
-                            : uav.getIsAvailable() != null && uav.getIsAvailable() == FLAG_ON);
-        }).collect(Collectors.toList());
-    }
 
     public List<AdminUserComplaintVo> toComplaintVos(List<OrderComplaint> complaints) {
         return complaints.stream()

@@ -28,7 +28,7 @@ public record AdminOrderVo(
         String taskNum,
         @Schema(description = "关联任务名称")
         String taskName,
-        @Schema(description = "作业设备DJI ID（解析链 task → task_assignment → rider_uav → 在线设备；"
+        @Schema(description = "作业设备DJI ID（解析链 task → 接单飞手 → 活动连机/借用在线设备；"
                 + "任务未接单/飞手未绑定设备/设备离线时为 null，前端按“无作业设备”占位）")
         String deviceId,
         @Schema(description = "订单总金额，单位：元")

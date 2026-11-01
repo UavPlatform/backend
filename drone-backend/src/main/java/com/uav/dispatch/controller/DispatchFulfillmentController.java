@@ -27,7 +27,7 @@ public class DispatchFulfillmentController {
     @PostMapping("/{orderId}/deliver") @RequireRole(1)
     @Operation(summary = "提交送达材料", description = "运输中飞手提交本人本次指派且用途为PILOT_DELIVERY的已核验对象材料，随后等待需求方收货材料；上传地址或PUT成功本身不算凭证")
     public Result<DispatchOrderVO> deliver(@PathVariable String orderId, @Valid @RequestBody DispatchDeliveryDTO input) {
-        return Result.success(flow.deliver(UserContext.getUserId(), orderId, input.assignmentVersion(), input.materialIds()));
+        return Result.success(flow.deliver(UserContext.getUserId(), orderId, input.assignmentVersion(), input.materialIds(), input.note()));
     }
     @PostMapping("/{orderId}/receipt") @RequireRole(0)
     @Operation(summary = "提交收货材料并结单", description = "需求方提交本人SHIPPER_RECEIPT材料，重新核验双方对象存在及大小后结单；按下单距离快照结算；差额为负则全额模拟退差，不额外收定金")

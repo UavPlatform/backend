@@ -3,6 +3,7 @@ package com.uav.chat;
 import com.uav.live.service.AppWebSocketService;
 import com.uav.support.RealProtocolTestBase;
 import com.uav.support.TestAccounts;
+import com.uav.support.UniqueNames;
 import jakarta.websocket.ClientEndpointConfig;
 import jakarta.websocket.CloseReason;
 import jakarta.websocket.ContainerProvider;
@@ -109,9 +110,9 @@ class ChatKickCloseCodeE2EIT extends RealProtocolTestBase {
     @Test
     @DisplayName("设备通道不受 4001 语义影响：同 deviceId 二次连接不关闭旧会话")
     void droneChannelUnaffectedByKickSemantics() throws Exception {
-        // 真实注册飞手：djiId 即绑定设备号，token 由服务端签发
+        // 真实注册飞手 + 批准借用机；token 由服务端签发（无 rider_uav）
         TestAccounts.Account rider = accounts().registerRider();
-        String deviceId = rider.djiId();
+        String deviceId = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
 
         TrackingEndpoint first = connectDevice(rider, deviceId);
         TrackingEndpoint second = connectDevice(rider, deviceId);

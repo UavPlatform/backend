@@ -1,7 +1,6 @@
 Class <com.uav.admin.pojo.vo.AdminOrderVo> has simple name ending with 'Vo' in (AdminOrderVo.java:0)
 Class <com.uav.admin.pojo.vo.AdminPageVo> has simple name ending with 'Vo' in (AdminPageVo.java:0)
 Class <com.uav.admin.pojo.vo.AdminPilotDetailVo> has simple name ending with 'Vo' in (AdminPilotDetailVo.java:0)
-Class <com.uav.admin.pojo.vo.AdminPilotDroneVo> has simple name ending with 'Vo' in (AdminPilotDroneVo.java:0)
 Class <com.uav.admin.pojo.vo.AdminPilotVo> has simple name ending with 'Vo' in (AdminPilotVo.java:0)
 Class <com.uav.admin.pojo.vo.AdminTaskVo> has simple name ending with 'Vo' in (AdminTaskVo.java:0)
 Class <com.uav.admin.pojo.vo.AdminUserComplaintVo> has simple name ending with 'Vo' in (AdminUserComplaintVo.java:0)

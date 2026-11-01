@@ -1,86 +1,72 @@
 package com.uav.live.service.impl;
 
+import com.uav.equipment.mapper.DroneBorrowRepository;
+import com.uav.equipment.mapper.ProviderDroneRepository;
+import com.uav.equipment.pojo.entity.DroneBorrow;
+import com.uav.flight.mapper.FlightConnectionRepository;
 import com.uav.live.service.AppWebSocketService;
 import com.uav.live.service.LiveSessionService;
 import com.uav.task.mapper.TaskAssignmentRepository;
-import com.uav.user.mapper.RiderUavRepository;
-import com.uav.user.pojo.entity.RiderUav;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
-/**
- * 任务→设备映射解析器（1B-4b 微任务，裁决 Q3=C；t38 用户端直播观看依赖）。
- *
- * <p>解析链（冻结契约）：taskId → task_assignment.rider_id → rider_uav 绑定设备 →
- * 取其中「在线」的一台（appWebSocketService.isConnected）。
- * 无接单记录 / 无绑定设备 / 设备均离线 → deviceId=null 且 liveState=IDLE。
- *
- * <p>用途：TaskVo / OrderVO 携带 deviceId + liveState，用户端进详情页即可判定
- * 「观看直播」入口并调用 /live/get 拉取凭证。
- */
+/** 任务→设备：派单活动连机优先，其次已批准借用机身号中在线的一台（无 rider_uav）。 */
 @Slf4j
 @Service
 public class LiveDeviceResolver {
 
-    /** 解析结果：deviceId 为 null 表示当前无可观看的在线设备；liveState 为 LiveSession 状态名。 */
     public record TaskLiveDevice(String deviceId, String liveState) {
-        public static TaskLiveDevice idle() {
-            return new TaskLiveDevice(null, "IDLE");
-        }
+        public static TaskLiveDevice idle() { return new TaskLiveDevice(null, "IDLE"); }
     }
 
     private final TaskAssignmentRepository taskAssignmentRepository;
-
-    private final RiderUavRepository riderUavRepository;
-
+    private final FlightConnectionRepository connections;
+    private final ProviderDroneRepository drones;
+    private final DroneBorrowRepository borrows;
     private final AppWebSocketService appWebSocketService;
-
     private final LiveSessionService liveSessionService;
 
     public LiveDeviceResolver(TaskAssignmentRepository taskAssignmentRepository,
-                              RiderUavRepository riderUavRepository,
+                              FlightConnectionRepository connections,
+                              ProviderDroneRepository drones,
+                              DroneBorrowRepository borrows,
                               AppWebSocketService appWebSocketService,
                               LiveSessionService liveSessionService) {
         this.taskAssignmentRepository = taskAssignmentRepository;
-        this.riderUavRepository = riderUavRepository;
+        this.connections = connections;
+        this.drones = drones;
+        this.borrows = borrows;
         this.appWebSocketService = appWebSocketService;
         this.liveSessionService = liveSessionService;
     }
 
-    /**
-     * 解析任务关联的作业设备与其直播态（只读，可安全在详情页路径调用）。
-     */
     public TaskLiveDevice resolveForTask(Long taskId) {
-        if (taskId == null) {
-            return TaskLiveDevice.idle();
-        }
+        if (taskId == null) return TaskLiveDevice.idle();
         var assignment = taskAssignmentRepository.findByTaskId(taskId).orElse(null);
-        if (assignment == null) {
-            return TaskLiveDevice.idle(); // 尚未接单：无作业设备
-        }
+        if (assignment == null) return TaskLiveDevice.idle();
         return resolveForRider(assignment.getRiderId());
     }
 
-    /**
-     * 按飞手解析其绑定设备中在线的一台及直播态；列表批量装配时同一飞手只解析一次。
-     */
     public TaskLiveDevice resolveForRider(Long riderId) {
-        if (riderId == null) {
-            return TaskLiveDevice.idle();
-        }
-        List<RiderUav> bindings = riderUavRepository.findByUserId(riderId);
-        String connectedDeviceId = bindings.stream()
-                .map(RiderUav::getDjiId)
-                .filter(appWebSocketService::isConnected)
-                .findFirst()
+        if (riderId == null) return TaskLiveDevice.idle();
+        String connected = connections.findFirstByPilotIdAndActiveSerialNotNullOrderByOpenedAtDesc(riderId)
+                .map(c -> c.getActiveSerial())
+                .filter(s -> s != null && appWebSocketService.isConnected(s))
                 .orElse(null);
-        if (connectedDeviceId == null) {
-            return TaskLiveDevice.idle(); // 绑定设备均离线
+        if (connected == null) {
+            connected = borrows.findByPilotIdAndStatusOrderByBorrowedAtDesc(riderId, DroneBorrow.APPROVED).stream()
+                    .map(DroneBorrow::getDroneId)
+                    .filter(id -> id != null)
+                    .map(id -> drones.findById(id).orElse(null))
+                    .filter(d -> d != null)
+                    .map(d -> d.getSerialNumber())
+                    .filter(s -> s != null && appWebSocketService.isConnected(s))
+                    .findFirst()
+                    .orElse(null);
         }
-        String liveState = liveSessionService.getSnapshot(connectedDeviceId).getState().name();
-        log.debug("飞手 {} 解析到在线设备 {}（liveState={}）", riderId, connectedDeviceId, liveState);
-        return new TaskLiveDevice(connectedDeviceId, liveState);
+        if (connected == null) return TaskLiveDevice.idle();
+        String liveState = liveSessionService.getSnapshot(connected).getState().name();
+        log.debug("飞手 {} 解析到在线设备 {}（liveState={}）", riderId, connected, liveState);
+        return new TaskLiveDevice(connected, liveState);
     }
 }

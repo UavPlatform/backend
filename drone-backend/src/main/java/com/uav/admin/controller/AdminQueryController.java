@@ -115,7 +115,7 @@ public class AdminQueryController {
     }
 
     @Operation(summary = "注册飞手分页列表",
-            description = "注册飞手（role=1）；含绑定无人机数、在线无人机数与累计完成单；page 从 0 起",
+            description = "注册飞手（role=1）；含借用记录数、在线无人机数与累计完成单；page 从 0 起",
             parameters = {
                     @Parameter(name = "page", description = "页码（从 0 起）"),
                     @Parameter(name = "size", description = "每页条数（默认 20，上限 100）"),
@@ -130,8 +130,7 @@ public class AdminQueryController {
     }
 
     @Operation(summary = "飞手详情",
-            description = "基本信息 + 绑定无人机表（djiId、机型名、在线、可用）+ 关联订单；"
-                    + "无人机启用/禁用复用 POST /admin/uav/available（按 deviceId=djiId 启停）",
+            description = "基本信息 + 借用记录（GOV-007）+ 关联订单；机库启停见机场·无人机管理",
             parameters = {@Parameter(name = "userId", description = "飞手ID", required = true)})
     @GetMapping("/pilots/{userId}")
     public Result<AdminPilotDetailVo> pilotDetail(@PathVariable Long userId) {

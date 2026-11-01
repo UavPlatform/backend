@@ -3,7 +3,6 @@ package com.uav.user.service.impl;
 import com.uav.user.mapper.UserRepository;
 import com.uav.user.pojo.dto.RiderRegisterDto;
 import com.uav.user.pojo.entity.User;
-import com.uav.user.service.RiderUavService;
 import com.uav.user.service.RiderRegisterService;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
@@ -19,9 +18,6 @@ public class RiderRegisterServiceImpl implements RiderRegisterService {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private RiderUavService riderUavService;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public User register(RiderRegisterDto dto) {
@@ -34,17 +30,6 @@ public class RiderRegisterServiceImpl implements RiderRegisterService {
         user.setPassword(PasswordUtil.hash(dto.getPassword()));
         user.setStatus(1);
         user.setRole(1);
-        user = userRepository.save(user);
-
-        if (dto.getAircraftModelId() != null
-                && (dto.getDjiId() == null || dto.getDjiId().isBlank())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAM,
-                    "未提供 djiId 时不能指定机型");
-        }
-        if (dto.getDjiId() != null && !dto.getDjiId().isBlank()) {
-            riderUavService.bindDrone(user.getId(), dto.getDjiId(), dto.getAircraftModelId());
-        }
-
-        return user;
+        return userRepository.save(user);
     }
 }

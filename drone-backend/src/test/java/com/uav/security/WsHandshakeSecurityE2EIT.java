@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * <ul>
  *   <li>/ws/{sid}（Jakarta chat）：无 token / token 与 sid 不符 → 拒绝；匹配 → 连通</li>
  *   <li>/ws/web：无 token → 拒绝；有 token → 连通</li>
- *   <li>/ws/drone：无 token / 非飞手 / 设备未绑定 → 拒绝；绑定飞手 → 连通</li>
+ *   <li>/ws/drone：无 token / 非飞手 / 无使用权 → 拒绝；已批准借用 → 连通</li>
  * </ul>
  *
  * <p>层次与驱动（R4/R9/O4/O6）：真实 WebSocket 协议测试——继承 {@link RealProtocolTestBase}
@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  *
  * <p>身份来源（R3）：全部走 {@link TestAccounts} 的真实注册/登录接口，不再构造自签 token。
  * 「身份不符」用两个真实用户互串（一方 token + 另一方 sid），「非飞手」用真实普通用户，
- * 「已绑定飞手」用 {@code /rider/register} 的真实绑定链路（服务端据此写入 RiderUav），
+ * 「已获借用/连机权的飞手」用 {@code /rider/register} 的TestFixtures 批准借用链路，
  * 因此本类不手工插入任何造数行（R7），隔离靠唯一用户名/DJI ID（R5）。
  */
 class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
@@ -156,7 +156,7 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("设备 WS：飞手连接未绑定设备握手被拒")
+    @DisplayName("设备 WS：飞手连接无使用权设备握手被拒")
     void droneWsUnboundRiderRejected() throws Exception {
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), null);
 
@@ -168,10 +168,11 @@ class WsHandshakeSecurityE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    @DisplayName("设备 WS：绑定设备的飞手握手成功")
+    @DisplayName("设备 WS：已批准借用机的飞手握手成功")
     void droneWsBoundRiderAccepted() throws Exception {
         String deviceId = UniqueNames.djiId();
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), deviceId);
+        fixtures.bindDrone(rider.id(), deviceId);
 
         // 业务前置：握手通过后 DroneWebSocketHandler 只接纳已「申请连接」的设备，否则立即以
         // POLICY_VIOLATION 关闭。原用例缺这一步，只靠「服务端关闭帧尚未到达」的时间窗通过（CI 上偶发红）；

@@ -184,14 +184,11 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("注册飞手列表：只含 role=1，绑定/在线/完成单聚合，空关键字无命中")
+    @DisplayName("注册飞手列表：只含 role=1，完成单聚合，空关键字无命中")
     void pilotListAggregatesAndExcludesUsers() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
-        TestAccounts.Account rider = accounts().registerRider(); // 绑定 1 台（未映射机型、无设备档案）
-        String modeledDjiId = UniqueNames.djiId();
-        fixtures.bindDrone(rider.id(), modeledDjiId);           // 绑定 2 台（FC30 机型映射）
-        saveUav(rider.djiId(), '1', '1');                       // 在线
-        saveUav(modeledDjiId, '0', '1');                        // 离线
+        TestAccounts.Account rider = accounts().registerRider();
+        fixtures.bindDrone(rider.id(), UniqueNames.djiId());
 
         // 完成单：直连仓储造一条 complete_time 非空的接单记录
         Task task = fixtures.task(TaskStatus.COMPLETED, 100.0, owner.id());
@@ -209,8 +206,7 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         JsonNode row = hit.path("content").get(0);
         assertThat(row.path("userId").asLong()).isEqualTo(rider.id());
         assertThat(row.path("status").asInt()).isEqualTo(1);
-        assertThat(row.path("uavCount").asInt()).isEqualTo(2);
-        assertThat(row.path("onlineUavCount").asInt()).isEqualTo(1);
+        assertThat(row.path("uavCount").isMissingNode() || row.path("uavCount").isNull()).isTrue();
         assertThat(row.path("completedCount").asLong()).isEqualTo(1);
 
         // 普通用户不混入飞手列表
@@ -226,16 +222,12 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("飞手详情：无人机表（djiId/机型/在线/可用）+ 关联订单（已接单与已选定）")
-    void pilotDetailReturnsDronesAndOrders() throws Exception {
+    @DisplayName("飞手详情：借用记录 + 关联订单（已接单与已选定）")
+    void pilotDetailReturnsBorrowsAndOrders() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
-        TestAccounts.Account rider = accounts().registerRider(); // dji1：未映射机型
-        String modeledDjiId = UniqueNames.djiId();
-        fixtures.bindDrone(rider.id(), modeledDjiId);           // dji2：FC30 机型映射
-        saveUav(rider.djiId(), '0', '1');                       // 离线、可用
-        saveUav(modeledDjiId, '1', '0');                        // 在线、禁用
+        TestAccounts.Account rider = accounts().registerRider();
+        String serial = fixtures.bindDrone(rider.id(), UniqueNames.djiId());
 
-        // 订单 A：选定 → 支付 → 飞手确认（产生接单记录）
         UserContext.setUser(owner.id(), owner.userName(), 0);
         Task taskA = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("pd-a")));
         UserContext.clear();
@@ -243,7 +235,6 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         taskService.riderConfirmOrder(taskA.getTaskNum(), rider.id());
         MissionOrder orderA = orderRepository.findByTaskId(taskA.getId()).orElseThrow();
 
-        // 订单 B：用户已选定、飞手未确认（无接单记录，凭 selectedApplicationId 关联）
         UserContext.setUser(owner.id(), owner.userName(), 0);
         Task taskB = taskService.createTask(fixtures.twoWaypointTask(UniqueNames.unique("pd-b")));
         UserContext.clear();
@@ -255,28 +246,17 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         assertThat(data.path("userId").asLong()).isEqualTo(rider.id());
         assertThat(data.path("userName").asText()).isEqualTo(rider.userName());
         assertThat(data.path("role").asInt()).isEqualTo(1);
+        assertThat(data.path("drones").isMissingNode() || data.path("drones").isNull()).isTrue();
 
-        // 无人机表：djiId、机型名、在线、可用
-        JsonNode drones = data.path("drones");
-        assertThat(drones.size()).isEqualTo(2);
-        JsonNode unmodeled = droneByDjiId(drones, rider.djiId());
-        assertThat(unmodeled.path("aircraftModelId").isNull())
-                .as("注册路径未映射机型 → aircraftModelId 为 null").isTrue();
-        assertThat(unmodeled.path("modelName").isNull()).isTrue();
-        assertThat(unmodeled.path("online").asBoolean()).isFalse();
-        assertThat(unmodeled.path("available").asBoolean()).isTrue();
+        JsonNode borrows = data.path("borrows");
+        assertThat(borrows.size()).isEqualTo(1);
+        assertThat(borrows.get(0).path("status").asText()).isEqualTo("APPROVED");
+        assertThat(borrows.get(0).path("serialNumber").asText()).isEqualTo(serial);
+        assertThat(borrows.get(0).path("aircraftModelId").asLong()).isEqualTo(fixtures.defaultAircraftModelId());
 
-        JsonNode modeled = droneByDjiId(drones, modeledDjiId);
-        assertThat(modeled.path("aircraftModelId").asLong()).isEqualTo(fixtures.defaultAircraftModelId());
-        assertThat(modeled.path("modelName").asText()).isNotBlank();
-        assertThat(modeled.path("online").asBoolean()).isTrue();
-        assertThat(modeled.path("available").asBoolean()).isFalse();
-
-        // 关联订单：A（已接单）与 B（已选定未确认）
         List<String> orderNums = data.path("orders").findValuesAsText("orderNum");
         assertThat(orderNums).contains(orderA.getOrderNum(), orderB.getOrderNum());
 
-        // 普通用户/不存在 ID → 404
         mockMvc.perform(get("/admin/pilots/" + owner.id())
                         .header("Authorization", admin.authorization()))
                 .andExpect(status().isNotFound())
@@ -284,49 +264,6 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         mockMvc.perform(get("/admin/pilots/987654321")
                         .header("Authorization", admin.authorization()))
                 .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("飞手注册绑机：自动补设备档案，详情不再把绑定设备标为未注册")
-    void pilotDetailRecognizesArchiveFromBindPath() throws Exception {
-        TestAccounts.Account rider = accounts().registerRider();
-        TestAccounts.AdminAccount admin = accounts().adminLogin();
-
-        JsonNode drone = droneByDjiId(
-                adminGet(get("/admin/pilots/" + rider.id()), admin).path("drones"), rider.djiId());
-        assertThat(drone.path("available").isNull())
-                .as("绑机后应有 uav 档案，available 不应为 null").isFalse();
-        assertThat(drone.path("available").asBoolean()).isTrue();
-        assertThat(drone.path("online").asBoolean()).isFalse();
-    }
-
-    @Test
-    @DisplayName("无人机启用/禁用复用 /admin/uav/available（按 djiId），飞手详情可用状态随之翻转")
-    void uavAvailableToggleVisibleInPilotDetail() throws Exception {
-        TestAccounts.Account rider = accounts().registerRider();
-        saveUav(rider.djiId(), '1', '1');
-        TestAccounts.AdminAccount admin = accounts().adminLogin();
-
-        assertThat(droneByDjiId(
-                adminGet(get("/admin/pilots/" + rider.id()), admin).path("drones"), rider.djiId())
-                .path("available").asBoolean()).isTrue();
-
-        mockMvc.perform(post("/admin/uav/available")
-                        .param("deviceId", rider.djiId()).param("isAvailable", "0")
-                        .header("Authorization", admin.authorization()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-
-        // 同事务内 bulk UPDATE 不刷新一级缓存（生产上各请求独立事务/EM 不受影响）：
-        // 清掉共享 PC，让回读走真实 SQL，模拟下一次独立请求的可见性。
-        entityManager.clear();
-
-        JsonNode drone = droneByDjiId(
-                adminGet(get("/admin/pilots/" + rider.id()), admin).path("drones"), rider.djiId());
-        assertThat(drone.path("available").asBoolean())
-                .as("按 djiId 禁用后，飞手详情应回读为不可用").isFalse();
-        assertThat(drone.path("online").asBoolean())
-                .as("启停只改可用状态，不改在线状态").isTrue();
     }
 
     @Test
@@ -368,7 +305,8 @@ class AdminSubjectQueryApiIT extends IntegrationTestBase {
         assertThat(page.path("totalElements").asLong()).isEqualTo(1);
 
         JsonNode pilot = adminGet(get("/admin/pilots/" + soloRider.id()), admin);
-        assertThat(pilot.path("drones").size()).isZero();
+        assertThat(pilot.path("borrows").size()).isZero();
+        assertThat(pilot.path("drones").isMissingNode() || pilot.path("drones").isNull()).isTrue();
         assertThat(pilot.path("orders").size()).isZero();
         assertThat(pilot.path("completedCount").asLong()).isZero();
     }

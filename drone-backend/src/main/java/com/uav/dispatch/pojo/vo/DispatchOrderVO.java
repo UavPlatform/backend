@@ -12,4 +12,5 @@ public record DispatchOrderVO(String orderId, String stage, String fundsStatus, 
                               LocalDateTime startedAt, LocalDateTime deliveredAt, LocalDateTime receiptAt,
                               DispatchExecutedDroneVO executedDrone,
                               LocalDateTime depositPaidAt, LocalDateTime waitingSince,
-                              LocalDateTime acceptedAt, LocalDateTime arrivedAt) { }
+                              LocalDateTime acceptedAt, LocalDateTime arrivedAt,
+                              String deliveryNote) { }

@@ -12,7 +12,6 @@ import com.uav.rider.mapper.RiderQualificationRepository;
 import com.uav.server.enums.ApiErrorCode;
 import com.uav.server.exception.BusinessException;
 import com.uav.task.mapper.TaskApplicationRepository;
-import com.uav.user.mapper.RiderUavRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,19 +30,17 @@ public class AdminAircraftModelService {
 
     private final AircraftModelRepository models;
     private final ProviderDroneRepository drones;
-    private final RiderUavRepository riderUavs;
     private final RiderQualificationRepository qualifications;
     private final FlightConnectionRepository flights;
     private final DispatchOrderRepository orders;
     private final TaskApplicationRepository applications;
 
     public AdminAircraftModelService(AircraftModelRepository models, ProviderDroneRepository drones,
-                                     RiderUavRepository riderUavs, RiderQualificationRepository qualifications,
+                                     RiderQualificationRepository qualifications,
                                      FlightConnectionRepository flights, DispatchOrderRepository orders,
                                      TaskApplicationRepository applications) {
         this.models = models;
         this.drones = drones;
-        this.riderUavs = riderUavs;
         this.qualifications = qualifications;
         this.flights = flights;
         this.orders = orders;
@@ -115,7 +112,6 @@ public class AdminAircraftModelService {
 
     private boolean referenced(Long id) {
         return drones.existsByAircraftModelId(id)
-                || riderUavs.existsByAircraftModelId(id)
                 || qualifications.existsByAircraftModelId(id)
                 || flights.existsByAircraftModelId(id)
                 || orders.existsByExecutedAircraftModelId(id)

@@ -1,6 +1,11 @@
 package com.uav.support;
 
 import com.uav.aircraft.mapper.AircraftModelRepository;
+import com.uav.equipment.mapper.DroneBorrowRepository;
+import com.uav.equipment.mapper.ProviderDroneRepository;
+import com.uav.equipment.pojo.entity.DroneBorrow;
+import com.uav.equipment.pojo.entity.ProviderDrone;
+import com.uav.server.util.SerialNumbers;
 import com.uav.order.mapper.OrderRepository;
 import com.uav.order.pojo.entity.MissionOrder;
 import com.uav.pay.mapper.PayRecordRepository;
@@ -19,11 +24,8 @@ import com.uav.task.pojo.dto.WaypointDto;
 import com.uav.task.pojo.entity.Task;
 import com.uav.task.pojo.entity.TaskApplication;
 import com.uav.task.pojo.entity.TaskAttachment;
-import com.uav.user.mapper.RiderUavRepository;
 import com.uav.user.mapper.UserRepository;
-import com.uav.user.pojo.entity.RiderUav;
 import com.uav.user.pojo.entity.User;
-import com.uav.user.service.RiderUavService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -36,10 +38,9 @@ import java.util.List;
  * 不再逐类复制私有 {@code newUser()} / {@code twoWaypointTask()}；O2：无 @Test 的工具类）。
  *
  * <p>本工厂做「直连仓储造数」，造出的实体字段按各测试类的既有私有方法机械收编，语义保持不变
- * （例如用户密码在绕过登录的场景下沿用占位值 {@code irrelevant}）。只有无人机绑定（{@code rider_uav}）是例外：
+ * （例如用户密码在绕过登录的场景下沿用占位值 {@code irrelevant}）。设备使用权（已批准借用）是例外：
  * {@link #bindDrone(User)} / {@link #bindDrone(User, String)} 必须走生产绑定路径
- * {@link RiderUavService#bindDrone(Long, String, Long)}（非空校验 + 机型校验 + 全局唯一校验），不得直接
- * {@code riderUavRepository.save} 造出与生产不一致的绑定状态。需要「真实身份」时走
+ * 通过 {@link #bindDrone(User)} 写入已批准借用。需要「真实身份」时走
  * {@link TestAccounts} 的真实注册/登录接口；需要「真实业务链路」时由测试调用对应 Service。
  *
  * <p>唯一命名 / 唯一客户端身份的公开入口是 {@link UniqueNames}
@@ -54,10 +55,10 @@ public class TestFixtures {
     private UserRepository userRepository;
 
     @Autowired
-    private RiderUavRepository riderUavRepository;
+    private ProviderDroneRepository providerDroneRepository;
 
     @Autowired
-    private RiderUavService riderUavService;
+    private DroneBorrowRepository droneBorrowRepository;
 
     @Autowired
     private AircraftModelRepository aircraftModelRepository;
@@ -118,8 +119,7 @@ public class TestFixtures {
     }
 
     /**
-     * 造一个已绑定唯一无人机的飞手（role=1），可通过 {@code @RequireDrone} 门槛，也可用其
-     * {@code userId + djiId} 通过 {@code /ws/drone?deviceId=<djiId>&token=<token>} 握手鉴权。
+     * 造一个已批准借用一台平台机的飞手（可通过设备通道 mayUse）。
      */
     public User riderWithDrone() {
         User rider = rider();
@@ -127,49 +127,56 @@ public class TestFixtures {
         return rider;
     }
 
-    /**
-     * 给飞手绑定一台唯一无人机，使其能通过 {@code @RequireDrone} 门槛
-     * （{@code JwtInterceptor} 以 {@code riderUavRepository.existsByUserId} 判定）。
-     */
-    public RiderUav bindDrone(User rider) {
+    /** 给飞手批准借用一台平台机（默认机型 FC30、随机机身号）。返回机身号。 */
+    public String bindDrone(User rider) {
         return bindDrone(rider, UniqueNames.djiId());
     }
 
-    /**
-     * 用指定 DJI ID 绑定（机型映射为默认种子 {@link #defaultAircraftModelId()}），
-     * 走生产绑定路径 {@link RiderUavService#bindDrone(Long, String, Long)}
-     * （非空校验 + 机型校验 + 全局唯一校验，与 {@code /rider/drone/bind} 同一条代码路径），
-     * 而不是直接 {@code riderUavRepository.save} 造出与生产不一致的绑定状态。
-     * DJI ID 全库唯一，重复会触发生产侧「该无人机已被绑定」。
-     */
-    public RiderUav bindDrone(User rider, String djiId) {
-        return bindDrone(rider.getId(), djiId);
+    public String bindDrone(User rider, String serial) {
+        return bindDrone(rider.getId(), serial);
+    }
+
+    public String bindDrone(long userId, String serial) {
+        return bindDrone(userId, serial, defaultAircraftModelId());
     }
 
     /**
-     * 用 userId 绑定指定 DJI ID（核心入口，机型为默认种子 FC30）：走生产绑定路径
-     * {@link RiderUavService#bindDrone(Long, String, Long)}，而不是直接
-     * {@code riderUavRepository.save} 造出与生产不一致的绑定状态。
-     *
-     * <p>供真实协议测试把设备绑定到 {@link TestAccounts.Account#id()} 指定的真实飞手上
-     * （例如 LiveRiderStartE2EIT 需要 {@code deviceId} 绑定到握手令牌的 userId）。
+     * 测试夹具：写入一台平台机 + 已批准借用，使 {@code PilotDeviceAccess#mayUse} 通过。
+     * {@code serial} 会规范化为大写；{@code aircraftModelId} 为空时用 FC30。
      */
-    public RiderUav bindDrone(long userId, String djiId) {
-        return bindDrone(userId, djiId, defaultAircraftModelId());
-    }
-
-    /**
-     * 用 userId 绑定指定 DJI ID 并映射指定机型（{@code aircraftModelId} 为 {@code null}
-     * 时造出与注册旧路径一致的未映射设备）：仍走生产绑定路径
-     * {@link RiderUavService#bindDrone(Long, String, Long)}。
-     */
-    public RiderUav bindDrone(long userId, String djiId, Long aircraftModelId) {
-        riderUavService.bindDrone(userId, djiId, aircraftModelId);
-        return riderUavRepository.findByUserId(userId).stream()
-                .filter(binding -> djiId.equals(binding.getDjiId()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "绑定后未查到 rider_uav 记录: userId=" + userId + ", djiId=" + djiId));
+    public String bindDrone(long userId, String serial, Long aircraftModelId) {
+        String norm = SerialNumbers.normalize(serial);
+        long modelId = aircraftModelId == null ? defaultAircraftModelId() : aircraftModelId;
+        ProviderDrone drone = providerDroneRepository.findBySerialNumber(norm).orElseGet(() -> {
+            ProviderDrone d = new ProviderDrone();
+            d.setId(java.util.UUID.randomUUID().toString());
+            d.setAircraftModelId(modelId);
+            d.setSerialNumber(norm);
+            d.setAirportId(1L);
+            d.setEnabled(true);
+            d.setCreatedAt(java.time.LocalDateTime.now());
+            return providerDroneRepository.saveAndFlush(d);
+        });
+        if (drone.getCurrentBorrowId() != null) {
+            var existing = droneBorrowRepository.findById(drone.getCurrentBorrowId()).orElse(null);
+            if (existing != null && userId == existing.getPilotId() && DroneBorrow.APPROVED.equals(existing.getStatus())) {
+                return norm;
+            }
+            throw new IllegalStateException("机身号已被其他飞手借用: " + norm);
+        }
+        DroneBorrow borrow = new DroneBorrow();
+        borrow.setId(java.util.UUID.randomUUID().toString());
+        borrow.setDroneId(drone.getId());
+        borrow.setAircraftModelId(modelId);
+        borrow.setPilotId(userId);
+        borrow.setRequestKey(UniqueNames.unique("loan"));
+        borrow.setStatus(DroneBorrow.APPROVED);
+        borrow.setAppliedAt(java.time.LocalDateTime.now());
+        borrow.setBorrowedAt(borrow.getAppliedAt());
+        droneBorrowRepository.saveAndFlush(borrow);
+        drone.setCurrentBorrowId(borrow.getId());
+        providerDroneRepository.saveAndFlush(drone);
+        return norm;
     }
 
     /** 默认可吊运机型 ID（V2 迁移种子 {@code FC30}）；种子缺失时快速失败。 */
@@ -180,17 +187,19 @@ public class TestFixtures {
                 .getId();
     }
 
-    /** 读取飞手当前绑定的第一个 DJI ID；未绑定时快速失败。 */
+    /** 读取飞手当前已批准借用机身号；无借用时快速失败。 */
     public String djiIdOf(User rider) {
         return djiIdOf(rider.getId());
     }
 
-    /** 读取指定 userId 当前绑定的第一个 DJI ID；未绑定时快速失败。 */
     public String djiIdOf(long userId) {
-        return riderUavRepository.findByUserId(userId).stream()
-                .map(RiderUav::getDjiId)
+        return droneBorrowRepository.findByPilotIdAndStatusOrderByBorrowedAtDesc(userId, DroneBorrow.APPROVED).stream()
+                .map(DroneBorrow::getDroneId)
+                .map(id -> providerDroneRepository.findById(id).orElse(null))
+                .filter(d -> d != null)
+                .map(ProviderDrone::getSerialNumber)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("用户未绑定无人机: userId=" + userId));
+                .orElseThrow(() -> new IllegalStateException("用户无已批准借用机: userId=" + userId));
     }
 
     // ---------- 任务 ----------

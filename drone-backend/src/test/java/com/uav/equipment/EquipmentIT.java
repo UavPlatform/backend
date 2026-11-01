@@ -87,7 +87,6 @@ class EquipmentIT extends IntegrationTestBase {
                 .path("returnedAt").isNull()).isFalse();
         postData(pilot.token(), "/equipment/pilot/borrows/" + loan.path("borrowId").asText() + "/return", Map.of());
         assertThat(getData(pilot.token(), "/equipment/pilot/borrows/current").path("items")).isEmpty();
-        assertThat(getData(pilot.token(), "/rider/drone/list").size()).isZero();
         assertThat(getData(pilot.token(), "/dispatch/pilot/orders").size()).isZero();
         assertThat(getData(admin.token(), "/admin/drones/" + id + "/borrows").path("totalElements").asLong()).isEqualTo(1);
 

@@ -1,7 +1,6 @@
 package com.uav.server.ws.auth;
 
 import com.uav.server.util.JwtUtil;
-import com.uav.user.mapper.RiderUavRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
@@ -12,29 +11,15 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
 /**
- * WebSocket 握手鉴权拦截器（修复 P0-1：/ws/{sid}、/ws/drone、/ws/web 握手无鉴权）。
- *
- * <p>协议：与 REST 共用同一枚登录 accessToken，
- * <ul>
- *   <li>首选：握手请求头 {@code Authorization: Bearer <accessToken>}（原生客户端）</li>
- *   <li>兜底：握手 URL query {@code ?token=<accessToken>}（浏览器 WebSocket API 无法自定义握手头）</li>
- * </ul>
- *
- * <p>拦截器返回 false 时，Spring 以 403 FORBIDDEN 拒绝握手。
- * <ul>
- *   <li>DEVICE_CHANNEL（/ws/drone）：要求 role=1（飞手）且 deviceId 已绑定到该飞手；</li>
- *   <li>WEB_CHANNEL（/ws/web）：仅要求有效登录；</li>
- *   <li>CHAT（/ws/{sid}）：要求令牌 userId 等于路径中的 sid（不能冒充他人收消息）。</li>
- * </ul>
+ * WebSocket 握手鉴权。DEVICE_CHANNEL 用注入的 deviceAccess（派单连机或已批准借用），不再默认 rider_uav。
  */
 @Slf4j
 public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
 
-    /** 飞手角色码（P2-29 角色常量化的一部分，先固定使用） */
     public static final int ROLE_RIDER = 1;
-
     public static final String ATTR_USER_ID = "wsUserId";
     public static final String ATTR_USERNAME = "wsUsername";
     public static final String ATTR_ROLE = "wsRole";
@@ -42,21 +27,17 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
     public enum Mode { DEVICE_CHANNEL, WEB_CHANNEL, CHAT }
 
     private final JwtUtil jwtUtil;
-    private final RiderUavRepository riderUavRepository;
     private final Mode mode;
-    /** Device-channel ownership check (pilot, deviceId); defaults to the legacy rider_uav binding. */
-    private final java.util.function.BiPredicate<Long, String> deviceAccess;
+    private final BiPredicate<Long, String> deviceAccess;
 
-    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, RiderUavRepository riderUavRepository, Mode mode) {
-        this(jwtUtil, riderUavRepository, mode, riderUavRepository::existsByUserIdAndDjiId);
+    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, Mode mode) {
+        this(jwtUtil, mode, (pilot, device) -> false);
     }
 
-    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, RiderUavRepository riderUavRepository, Mode mode,
-                                      java.util.function.BiPredicate<Long, String> deviceAccess) {
+    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, Mode mode, BiPredicate<Long, String> deviceAccess) {
         this.jwtUtil = jwtUtil;
-        this.riderUavRepository = riderUavRepository;
         this.mode = mode;
-        this.deviceAccess = deviceAccess;
+        this.deviceAccess = deviceAccess == null ? (p, d) -> false : deviceAccess;
     }
 
     @Override
@@ -101,7 +82,7 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
                 return false;
             }
             if (!deviceAccess.test(userId, deviceId)) {
-                log.warn("拒绝 WebSocket 握手（设备通道）：设备未绑定到该飞手、也不是其派单任务当前连机的无人机, userId={}, deviceId={}", userId, deviceId);
+                log.warn("拒绝 WebSocket 握手（设备通道）：设备不是该飞手派单连机或已批准借用机, userId={}, deviceId={}", userId, deviceId);
                 return false;
             }
         }
@@ -118,7 +99,6 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
-        // no-op
     }
 
     private String extractToken(ServerHttpRequest request) {
@@ -130,20 +110,13 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
     }
 
     private String queryParam(ServerHttpRequest request, String name) {
-        if (request.getURI() == null) {
-            return null;
-        }
-        List<String> values = UriComponentsBuilder.fromUri(request.getURI())
-                .build()
-                .getQueryParams()
-                .get(name);
+        if (request.getURI() == null) return null;
+        List<String> values = UriComponentsBuilder.fromUri(request.getURI()).build().getQueryParams().get(name);
         return (values == null || values.isEmpty()) ? null : values.get(0);
     }
 
     private String lastPathSegment(ServerHttpRequest request) {
-        if (request.getURI() == null || request.getURI().getPath() == null) {
-            return null;
-        }
+        if (request.getURI() == null || request.getURI().getPath() == null) return null;
         String path = request.getURI().getPath();
         int lastSlash = path.lastIndexOf('/');
         return lastSlash < 0 || lastSlash == path.length() - 1 ? null : path.substring(lastSlash + 1);

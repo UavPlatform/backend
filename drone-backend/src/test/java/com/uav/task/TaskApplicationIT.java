@@ -96,16 +96,9 @@ class TaskApplicationIT extends IntegrationTestBase {
         return taskNum;
     }
 
-    /** 注册无设备飞手并绑定一台映射到指定机型的设备（生产绑机路径）。 */
+    /** 注册飞手（应征仅校验机型可吊运，不再要求自有机绑定）。 */
     private TestAccounts.Account riderMappedTo(String modelCode) throws Exception {
-        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), null);
-        mockMvc.perform(post("/rider/drone/bind")
-                        .param("djiId", UniqueNames.djiId())
-                        .param("aircraftModelId", String.valueOf(modelId(modelCode)))
-                        .header("Authorization", rider.authorization()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
-        return rider;
+        return accounts().registerRider(UniqueNames.userName("rider"), null);
     }
 
     /** POST /rider/apply，返回成功响应体（断言 200 由调用方负责）。 */
@@ -272,22 +265,11 @@ class TaskApplicationIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("未映射机型的设备应征 → AIRCRAFT_MODEL_REQUIRED；无机型字段同样拒绝")
-    void unmappedDeviceApplyRejected() throws Exception {
+    @DisplayName("应征缺 aircraftModelId → AIRCRAFT_MODEL_REQUIRED")
+    void missingModelApplyRejected() throws Exception {
         TestAccounts.Account owner = accounts().registerUser();
         String taskNum = createTransportTask(owner, "2.00");
-        // 注册时绑定设备但未映射机型（旧注册路径）
         TestAccounts.Account rider = accounts().registerRider();
-        assertThat(rider.djiId()).isNotNull();
-
-        mockMvc.perform(post("/rider/apply")
-                        .header("Authorization", rider.authorization())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"taskNum\":\"" + taskNum + "\",\"aircraftModelId\":"
-                                + modelId("FC30") + "}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode")
-                        .value(ApiErrorCode.AIRCRAFT_MODEL_REQUIRED.getCode()));
 
         mockMvc.perform(post("/rider/apply")
                         .header("Authorization", rider.authorization())
@@ -296,11 +278,8 @@ class TaskApplicationIT extends IntegrationTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode")
                         .value(ApiErrorCode.AIRCRAFT_MODEL_REQUIRED.getCode()));
-
-        assertThat(applications(owner, taskNum).size())
-                .as("被门禁拒绝的应征不应落库")
-                .isZero();
     }
+
 
     @Test
     @DisplayName("超重拒绝：货物重量超过机型最大载重 → EXCEEDS_PAYLOAD 且不落库")

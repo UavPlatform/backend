@@ -42,8 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>两种环境下 {@link Account#token()} 都是服务端真实签发的 accessToken，可直接用于：
  * REST 的 {@code Authorization: Bearer <token>}、WebSocket 握手 {@code ws://host:port/ws/...?token=<token>}
  * （{@code WsAuthHandshakeInterceptor} 支持 query 令牌；{@code /ws/drone} 还要求 role=1 且
- * {@code deviceId} 已绑定到该飞手，故需用带同一 djiId 注册的 {@link #registerRider(String, String)}），
- * 以及 {@code @RequireDrone} 端点（要求 {@code riderUavRepository.existsByUserId}）。
+ * {@code deviceId} 为该飞手派单连机或已批准借用机，需另用 {@code TestFixtures#bindDrone} 授予）。
  *
  * <p><b>限流身份隔离</b>：{@code RateLimiterAspect} 的 key 退化为 X-Forwarded-For/remoteAddr 时，
  * MockMvc 与真实 TCP 下客户端地址恒定，第 4 次注册、第 6 次登录起必然 429。这里为**每次调用**
@@ -103,20 +102,18 @@ public final class TestAccounts {
 
     // ---------- 飞手 ----------
 
-    /** 注册一个唯一用户名、已绑定唯一无人机的飞手（{@code /rider/register} 直接返回 token）。 */
+    /** 注册一个唯一用户名的飞手（不登记无人机；{@code /rider/register} 直接返回 token）。 */
     public Account registerRider() {
-        return registerRider(UniqueNames.userName("rider"), UniqueNames.djiId());
+        return registerRider(UniqueNames.userName("rider"), null);
     }
 
     /**
-     * 用指定用户名与 DJI ID 注册飞手；{@code djiId} 为 {@code null}/空表示不绑定无人机，
-     * 该飞手随后访问 {@code @RequireDrone} 端点应被 403 拒绝。
+     * 用指定用户名注册飞手。{@code djiId} 仅记在 {@link Account} 上供测试跟踪，不再写入服务端。
      */
     public Account registerRider(String userName, String djiId) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("userName", userName);
         body.put("password", DEFAULT_PASSWORD);
-        body.put("djiId", djiId);
         JsonNode json = postExpectOk("/rider/register", body);
         String token = json.path("data").path("token").asText();
         assertThat(token).as("/rider/register 应直接返回 token，响应=%s", json).isNotBlank();

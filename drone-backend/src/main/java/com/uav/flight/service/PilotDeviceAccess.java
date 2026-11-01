@@ -1,30 +1,39 @@
 package com.uav.flight.service;
 
+import com.uav.equipment.mapper.DroneBorrowRepository;
+import com.uav.equipment.mapper.ProviderDroneRepository;
+import com.uav.equipment.pojo.entity.DroneBorrow;
 import com.uav.flight.mapper.FlightConnectionRepository;
-import com.uav.user.mapper.RiderUavRepository;
+import com.uav.server.util.SerialNumbers;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
 
 /**
  * Whether a pilot may use a device (device channel handshake, pilot start live).
- * ADR-0007 (2026-10-22): the drone belongs to the dispatch task, not the pilot, so a device that is the active
- * flight connection of the pilot's own dispatch task is allowed without a manual binding. The legacy
- * rider_uav binding (old matching flow) is still accepted.
+ * ADR-0007 / GOV-007: active dispatch flight connection or approved platform borrow.
+ * Pilot self-owned rider_uav binding has been removed.
  */
 @Component
 public class PilotDeviceAccess {
-    private final RiderUavRepository riderUav;
     private final FlightConnectionRepository connections;
+    private final ProviderDroneRepository drones;
+    private final DroneBorrowRepository borrows;
 
-    public PilotDeviceAccess(RiderUavRepository riderUav, FlightConnectionRepository connections) {
-        this.riderUav = riderUav; this.connections = connections;
+    public PilotDeviceAccess(FlightConnectionRepository connections, ProviderDroneRepository drones,
+                             DroneBorrowRepository borrows) {
+        this.connections = connections; this.drones = drones; this.borrows = borrows;
     }
 
     public boolean mayUse(Long pilot, String deviceId) {
         if (pilot == null || deviceId == null || deviceId.isBlank()) return false;
-        if (riderUav.existsByUserIdAndDjiId(pilot, deviceId)) return true;
-        return connections.findByActiveSerial(com.uav.server.util.SerialNumbers.normalize(deviceId))
-                .filter(c -> pilot.equals(c.getPilotId())).isPresent();
+        String serial = SerialNumbers.normalize(deviceId);
+        if (connections.findByActiveSerial(serial).filter(c -> pilot.equals(c.getPilotId())).isPresent()) {
+            return true;
+        }
+        var drone = drones.findBySerialNumber(serial).orElse(null);
+        if (drone == null || drone.getCurrentBorrowId() == null) return false;
+        return borrows.findById(drone.getCurrentBorrowId())
+                .filter(b -> DroneBorrow.APPROVED.equals(b.getStatus()))
+                .filter(b -> pilot.equals(b.getPilotId()))
+                .isPresent();
     }
 }

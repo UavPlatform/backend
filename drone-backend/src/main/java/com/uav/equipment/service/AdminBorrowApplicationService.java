@@ -44,7 +44,7 @@ public class AdminBorrowApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public AdminPageVo<AdminBorrowApplicationVO> list(String status, int page, int size) {
+    public AdminPageVo<AdminBorrowApplicationVO> list(String status, Long pilotId, int page, int size) {
         int pageSize = clamp(size);
         if (page < 0) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
         if (status != null && !status.isBlank()
@@ -52,7 +52,7 @@ public class AdminBorrowApplicationService {
             throw new BusinessException(ApiErrorCode.INVALID_PARAM);
         }
         String filter = status == null || status.isBlank() ? null : status;
-        var rows = borrows.adminSearch(filter, PageRequest.of(page, pageSize,
+        var rows = borrows.adminSearch(filter, pilotId, PageRequest.of(page, pageSize,
                 Sort.by(Sort.Order.desc("appliedAt"), Sort.Order.desc("id"))));
         Map<Long, User> pilots = pilots(rows.stream().map(DroneBorrow::getPilotId).toList());
         Map<Long, String> modelNames = models.findAllById(rows.stream().map(DroneBorrow::getAircraftModelId).distinct().toList())

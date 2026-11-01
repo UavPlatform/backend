@@ -84,7 +84,7 @@ public class WebLiveController {
     }
 
     /**
-     * 飞手主动开播（1B-4b / ADR-0007）：设备须在线，且为本人派单任务当前连机的无人机，或旧流程 rider_uav 绑定。
+     * 飞手主动开播（1B-4b / ADR-0007）：设备须在线，且为本人派单任务当前连机的无人机，或已批准借用机。
      * 复用 START_LIVE 下发/ACK 与 /live/get 凭证链路；停止走 t12 的 STOP_LIVE/LIVE_STOPPED 链路。
      */
     @RequireRole(1)
@@ -92,13 +92,13 @@ public class WebLiveController {
     @RateLimiter(limit = 5, windowSeconds = 60)
     @Operation(
             summary = "飞手主动开播",
-            description = "飞手对在线设备发送开播请求（1B-4b / ADR-0007）：设备须为本人派单任务当前连机的无人机，或旧流程中本人绑定（rider_uav）的设备",
+            description = "飞手对在线设备发送开播请求（1B-4b / ADR-0007）：设备须为本人派单任务当前连机的无人机，或本人已批准借用的平台无人机",
             parameters = {
                     @Parameter(name = "deviceId", description = "无人机设备ID", required = true)
             },
             responses = {
                     @ApiResponse(responseCode = "200", description = "发送成功 / 已运行 / 等待确认"),
-                    @ApiResponse(responseCode = "403", description = "设备不是本人当前派单连机的无人机，也未绑定到当前飞手"),
+                    @ApiResponse(responseCode = "403", description = "设备不是本人当前派单连机的无人机，也非本人当前连机/借用机"),
                     @ApiResponse(responseCode = "404", description = "设备未注册"),
                     @ApiResponse(responseCode = "409", description = "设备未连接 / 正在启动中")
             }
@@ -109,7 +109,7 @@ public class WebLiveController {
         webUavService.getRegisteredUav(deviceId);
         // ADR-0007 (10-22): the drone belongs to the dispatch task; see PilotDeviceAccess.
         if (!pilotDeviceAccess.mayUse(riderId, deviceId)) {
-            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "设备未绑定到当前飞手");
+            throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION, "设备不是当前飞手可用的连机或借用机");
         }
         return doStartLive(deviceId, LIVE_ACK_TIMEOUT_MILLIS, LIVE_STARTING_TTL_MILLIS);
     }

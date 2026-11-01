@@ -1,8 +1,8 @@
 package com.uav.live.controller;
 
+import com.uav.flight.service.PilotDeviceAccess;
 import com.uav.live.service.AppWebSocketService;
 import com.uav.server.util.UserContext;
-import com.uav.user.mapper.RiderUavRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,11 +28,11 @@ public class AppWebSocketController {
     private AppWebSocketService appWebSocketService;
 
     @Autowired
-    private RiderUavRepository riderUavRepository;
+    private PilotDeviceAccess pilotDeviceAccess;
 
     @Operation(
             summary = "申请WebSocket连接",
-            description = "设备申请建立WebSocket连接",
+            description = "设备申请建立WebSocket连接（须为当前飞手派单连机或已批准借用机）",
             responses = {
                     @ApiResponse(responseCode = "200", description = "申请成功"),
                     @ApiResponse(responseCode = "400", description = "申请失败")
@@ -40,22 +40,20 @@ public class AppWebSocketController {
     )
     @PostMapping("/ws/request")
     public ResponseEntity<Map<String, Object>> requestConnection(@RequestParam String deviceId) {
-        // P0-1：需登录，且仅绑定该设备的飞手（role=1）可为设备申请连接
         Long userId = UserContext.getUserId();
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "message", "未登录"));
         }
         Integer role = UserContext.getRole();
-        if (role == null || role != 1 || !riderUavRepository.existsByUserIdAndDjiId(userId, deviceId)) {
-            log.warn("设备连接申请被拒（无设备归属权）: userId={}, deviceId={}", userId, deviceId);
+        if (role == null || role != 1 || !pilotDeviceAccess.mayUse(userId, deviceId)) {
+            log.warn("设备连接申请被拒（无设备使用权）: userId={}, deviceId={}", userId, deviceId);
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("success", false, "message", "无权为该设备申请连接"));
         }
 
         log.info("设备 {} 申请WebSocket连接", deviceId);
         Map<String, Object> result = new HashMap<>();
-
         try {
             boolean success = appWebSocketService.requestConnection(deviceId);
             if (success) {
@@ -74,7 +72,4 @@ public class AppWebSocketController {
             return ResponseEntity.badRequest().body(result);
         }
     }
-
-
-
 }

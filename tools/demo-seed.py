@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """本地/演示环境种子数据（仅开发与演示用，禁止对生产库执行）。
 
-只调用公开 HTTP API（注册、登录、绑机、发单、应征、聊天、选定、mock 支付、确认、交付物、验收、评价），
+只调用公开 HTTP API（注册、登录、发单、应征、聊天、选定、mock 支付、确认、交付物、验收、评价），
 不直接写库，因此不绕过 ADR-0001（Flyway 唯一 DDL 来源）与任何业务门禁；产出的数据与真实用户操作完全一致。
 
 前置条件（见 README「本地演示环境」）：
@@ -231,9 +231,7 @@ def main():
     pilots = {}
     for name, dji, code, info in PILOTS:
         token, created = login_or_register(api, name, pw, rider=True)
-        drones = api.call("GET", "/rider/drone/list", token)["data"] or []
-        if not any(d.get("djiId") == dji for d in drones):
-            api.call("POST", "/rider/drone/bind", token, query={"djiId": dji, "aircraftModelId": models[code]})
+        # 飞手自有机绑定已全线清除；设备走平台借机（GOV-007），演示种子不再绑机。
         api.call("PATCH", "/rider/info", token, body={
             "age": info["age"], "location": info["location"], "selfIntroduction": info["selfIntroduction"],
             "idNumber": info["idNumber"], "idExpiryDate": info["idExpiryDate"],

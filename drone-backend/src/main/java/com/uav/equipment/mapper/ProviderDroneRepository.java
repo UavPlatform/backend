@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface ProviderDroneRepository extends JpaRepository<ProviderDrone, String> {
     boolean existsBySerialNumber(String serial);
+    Optional<ProviderDrone> findBySerialNumber(String serial);
     boolean existsByAircraftModelId(Long aircraftModelId);
     boolean existsByAirportId(Long airportId);
     @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select d from ProviderDrone d where d.id = :id")

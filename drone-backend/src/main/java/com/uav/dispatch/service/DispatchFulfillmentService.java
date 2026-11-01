@@ -35,15 +35,20 @@ public class DispatchFulfillmentService {
         return DispatchOrderViews.view(orders.saveAndFlush(order));
     }
     @Transactional
-    public DispatchOrderVO deliver(Long pilot, String id, long version, List<String> ids) {
+    public DispatchOrderVO deliver(Long pilot, String id, long version, List<String> ids, String note) {
         var order = pilotOrder(pilot, id, version);
         String canonical = canonical(ids);
-        if (order.getStage().equals("DELIVERY_CONFIRMATION") && canonical.equals(order.getPilotMaterialIdsJson())) return DispatchOrderViews.view(order);
+        String normalizedNote = note == null ? null : note.trim();
+        if (normalizedNote != null && normalizedNote.isEmpty()) normalizedNote = null;
+        if (normalizedNote != null && normalizedNote.length() > 500) throw new BusinessException(ApiErrorCode.INVALID_PARAM);
+        if (order.getStage().equals("DELIVERY_CONFIRMATION") && canonical.equals(order.getPilotMaterialIdsJson())
+                && Objects.equals(order.getDeliveryNote(), normalizedNote)) return DispatchOrderViews.view(order);
         if (!order.getStage().equals("IN_TRANSIT")) throw state();
         materials.requireVerified(order, pilot, "PILOT_DELIVERY", ids);
         notifications.owner(order, "DELIVERED", "飞手已提交送达凭证，请确认收货", "请查看送达凭证，并上传本次收货材料后确认收货。");
         flight.closeOrder(id, "DELIVERED");
-        order.setPilotMaterialIdsJson(canonical); order.setDeliveredAt(LocalDateTime.now());
+        order.setPilotMaterialIdsJson(canonical); order.setDeliveryNote(normalizedNote);
+        order.setDeliveredAt(LocalDateTime.now());
         order.setUpdatedAt(order.getDeliveredAt()); order.setStage("DELIVERY_CONFIRMATION");
         return DispatchOrderViews.view(orders.saveAndFlush(order));
     }

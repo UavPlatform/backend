@@ -41,26 +41,24 @@ class AircraftModelCatalogIT extends IntegrationTestBase {
     private AircraftModelRepository aircraftModelRepository;
 
     @Test
-    @DisplayName("V2 迁移：flyway 历史已执行、rider_uav.aircraft_model_id 列与外键落地、种子≥2")
+    @DisplayName("V2/V26 迁移：机型种子落地；rider_uav 已由 V26 删除")
     void v2MigrationApplied() throws Exception {
         try (Connection c = dataSource.getConnection();
              Statement st = c.createStatement()) {
-            // R10：flyway_schema_history / information_schema 查询在 H2 MySQL 模式与 MySQL 8 双兼容
-            // （MySQL 布尔列以 TRUE 字面量比较；H2 该列为 BOOLEAN，= 1 反而不兼容）
             try (ResultSet rs = st.executeQuery(
                     "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '2' AND success = TRUE")) {
                 assertThat(rs.next()).as("flyway_schema_history 无结果").isTrue();
                 assertThat(rs.getInt(1)).as("V2__aircraft_model.sql 应已执行且成功").isEqualTo(1);
             }
             try (ResultSet rs = st.executeQuery(
-                    "SELECT COUNT(*) FROM information_schema.key_column_usage"
-                            + " WHERE lower(table_name) = 'rider_uav'"
-                            + " AND lower(column_name) = 'aircraft_model_id'"
-                            + " AND lower(constraint_name) = 'fk_rider_uav_aircraft_model'")) {
-                assertThat(rs.next()).as("information_schema 无结果").isTrue();
-                assertThat(rs.getInt(1))
-                        .as("rider_uav.aircraft_model_id 外键 fk_rider_uav_aircraft_model 应由 V2 创建")
-                        .isEqualTo(1);
+                    "SELECT COUNT(*) FROM flyway_schema_history WHERE version = '26' AND success = TRUE")) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).as("V26 purge rider_uav 应已执行").isEqualTo(1);
+            }
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE lower(table_name) = 'rider_uav'")) {
+                assertThat(rs.next()).isTrue();
+                assertThat(rs.getInt(1)).as("rider_uav 表应已删除").isZero();
             }
         }
 

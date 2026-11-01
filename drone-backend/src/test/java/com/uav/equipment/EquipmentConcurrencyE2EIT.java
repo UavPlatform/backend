@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.support.RealProtocolTestBase;
 import com.uav.support.UniqueNames;
-import com.uav.user.mapper.RiderUavRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.net.URI;
@@ -19,7 +18,6 @@ import static org.assertj.core.api.Assertions.*;
 /** Concurrent approve of the same last in-stock airframe: only one loan wins. */
 class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
     private final ObjectMapper json = new ObjectMapper();
-    @Autowired RiderUavRepository bindings;
     private HttpRequest request(String token, String path, Object body) throws Exception {
         var request = HttpRequest.newBuilder(URI.create(baseUrl() + path)).timeout(Duration.ofSeconds(20)).header("Content-Type", "application/json");
         if (token != null) request.header("Authorization", "Bearer " + token);
@@ -75,8 +73,6 @@ class EquipmentConcurrencyE2EIT extends RealProtocolTestBase {
             var actual = send(client, loser.token(), "/equipment/pilot/borrows/current", null).path("items").get(0);
             assertThat(actual.path("borrowId").asText()).isEqualTo(current);
             assertThat(actual.path("returnedAt").isNull()).isTrue();
-            assertThat(bindings.findByUserId(winner.id())).isEmpty();
-            assertThat(bindings.findByUserId(loser.id())).isEmpty();
             assertThat(send(client, token, "/admin/drones/" + id + "/borrows", null).path("totalElements").asLong()).isEqualTo(2);
         }
     }

@@ -41,14 +41,14 @@ public final class TimelineMigrationFixture {
                         + "('second',1,7,'2026-10-24 12:00:00','2026-10-24 13:00:00','2026-10-24 14:00:00','PILOT_RELEASED'),"
                         + "('second',2,8,'2026-10-24 15:00:00',NULL,NULL,NULL),"
                         + "('released',1,7,'2026-10-24 12:00:00','2026-10-24 13:00:00','2026-10-24 14:00:00','PILOT_RELEASED')");
-                // Pre-V25 equipment stubs so V25 can ALTER/CREATE (baseline 24 → only V25 runs).
+                // Pre-V25 equipment stubs retained for local schema; baseline 25 → only V26 runs.
                 sql.execute("CREATE TABLE aircraft_model (id BIGINT PRIMARY KEY)");
                 sql.execute("CREATE TABLE provider_drone (id VARCHAR(36) PRIMARY KEY, aircraft_model_id BIGINT NOT NULL)");
                 sql.execute("CREATE TABLE drone_borrow (id VARCHAR(36) PRIMARY KEY, drone_id VARCHAR(36) NOT NULL, "
                         + "pilot_id BIGINT NOT NULL, request_key VARCHAR(64) NOT NULL, borrowed_at TIMESTAMP(6) NOT NULL, returned_at TIMESTAMP(6))");
             }
             var result = Flyway.configure().dataSource(url, user, password).locations("filesystem:src/main/resources/db/migration")
-                    .baselineOnMigrate(true).baselineVersion("24").load().migrate();
+                    .baselineOnMigrate(true).baselineVersion("25").load().migrate();
             assertThat(result.migrationsExecuted).isEqualTo(1);
             assertTime(connection, "first", "deposit_paid_at", "2026-10-24T11:00:00");
             assertTime(connection, "first", "waiting_since", "2026-10-24T11:00:00");

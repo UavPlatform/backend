@@ -20,6 +20,10 @@ public final class EventPacketSamples {
 
     public static JsonValue altitude(long altitudeMm) { return obj(Map.of("altitudeMm", new JsonValue.Int(altitudeMm))); }
 
+    public static JsonValue velocity(long speedMmps) { return obj(Map.of("speedMmps", new JsonValue.Int(speedMmps))); }
+
+    public static JsonValue battery(long chargePermille) { return obj(Map.of("chargePermille", new JsonValue.Int(chargePermille))); }
+
     public static JsonValue flying(boolean value) { return obj(Map.of("flying", new JsonValue.Bool(value))); }
 
     public static byte[] anchor(Identity identity) {

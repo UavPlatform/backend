@@ -26,8 +26,7 @@ public final class EventReconciliationSchema {
         long from = requiredPositive(fields.get("fromHeight"));
         long to = requiredPositive(fields.get("toHeight"));
         if (to < from || to - from + 1 > EventLimits.RECON_MAX_SPAN) throw EventFormatException.malformed("LIMIT");
-        int limit = (int) requiredPositive(fields.get("limit"));
-        if (limit > EventLimits.RECON_MAX_LIMIT) throw EventFormatException.malformed("LIMIT");
+        int limit = limit(fields.get("limit"));
         return new Request(chain.text(), validationVersion, from, to, optionalPositive(fields.get("cursor")),
                 optionalPositive(fields.get("missingCursor")), limit, prefix(fields.get("prefix")));
     }
@@ -52,6 +51,13 @@ public final class EventReconciliationSchema {
             previous = height;
         }
         return List.copyOf(entries);
+    }
+
+    private static int limit(JsonValue value) {
+        if (!(value instanceof JsonValue.Int number)) throw EventFormatException.malformed("SCHEMA_TYPE");
+        long raw = number.value();
+        if (raw < 1 || raw > EventLimits.RECON_MAX_LIMIT) throw EventFormatException.malformed("LIMIT");
+        return (int) raw;
     }
 
     private static long requiredPositive(JsonValue value) {

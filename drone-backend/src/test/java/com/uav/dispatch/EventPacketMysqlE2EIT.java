@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.flight.event.EventChainHasher;
 import com.uav.flight.event.EventCommitGate;
 import com.uav.flight.event.EventHex;
+import com.uav.flight.event.EventLimits;
 import com.uav.flight.event.EventMysql;
+import com.uav.flight.event.EventPacketCap;
 import com.uav.flight.event.EventPacketSamples;
 import com.uav.flight.event.EventPacketSchema;
 import com.uav.flight.service.TelemetryRetentionJob;
@@ -48,6 +50,7 @@ class EventPacketMysqlE2EIT extends RealProtocolTestBase {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EventCommitGate gate;
     @Autowired private TelemetryRetentionJob retention;
+    @Autowired private EventPacketCap cap;
 
     @DynamicPropertySource
     static void mysql(DynamicPropertyRegistry registry) throws Exception {
@@ -363,60 +366,240 @@ class EventPacketMysqlE2EIT extends RealProtocolTestBase {
     }
 
     @Test
-    void authorizationUsesTheCurrentAssignmentAndReplaySurvivesRelease() throws Exception {
+    void historicalCaptureFollowsTheAssignmentWindowAndReceiptsStayFixed() throws Exception {
         var owner = accounts().registerUser();
         var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
         var other = accounts().registerRider(UniqueNames.userName("evt"), null);
         var order = prepare(owner, pilot);
         var draft = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
-        byte[] raw = draft.at(1, null, draft.anchor(), pos(System.currentTimeMillis()));
-        var anonymous = post(null, order.packets(), raw, 401);
+        long accepted = acceptedAt(order.id, order.version);
+        byte[] early = draft.at(1, null, draft.anchor(), pos(accepted - EventLimits.CAPTURED_FUTURE_MS - 60_000));
+        var anonymous = post(null, order.packets(), early, 401);
         assertThat(anonymous.body().path("errorCode").asText()).isEqualTo("UNAUTHORIZED");
-        assertAbsent(SCHEMA.parse(raw, order.id).packetId(), draft.chain);
-        var forbidden = post(owner, order.packets(), raw, 403);
+        assertAbsent(SCHEMA.parse(early, order.id).packetId(), draft.chain);
+        var forbidden = post(owner, order.packets(), early, 403);
         assertThat(forbidden.body().path("errorCode").asText()).isEqualTo("FORBIDDEN");
-        assertAbsent(SCHEMA.parse(raw, order.id).packetId(), draft.chain);
-        var stranger = post(other, order.packets(), raw, 409);
-        assertThat(stranger.body().path("errorCode").asText()).isEqualTo("DISPATCH_ASSIGNMENT_CHANGED");
-        assertAbsent(SCHEMA.parse(raw, order.id).packetId(), draft.chain);
-        String zero = new String(raw, StandardCharsets.UTF_8).replace("\"assignmentVersion\":" + order.version, "\"assignmentVersion\":0");
+        var stranger = post(other, order.packets(), early, 403);
+        assertThat(stranger.body().path("errorCode").asText()).isEqualTo("NO_PERMISSION");
+        assertAbsent(SCHEMA.parse(early, order.id).packetId(), draft.chain);
+        var unknown = new Draft(order.id, 99, UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+        byte[] missingVersion = unknown.at(1, null, unknown.anchor(), pos(accepted));
+        assertThat(post(pilot, order.packets(), missingVersion, 409).body().path("errorCode").asText())
+                .isEqualTo("DISPATCH_ASSIGNMENT_CHANGED");
+        assertAbsent(SCHEMA.parse(missingVersion, order.id).packetId(), unknown.chain);
+        String zero = new String(early, StandardCharsets.UTF_8).replace("\"assignmentVersion\":" + order.version, "\"assignmentVersion\":0");
         assertThat(post(pilot, order.packets(), zero.getBytes(StandardCharsets.UTF_8), 400).body().path("message").asText()).isEqualTo("SCHEMA_TYPE");
-        String absent = new String(raw, StandardCharsets.UTF_8).replace("\"assignmentVersion\":" + order.version + ",", "");
-        assertThat(post(pilot, order.packets(), absent.getBytes(StandardCharsets.UTF_8), 400).body().path("message").asText()).isEqualTo("SCHEMA_FIELDS");
-        var stored = post(pilot, order.packets(), raw, 200);
+        var tooEarly = post(pilot, order.packets(), early, 200);
+        assertThat(outcome(tooEarly)).isEqualTo("REJECTED");
+        assertThat(reason(tooEarly)).isEqualTo("ASSIGNMENT_WINDOW");
+        assertThat(facts(SCHEMA.parse(early, order.id).packetId())).isZero();
+        assertThat(post(pilot, order.packets(), early, 200).data().path("receipt")).isEqualTo(tooEarly.data().path("receipt"));
+        long during = Math.max(accepted + 1_000, System.currentTimeMillis());
+        var one = SCHEMA.parse(early, order.id);
+        byte[] kept = draft.at(2, one.packetId(), one.chainHash(), pos(during));
+        var stored = post(pilot, order.packets(), kept, 200);
+        assertThat(outcome(stored)).isEqualTo("ACCEPTED");
+        assertThat(facts(SCHEMA.parse(kept, order.id).packetId())).isEqualTo(1);
         postJson(pilot, "/dispatch/pilot/orders/" + order.id + "/release", Map.of("assignmentVersion", order.version), 200);
-        var replay = post(pilot, order.packets(), raw, 200);
-        assertThat(replay.data().path("receipt")).isEqualTo(stored.data().path("receipt"));
-        byte[] next = draft.at(2, SCHEMA.parse(raw, order.id).packetId(), SCHEMA.parse(raw, order.id).chainHash(), pos(System.currentTimeMillis() + 3_000));
-        assertThat(post(pilot, order.packets(), next, 409).body().path("errorCode").asText()).isEqualTo("DISPATCH_ASSIGNMENT_CHANGED");
-        assertThat(count("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", SCHEMA.parse(next, order.id).packetId())).isZero();
-        var owner2 = accounts().registerUser();
-        var pilot2 = accounts().registerRider(UniqueNames.userName("evt"), null);
-        var cancelled = prepare(owner2, pilot2);
-        var live = new Draft(cancelled, "FC30SN2", "FLIGHT_CONTROLLER", "FC30");
-        byte[] kept = live.at(1, null, live.anchor(), pos(System.currentTimeMillis()));
-        var before = post(pilot2, cancelled.packets(), kept, 200);
-        postJson(owner2, "/dispatch/orders/" + cancelled.id + "/cancel", Map.of(), 200);
-        assertThat(post(pilot2, cancelled.packets(), kept, 200).data().path("receipt")).isEqualTo(before.data().path("receipt"));
-        byte[] after = live.at(2, SCHEMA.parse(kept, cancelled.id).packetId(), SCHEMA.parse(kept, cancelled.id).chainHash(), pos(System.currentTimeMillis() + 3_000));
-        assertThat(post(pilot2, cancelled.packets(), after, 409).body().path("errorCode").asText()).isEqualTo("ORDER_STATUS_INVALID");
+        assertThat(post(pilot, order.packets(), kept, 200).data().path("receipt")).isEqualTo(stored.data().path("receipt"));
+        assertThat(post(pilot, order.packets(), early, 200).data().path("receipt")).isEqualTo(tooEarly.data().path("receipt"));
+        var two = SCHEMA.parse(kept, order.id);
+        byte[] late = draft.at(3, two.packetId(), two.chainHash(), pos(during + 3_000));
+        var lateAck = post(pilot, order.packets(), late, 200);
+        assertThat(outcome(lateAck)).isEqualTo("ACCEPTED");
+        jdbc.update("UPDATE dispatch_assignment SET ended_at = DATE_SUB(NOW(6), INTERVAL 30 MINUTE) "
+                + "WHERE order_id = ? AND assignment_version = ?", order.id, order.version);
+        var three = SCHEMA.parse(late, order.id);
+        byte[] afterEnd = draft.at(4, three.packetId(), three.chainHash(), pos(System.currentTimeMillis()));
+        var outside = post(pilot, order.packets(), afterEnd, 200);
+        assertThat(reason(outside)).isEqualTo("ASSIGNMENT_WINDOW");
+        assertThat(facts(SCHEMA.parse(afterEnd, order.id).packetId())).isZero();
+        assertThat(post(pilot, order.packets(), kept, 200).data().path("receipt")).isEqualTo(stored.data().path("receipt"));
+        assertThat(post(pilot, order.packets(), late, 200).data().path("receipt")).isEqualTo(lateAck.data().path("receipt"));
+        assertThat(post(pilot, order.packets(), afterEnd, 200).data().path("receipt")).isEqualTo(outside.data().path("receipt"));
     }
 
     @Test
-    void sampleRetentionDoesNotDeleteRawPackets() throws Exception {
+    void redispatchKeepsTheOldRoundAndRejectsTheOtherPilot() throws Exception {
+        var owner = accounts().registerUser();
+        var first = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var second = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var order = prepare(owner, first);
+        var older = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+        long accepted = acceptedAt(order.id, order.version);
+        long during = Math.max(accepted + 1_000, System.currentTimeMillis());
+        byte[] kept = older.at(1, null, older.anchor(), pos(during));
+        var stored = post(first, order.packets(), kept, 200);
+        assertThat(outcome(stored)).isEqualTo("ACCEPTED");
+        postJson(first, "/dispatch/pilot/orders/" + order.id + "/release", Map.of("assignmentVersion", order.version), 200);
+        long version2 = claim(second, order.id);
+        assertThat(version2).isGreaterThan(order.version);
+        var one = SCHEMA.parse(kept, order.id);
+        byte[] late = older.at(2, one.packetId(), one.chainHash(), pos(during + 3_000));
+        var lateAck = post(first, order.packets(), late, 200);
+        assertThat(outcome(lateAck)).isEqualTo("ACCEPTED");
+        var newer = new Draft(order.id, version2, UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+        byte[] stolen = newer.at(1, null, newer.anchor(), pos(System.currentTimeMillis()));
+        assertThat(post(first, order.packets(), stolen, 403).body().path("errorCode").asText()).isEqualTo("NO_PERMISSION");
+        assertAbsent(SCHEMA.parse(stolen, order.id).packetId(), newer.chain);
+        byte[] backward = older.at(3, SCHEMA.parse(late, order.id).packetId(), SCHEMA.parse(late, order.id).chainHash(), pos(during + 6_000));
+        assertThat(post(second, order.packets(), backward, 403).body().path("errorCode").asText()).isEqualTo("NO_PERMISSION");
+        assertThat(count("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", SCHEMA.parse(backward, order.id).packetId())).isZero();
+        long secondAccepted = acceptedAt(order.id, version2);
+        byte[] beforeClaim = newer.at(1, null, newer.anchor(), pos(secondAccepted - EventLimits.CAPTURED_FUTURE_MS - 60_000));
+        var rejected = post(second, order.packets(), beforeClaim, 200);
+        assertThat(reason(rejected)).isEqualTo("ASSIGNMENT_WINDOW");
+        var opened = SCHEMA.parse(beforeClaim, order.id);
+        byte[] current = newer.at(2, opened.packetId(), opened.chainHash(), fly(System.currentTimeMillis()));
+        assertThat(outcome(post(second, order.packets(), current, 200))).isEqualTo("ACCEPTED");
+        assertThat(post(first, order.packets(), kept, 200).data().path("receipt")).isEqualTo(stored.data().path("receipt"));
+    }
+
+    @Test
+    void cancelKeepsHistoricalCaptureAndRejectsAnotherPilot() throws Exception {
+        var owner = accounts().registerUser();
+        var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var other = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var order = prepare(owner, pilot);
+        var draft = new Draft(order, "FC30SN2", "FLIGHT_CONTROLLER", "FC30");
+        long accepted = acceptedAt(order.id, order.version);
+        long during = Math.max(accepted + 1_000, System.currentTimeMillis());
+        byte[] kept = draft.at(1, null, draft.anchor(), pos(during));
+        var before = post(pilot, order.packets(), kept, 200);
+        assertThat(outcome(before)).isEqualTo("ACCEPTED");
+        postJson(owner, "/dispatch/orders/" + order.id + "/cancel", Map.of(), 200);
+        assertThat(post(pilot, order.packets(), kept, 200).data().path("receipt")).isEqualTo(before.data().path("receipt"));
+        var one = SCHEMA.parse(kept, order.id);
+        byte[] historical = draft.at(2, one.packetId(), one.chainHash(), pos(during + 3_000));
+        assertThat(outcome(post(pilot, order.packets(), historical, 200))).isEqualTo("ACCEPTED");
+        var two = SCHEMA.parse(historical, order.id);
+        byte[] intrusion = draft.at(3, two.packetId(), two.chainHash(), pos(during + 6_000));
+        assertThat(post(other, order.packets(), intrusion, 403).body().path("errorCode").asText()).isEqualTo("NO_PERMISSION");
+        assertThat(count("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", SCHEMA.parse(intrusion, order.id).packetId())).isZero();
+        byte[] tooEarly = draft.at(3, two.packetId(), two.chainHash(), pos(accepted - EventLimits.CAPTURED_FUTURE_MS - 60_000));
+        var rejected = post(pilot, order.packets(), tooEarly, 200);
+        assertThat(reason(rejected)).isEqualTo("ASSIGNMENT_WINDOW");
+        assertThat(post(pilot, order.packets(), kept, 200).data().path("receipt")).isEqualTo(before.data().path("receipt"));
+    }
+
+    @Test
+    void commonPrefixIgnoresHolesAndForks() throws Exception {
         var owner = accounts().registerUser();
         var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
         var order = prepare(owner, pilot);
         var draft = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
-        byte[] raw = draft.at(1, null, draft.anchor(), pos(System.currentTimeMillis()));
-        String packetId = post(pilot, order.packets(), raw, 200).data().path("receipt").path("packetId").asText();
+        long now = System.currentTimeMillis();
+        byte[] only = draft.at(3, UUID.randomUUID().toString(), draft.anchor(), fly(now));
+        var hole = post(pilot, order.packets(), only, 200);
+        assertThat(hole.data().path("progress").path("contiguousHeight").asLong()).isZero();
+        String isolated = hole.data().path("receipt").path("chainHash").asText();
+        var missed = post(pilot, order.reconcile(), reconcile(draft.chain, null, 1, 3, null, null, 10,
+                "[{\"height\":3,\"chainHash\":\"" + isolated + "\"}]"), 200);
+        assertThat(missed.data().path("commonPrefixHeight").asLong()).isZero();
+        var linked = new Draft(order, "FC30SN9", "FLIGHT_CONTROLLER", "FC30");
+        byte[] first = linked.at(1, null, linked.anchor(), fly(now));
+        var oneAck = post(pilot, order.packets(), first, 200);
+        var one = SCHEMA.parse(first, order.id);
+        byte[] second = linked.at(2, one.packetId(), one.chainHash(), fly(now));
+        post(pilot, order.packets(), second, 200);
+        var two = SCHEMA.parse(second, order.id);
+        byte[] fork = linked.at(3, UUID.randomUUID().toString(), new byte[32], fly(now));
+        var forked = post(pilot, order.packets(), fork, 200);
+        assertThat(forked.data().path("progress").path("contiguousHeight").asLong()).isEqualTo(2);
+        assertThat(forked.data().path("progress").path("integrity").asText()).isEqualTo("FORKED");
+        String prefix = "[{\"height\":1,\"chainHash\":\"" + oneAck.data().path("receipt").path("chainHash").asText()
+                + "\"},{\"height\":2,\"chainHash\":\"" + EventHex.encode(two.chainHash())
+                + "\"},{\"height\":3,\"chainHash\":\"" + forked.data().path("receipt").path("chainHash").asText() + "\"}]";
+        var matched = post(pilot, order.reconcile(), reconcile(linked.chain, null, 1, 3, null, null, 10, prefix), 200);
+        assertThat(matched.data().path("commonPrefixHeight").asLong()).isEqualTo(2);
+    }
+
+    @Test
+    void reconciliationLimitRejectsOverflowBeforeNarrowing() throws Exception {
+        var owner = accounts().registerUser();
+        var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var order = prepare(owner, pilot);
+        var draft = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+        post(pilot, order.packets(), draft.at(1, null, draft.anchor(), fly(System.currentTimeMillis())), 200);
+        assertThat(post(pilot, order.reconcile(), reconcileLimit(draft.chain, "1"), 200).status()).isEqualTo(200);
+        assertThat(post(pilot, order.reconcile(), reconcileLimit(draft.chain, "200"), 200).status()).isEqualTo(200);
+        assertLimit(pilot, order, draft.chain, "0");
+        assertLimit(pilot, order, draft.chain, "201");
+        assertLimit(pilot, order, draft.chain, "2147483648");
+        assertLimit(pilot, order, draft.chain, "4294967297");
+    }
+
+    @Test
+    void holeFillStaysAvailableWhenTheChainIsAtThePacketCap() throws Exception {
+        assertThat(cap.max()).isEqualTo(EventLimits.MAX_PACKETS_PER_CHAIN);
+        cap.setForTest(3);
+        try {
+            var owner = accounts().registerUser();
+            var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
+            var order = prepare(owner, pilot);
+            var draft = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+            long now = System.currentTimeMillis();
+            byte[] first = draft.at(1, null, draft.anchor(), fly(now));
+            var one = SCHEMA.parse(first, order.id);
+            byte[] second = draft.at(2, one.packetId(), one.chainHash(), fly(now));
+            var two = SCHEMA.parse(second, order.id);
+            byte[] third = draft.at(3, two.packetId(), two.chainHash(), fly(now));
+            var three = SCHEMA.parse(third, order.id);
+            byte[] fourth = draft.at(4, three.packetId(), three.chainHash(), fly(now));
+            var four = SCHEMA.parse(fourth, order.id);
+            post(pilot, order.packets(), second, 200);
+            post(pilot, order.packets(), third, 200);
+            post(pilot, order.packets(), fourth, 200);
+            byte[] extension = draft.at(5, four.packetId(), four.chainHash(), fly(now));
+            assertThat(post(pilot, order.packets(), extension, 400).body().path("message").asText()).isEqualTo("LIMIT");
+            assertThat(count("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", SCHEMA.parse(extension, order.id).packetId())).isZero();
+            byte[] occupied = draft.at(4, three.packetId(), three.chainHash(), fly(now));
+            assertThat(post(pilot, order.packets(), occupied, 409).body().path("message").asText()).isEqualTo("HEIGHT_FORK");
+            var filled = post(pilot, order.packets(), first, 200);
+            assertThat(filled.data().path("progress").path("contiguousHeight").asLong()).isEqualTo(4);
+            assertThat(filled.data().path("progress").path("contiguousHash").asText()).isEqualTo(EventHex.encode(four.chainHash()));
+            assertThat(bytes("SELECT raw_bytes FROM flight_event_packet WHERE packet_id = ?", four.packetId())).isEqualTo(fourth);
+            byte[] beyond = draft.at(6, four.packetId(), four.chainHash(), fly(now));
+            assertThat(post(pilot, order.packets(), beyond, 400).body().path("message").asText()).isEqualTo("LIMIT");
+        } finally {
+            cap.setForTest(EventLimits.MAX_PACKETS_PER_CHAIN);
+        }
+    }
+
+    @Test
+    void holeSurvivesSampleCleanupAndContinuesFromStoredBytes() throws Exception {
+        var owner = accounts().registerUser();
+        var pilot = accounts().registerRider(UniqueNames.userName("evt"), null);
+        var order = prepare(owner, pilot);
+        var draft = new Draft(order, "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
+        long now = System.currentTimeMillis();
+        byte[] first = draft.at(1, null, draft.anchor(), pos(now));
+        var one = SCHEMA.parse(first, order.id);
+        byte[] second = draft.at(2, one.packetId(), one.chainHash(), pos(now + 3_000));
+        var two = SCHEMA.parse(second, order.id);
+        byte[] third = draft.at(3, two.packetId(), two.chainHash(), pos(now + 6_000));
+        var late = post(pilot, order.packets(), third, 200);
+        String thirdId = late.data().path("receipt").path("packetId").asText();
+        assertThat(facts(thirdId)).isEqualTo(1);
         jdbc.update("INSERT INTO dispatch_flight_sample (connection_id, order_id, serial_number, sequence_number, fingerprint, captured_at, received_at) "
-                + "VALUES ('evt-c', ?, 'EVT-OLD', 1, 'evt-old', 0, CURRENT_TIMESTAMP(6))", order.id);
+                + "VALUES ('evt-hole', ?, 'EVT-HOLE', 1, 'evt-hole', 0, CURRENT_TIMESTAMP(6))", order.id);
         var dropped = retention.maintain();
         assertThat(dropped.dropped()).contains("p_hist");
-        assertThat(count("SELECT COUNT(*) FROM dispatch_flight_sample WHERE fingerprint = 'evt-old'")).isZero();
-        assertThat(bytes("SELECT raw_bytes FROM flight_event_packet WHERE packet_id = ?", packetId)).isEqualTo(raw);
-        assertThat(count("SELECT COUNT(*) FROM flight_event_receipt WHERE packet_id = ?", packetId)).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM dispatch_flight_sample WHERE fingerprint = 'evt-hole'")).isZero();
+        assertThat(bytes("SELECT raw_bytes FROM flight_event_packet WHERE packet_id = ?", thirdId)).isEqualTo(third);
+        assertThat(jdbc.queryForObject("SELECT decided_at_ms FROM flight_event_receipt WHERE packet_id = ?", Long.class, thirdId))
+                .isEqualTo(late.data().path("receipt").path("decidedAt").asLong());
+        assertThat(facts(thirdId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT outcome FROM flight_event_result WHERE packet_id = ?", String.class, thirdId)).isEqualTo("ACCEPTED");
+        post(pilot, order.packets(), first, 200);
+        var filled = post(pilot, order.packets(), second, 200);
+        assertThat(filled.data().path("progress").path("contiguousHeight").asLong()).isEqualTo(3);
+        assertThat(filled.data().path("progress").path("contiguousHash").asText()).isEqualTo(late.data().path("receipt").path("chainHash").asText());
+        assertThat(bytes("SELECT raw_bytes FROM flight_event_packet WHERE packet_id = ?", thirdId)).isEqualTo(third);
+        assertThat(count("SELECT COUNT(*) FROM flight_event_packet WHERE chain_id = ?", draft.chain)).isEqualTo(3);
+        assertThat(post(pilot, order.packets(), third, 200).data().path("receipt")).isEqualTo(late.data().path("receipt"));
     }
 
     private void assertAbsent(String packetId, String chainId) {
@@ -472,6 +655,17 @@ class EventPacketMysqlE2EIT extends RealProtocolTestBase {
 
     private static String num(Long value) { return value == null ? "null" : value.toString(); }
 
+    private static byte[] reconcileLimit(String chainId, String limit) {
+        String body = "{\"schemaVersion\":1,\"chainId\":\"" + chainId + "\",\"validationVersion\":null,\"fromHeight\":1,"
+                + "\"toHeight\":1,\"cursor\":null,\"missingCursor\":null,\"limit\":" + limit + ",\"prefix\":null}";
+        return body.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private void assertLimit(Account pilot, Order order, String chainId, String limit) throws Exception {
+        var rejected = post(pilot, order.reconcile(), reconcileLimit(chainId, limit), 400);
+        assertThat(rejected.body().path("message").asText()).isEqualTo("LIMIT");
+    }
+
     private static byte[] flip(byte[] raw) {
         String text = new String(raw, StandardCharsets.UTF_8);
         int at = text.indexOf("\"chainHash\":\"") + "\"chainHash\":\"".length();
@@ -483,6 +677,41 @@ class EventPacketMysqlE2EIT extends RealProtocolTestBase {
     private static EventPacketSamples.Ev pos(long capturedAt) {
         return new EventPacketSamples.Ev(UUID.randomUUID().toString(), capturedAt, "POSITION",
                 EventPacketSamples.position(282_000_000L, 1_130_000_000L));
+    }
+
+    private static EventPacketSamples.Ev fly(long capturedAt) {
+        return new EventPacketSamples.Ev(UUID.randomUUID().toString(), capturedAt, "ACTUAL_FLYING_STATE",
+                EventPacketSamples.flying(true));
+    }
+
+    private static String outcome(Reply reply) {
+        return reply.data().path("receipt").path("results").get(0).path("outcome").asText();
+    }
+
+    private static String reason(Reply reply) {
+        return reply.data().path("receipt").path("results").get(0).path("reason").asText();
+    }
+
+    private long claim(Account pilot, String orderId) throws Exception {
+        JsonNode card = null;
+        for (var item : get(pilot, "/dispatch/pilot/hall").path("items")) {
+            if (orderId.equals(item.path("orderId").asText())) card = item;
+        }
+        assertThat(card).isNotNull();
+        return postJson(pilot, "/dispatch/pilot/orders/" + orderId + "/claim",
+                Map.of("offerRevision", card.path("offerRevision").asLong()), 200).path("assignmentVersion").asLong();
+    }
+
+    private long acceptedAt(String orderId, long version) {
+        Long value = jdbc.queryForObject(
+                "SELECT accepted_at FROM dispatch_assignment WHERE order_id = ? AND assignment_version = ?",
+                (rs, n) -> rs.getTimestamp(1).getTime(), orderId, version);
+        assertThat(value).isNotNull();
+        return value;
+    }
+
+    private int facts(String packetId) {
+        return count("SELECT COUNT(*) FROM flight_event_fact WHERE packet_id = ?", packetId);
     }
 
     private int count(String sql, Object... args) {

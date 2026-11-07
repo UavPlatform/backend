@@ -62,17 +62,18 @@ public class EventReconciliationService {
                 holes.cursor(), chain.contiguousHeight(),
                 chain.contiguousHash() == null ? null : EventHex.encode(chain.contiguousHash()),
                 chain.highestReceivedHeight(), chain.integrity(), chain.projectionRevision(),
-                commonPrefix(chain.chainId(), request.prefix()));
+                commonPrefix(chain, request.prefix()));
     }
 
-    private Long commonPrefix(String chainId, java.util.List<EventReconciliationSchema.Request.Prefix> prefix) {
+    private Long commonPrefix(EventPacketStore.ChainRow chain, java.util.List<EventReconciliationSchema.Request.Prefix> prefix) {
         if (prefix == null) return null;
-        Long matched = null;
+        long matched = 0;
         for (var entry : prefix) {
-            var rows = store.hashes(chainId, entry.height(), entry.height());
+            if (entry.height() != matched + 1 || entry.height() > chain.contiguousHeight()) break;
+            var rows = store.hashes(chain.chainId(), entry.height(), entry.height());
             if (rows.isEmpty() || !MessageDigest.isEqual(rows.getFirst().chainHash(), entry.chainHash())) break;
             matched = entry.height();
         }
-        return matched == null ? 0L : matched;
+        return matched;
     }
 }

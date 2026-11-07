@@ -103,7 +103,7 @@ public final class JsonCanon {
             if (c == '\n') { ascii("\\n", out); i++; continue; }
             if (c == '\r') { ascii("\\r", out); i++; continue; }
             if (c == '\t') { ascii("\\t", out); i++; continue; }
-            if (c < 0x20 || c == 0x2028 || c == 0x2029) {
+            if (c < 0x20) {
                 ascii(String.format("\\u%04x", (int) c), out);
                 i++;
                 continue;
@@ -283,11 +283,18 @@ public final class JsonCanon {
             int value = 0;
             for (int i = 0; i < 4; i++) {
                 if (end()) throw EventFormatException.malformed("SYNTAX");
-                int nibble = Character.digit(take(), 16);
+                int nibble = hexNibble(take());
                 if (nibble < 0) throw EventFormatException.malformed("SYNTAX");
                 value = (value << 4) | nibble;
             }
             return value;
+        }
+
+        private static int hexNibble(char c) {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
         }
 
         private JsonValue literal(String word, JsonValue value) {

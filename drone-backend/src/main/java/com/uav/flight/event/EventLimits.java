@@ -16,6 +16,14 @@ public final class EventLimits {
     public static final int MAX_ARRAY = 500;
     public static final long MAX_HEIGHT = 1_000_000L;
     public static final int MAX_PACKETS_PER_CHAIN = 2_000;
+
+    /**
+     * At the cap, a height already inside the received range can still fill a hole.
+     * A height above the highest received height would grow the chain and is refused.
+     */
+    public static boolean admitsAnotherPacket(long storedCount, long highestReceivedHeight, long height, int maxPackets) {
+        return storedCount < maxPackets || height <= highestReceivedHeight;
+    }
     public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
     public static final long SENSOR_INTERVAL_MS = 2_000L;
     public static final long CAPTURED_PAST_MS = 7L * 24 * 60 * 60 * 1000L;

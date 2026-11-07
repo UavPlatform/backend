@@ -26,6 +26,8 @@ class EventGoldenVectorTest {
             + "\"recordingSourceId\":\"22222222-2222-4222-8222-222222222222\",\"schemaVersion\":1,"
             + "\"serialNumber\":\"FC30SN1\",\"serialSource\":\"FLIGHT_CONTROLLER\"}";
     private static final Path FILE = Path.of("../spec/event-contract/golden-vectors.json");
+    private static final String NON_ASCII_INPUT = "7b227a223a312c2273223a22c3a92fe280a8e280a9227d";
+    private static final String NON_ASCII_CANONICAL = "7b2273223a22c3a92fe280a8e280a9222c227a223a317d";
 
     @Test
     void proposedVectorsMatchAnIndependentSha256() throws Exception {
@@ -63,6 +65,8 @@ class EventGoldenVectorTest {
                 vector("height2-altitude", second, secondParsed),
                 vector("other-airframe-product-serial", otherRaw, otherParsed));
         String json = render(anchor, vectors);
+        byte[] fixtureInput = EventHex.decode(NON_ASCII_INPUT, NON_ASCII_INPUT.length() / 2);
+        assertThat(EventHex.encode(JsonCanon.canonical(JsonCanon.parse(fixtureInput)))).isEqualTo(NON_ASCII_CANONICAL);
         assertThat(FILE).exists();
         assertThat(Files.readString(FILE)).isEqualTo(json);
         assertThatThrownBy(() -> JsonCanon.parse("{\"a\":01}".getBytes(StandardCharsets.UTF_8))).hasMessage("NUMBER");
@@ -94,6 +98,10 @@ class EventGoldenVectorTest {
                     .append("\", \"rawSha256Hex\": \"").append(vector.raw).append("\"}");
             out.append(i + 1 == vectors.size() ? "\n" : ",\n");
         }
+        out.append("  ],\n");
+        out.append("  \"canonicalFixtures\": [\n");
+        out.append("    {\"name\": \"non-ascii-line-separator\", \"inputUtf8Hex\": \"").append(NON_ASCII_INPUT)
+                .append("\", \"canonicalUtf8Hex\": \"").append(NON_ASCII_CANONICAL).append("\"}\n");
         out.append("  ]\n}\n");
         return out.toString();
     }

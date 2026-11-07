@@ -14,11 +14,13 @@ public final class EventDecider {
     private EventDecider() { }
 
     public static Decision decide(ParsedEvent event, EventAttribution attribution, long now,
-            List<Prior> acceptedInPacket, Existing existing, boolean storedIntervalHit) {
+            List<Prior> acceptedInPacket, Existing existing, boolean storedIntervalHit,
+            AssignmentCaptureWindow.Span assignmentWindow) {
         if (event.semanticReject() != null) return rejected(event.semanticReject());
         if (event.capturedAt() < now - EventLimits.CAPTURED_PAST_MS || event.capturedAt() > now + EventLimits.CAPTURED_FUTURE_MS) {
             return rejected("EVENT_TIME_WINDOW");
         }
+        if (assignmentWindow == null || !assignmentWindow.contains(event.capturedAt())) return rejected("ASSIGNMENT_WINDOW");
         if (existing != null) {
             if (existing.attribution().same(attribution)) return new Decision("DUPLICATE", "DUPLICATE", existing.packetId());
             return rejected("EVENT_ID_CONFLICT");

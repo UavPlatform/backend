@@ -33,7 +33,9 @@
 
 首包 `height = 1`，`prevPacketId = null`，`prevChainHash = H0`。缺字段和 JSON `null` 不是一回事；首包的 `prevPacketId: null` 是列明的例外。
 
-数字只接受整数 token：拒绝前导零、指数、小数、`-0`、绝对值大于 `2^53-1`。UUID 小写。哈希 64 位小写十六进制。重复键、非法 UTF-8、孤立代理项、未知字段在 JCS 之前拒绝。生产路径不使用 erdtman JCS 1.1 做解析；该库只在测试里对照合法整数的规范输出。
+数字只接受整数 token：拒绝前导零、指数、小数、`-0`、绝对值大于 `2^53-1`。UUID 小写。哈希 64 位小写十六进制。重复键、非法 UTF-8、孤立代理项、未知字段在 JCS 之前拒绝。`\u` 转义的四位十六进制只接受 ASCII `0-9a-fA-F`；全角或其他非 ASCII 数字在严格解析时拒绝。字符串里的 U+2028 和 U+2029 按 RFC 8785 保留为 UTF-8，不转成 `\u2028` / `\u2029`。生产路径不使用 erdtman JCS 1.1 做解析；该库只在测试里对照合法整数的规范输出。
+
+共享非 ASCII 夹具在 `golden-vectors.json` 的 `canonicalFixtures`。Node 脚本用自己的规范器重算这些字节，不调用本仓库的 Java。Kotlin 仍未独立验证。
 
 黄金向量：`spec/event-contract/golden-vectors.json`。Node 复核脚本：`spec/event-contract/verify-golden.mjs`。Java 断言：`EventGoldenVectorTest`。
 
@@ -59,7 +61,7 @@
 
 缺值就不发该事件，不补 0 或 false。未知类型且 payload 为对象时，该条 `UNKNOWN_EVENT_TYPE`，包仍确认。可解析但语义不合法的事件逐条 `REJECTED`，留在原哈希里。
 
-`POSITION` / `ALTITUDE` / `VELOCITY` / `BATTERY` 同链同类型间隔必须 ≥ 2000ms，相等允许。实际状态与操作不限频。间隔按先入库者计算，不可交换，且不回写已发出的 receipt。`capturedAt` 须落在服务端当前时间的过去 7 天到未来 10 分钟内，这是技术窗口，不是产品规则。
+`POSITION` / `ALTITUDE` / `VELOCITY` / `BATTERY` 同链同类型间隔必须 ≥ 2000ms，相等允许。实际状态与操作不限频。间隔按先入库者计算，不可交换，且不回写已发出的 receipt。`capturedAt` 须落在服务端当前时间的过去 7 天到未来 10 分钟内，这是技术窗口，不是产品规则。它还须落在该 `assignmentVersion` 的作业窗口内，否则该条 `REJECTED` / `ASSIGNMENT_WINDOW`，包和 receipt 仍固定。作业窗口见「授权」。
 
 ## receipt 与 progress
 
@@ -79,19 +81,25 @@ progress 动态：`validationVersion`, `contiguousHeight`, `contiguousHash`, `hi
 
 `POST event-reconciliation` 的键全部必填：`schemaVersion`, `chainId`, `validationVersion`, `fromHeight`, `toHeight`, `cursor`, `missingCursor`, `limit`, `prefix`。`validationVersion`、两个 cursor、`prefix` 可以是 JSON `null`。`null` 版本表示按当前版本读。版本不一致返回 409，`message` 含 `RECONCILIATION_VERSION_CHANGED current=<n>`，不返回残页。
 
-`prefix` 为 null 时 `commonPrefixHeight` 为 null。提供了前缀且第一项就不匹配时为 0。否则为已连续匹配的最后高度。正常路径直接给出请求区间，不必每次二分。
+`prefix` 为 null 时 `commonPrefixHeight` 为 null。共同前缀只沿连续已验证历史计算：从高度 1 起每次加 1，且不得超过 `contiguousHeight`。洞上或分叉之后的候选即使哈希相等也不计入。没有已验证历史、第一项不是高度 1、或哈希不匹配时为 0。正常路径直接给出请求区间，不必每次二分。
 
 ## 技术上限
 
 这些是工程上限，不是价格：正文 262144 字节；事件与数组 500；深度 8；字符串 1024 个码元；对象键 32；高度 1..1000000；每链 2000 包；对账跨度 500；`limit` 1..200；前缀最多 64；上传响应里的缺洞最多 50 段；上传与对账各 600 次 / 60 秒。`schemaVersion`、`hashVersion`、`receiptVersion` 目前都是 1。
 
+`limit` 先按 long 检查 1..200，再转成 int。`2147483648` 与 `4294967297` 都是 LIMIT，不能先窄化成 int。链上已有 2000 包时，高度不超过当前最高已收高度的缺洞仍可补入；超过该高度的新包是 LIMIT。容量不把已经收到的历史洞封死。
+
 401 用原包重试。429 带 `Retry-After`（秒）后退避。408 与 5xx 保留原包重试。提交前失败会整笔回滚，不留下半份 receipt。
 
 ## 授权
 
-新包要求调用者是订单当前 `assignedPilotId`，且包内 `assignmentVersion` 等于订单当前轮次。不允许把缺失或 null 当成 0。`CANCELLED` 拒绝新包。不要求先到场，也不要求先 `connect`。
+新包按采集时的历史授权核验，不看订单当前 stage，也不要求调用者仍是当前 `assignedPilotId`。证据只用已有的 `dispatch_assignment` 行：`pilot_id`、`accepted_at`、`ended_at`。`accepted_at` 在接单时写入。放单、货主取消、完成都会写入 `ended_at`。没有对应行（例如版本 0 或从未接过的版本）拒绝，不编造作业区间。`assignmentVersion` 缺失或 0 仍是 schema 错误。
 
-已经确认的包，原链飞手在放单或取消后仍可重放并拿到原来的 receipt。放单后的新包拒绝。换一轮 `assignmentVersion` 就是另一条链。从未确认的包在改派之后补传，本草案不接受。
+调用者必须是该行的 `pilot_id`。其他人是 403。不要求先到场，也不要求先 `connect`。
+
+作业窗口的起止是这一行的 `accepted_at` 与 `ended_at`。两端各允许现有技术钟差 10 分钟（`CAPTURED_FUTURE_MS`），用来吸收设备与服务器的时钟差，不是新产品时长。轮次尚未结束（`ended_at` 为空）时，上界是服务器当前时间加这 10 分钟。时间列是服务端 `LocalDateTime.now()`，按 JVM 默认时区换成 epoch 毫秒。窗口外的事件逐条 `ASSIGNMENT_WINDOW`，原包和 receipt 仍提交，不因后来的放单、改派或取消改写。窗口内的迟到包由当时的飞手补传，即使订单已经放单、改派或取消。
+
+已经确认的包，原链飞手在放单或取消后重放，拿到的是最初 receipt。换一轮 `assignmentVersion` 就是另一条链：旧飞手不能往新轮次写，新飞手不能往旧轮次写。
 
 上传与对账先锁订单行，再按 `chain_id` 锁定该订单的链。后续结单必须复用这把锁。
 
@@ -99,7 +107,7 @@ progress 动态：`validationVersion`, `contiguousHeight`, `contiguousHash`, `hi
 
 Flyway `V27`（Java 迁移）分开保存：`flight_event_chain`、`flight_event_packet`（原始 bytes、规范 UTF-8、两种哈希）、`flight_event_receipt`、`flight_event_result`、`flight_event_fact`、`flight_event_conflict`。
 
-序列号、来源、机型用 `VARBINARY`。UUID 用 `utf8mb4_bin`。`order_id` 沿用 `dispatch_order.id` 的排序规则，以便外键合法。不用 `INSERT IGNORE`。不改 V1–V26 的校验和。
+序列号、来源、机型用 `VARBINARY`。UUID 用 `utf8mb4_bin`。`order_id` 沿用 `dispatch_order.id` 的排序规则，以便外键合法。不用 `INSERT IGNORE`。不改 V1–V26 的文件，也不改它们已经写入的 checksum。V21 与 V27 都是 Java 迁移，沿用 Flyway `BaseJavaMigration` 的 null checksum：历史表里这两行的 checksum 是 NULL、type 是 JDBC、success 是 1。SQL 迁移的 checksum 必须非空，并且在 26→27 之后保持原值。null 不是失败，也不把 NULL 读成 0。
 
 现有 180 天清理只删除 `dispatch_flight_sample`。它不会删除事件原包。本阶段不新增自动清理，也不宣称永久保存已经批准。补洞所需的后包原文必须留到续链完成之后；删除策略未定。
 

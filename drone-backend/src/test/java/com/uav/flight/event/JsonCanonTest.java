@@ -27,9 +27,21 @@ class JsonCanonTest {
     }
 
     @Test
-    void escapesLineSeparatorsAndNotSolidus() {
-        String canonical = JsonCanon.canonicalText(JsonCanon.parse("{\"s\":\"a/b\\u2028\"}".getBytes(StandardCharsets.UTF_8)));
-        assertThat(canonical).isEqualTo("{\"s\":\"a/b\\u2028\"}");
+    void keepsLineAndParagraphSeparatorsAsUtf8() {
+        byte[] raw = "{\"s\":\"a/b\u2028\u2029\"}".getBytes(StandardCharsets.UTF_8);
+        byte[] canonical = JsonCanon.canonical(JsonCanon.parse(raw));
+        assertThat(new String(canonical, StandardCharsets.UTF_8)).isEqualTo("{\"s\":\"a/b\u2028\u2029\"}");
+        assertThat(canonical).containsSequence((byte) 0xE2, (byte) 0x80, (byte) 0xA8);
+        assertThat(canonical).containsSequence((byte) 0xE2, (byte) 0x80, (byte) 0xA9);
+        assertThat(new String(canonical, StandardCharsets.US_ASCII)).doesNotContain("\\u2028").doesNotContain("\\u2029");
+    }
+
+    @Test
+    void rejectsNonAsciiHexDigits() {
+        assertRejected("{\"a\":\"\\u" + "\uFF11\uFF11\uFF11\uFF11\"}", "SYNTAX");
+        assertRejected("{\"a\":\"\\u12" + "\uFF21F\"}", "SYNTAX");
+        assertRejected("{\"a\":\"\\u" + "\u0661\u0662\u0663\u0664\"}", "SYNTAX");
+        assertThat(JsonCanon.canonicalText(JsonCanon.parse("{\"a\":\"\\u0041\"}".getBytes(StandardCharsets.UTF_8)))).isEqualTo("{\"a\":\"A\"}");
     }
 
     @Test

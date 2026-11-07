@@ -1,6 +1,7 @@
 package com.uav.flight.event;
 
-import com.uav.dispatch.pojo.entity.DispatchOrder;
+import com.uav.dispatch.mapper.DispatchAssignmentRepository;
+import com.uav.dispatch.pojo.entity.DispatchAssignment;
 import com.uav.flight.pojo.vo.EventPacketAckVO;
 import com.uav.flight.pojo.vo.EventProgressVO;
 import com.uav.flight.pojo.vo.EventReceiptVO;
@@ -29,18 +30,24 @@ public class EventPacketService {
     private final EventChainLock locks;
     private final EventPacketStore store;
     private final EventCommitGate gate;
+    private final EventPacketCap cap;
+    private final DispatchAssignmentRepository assignments;
     private final Clock clock;
     private final EventPacketSchema schema = new EventPacketSchema();
 
     @Autowired
-    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate) {
-        this(locks, store, gate, Clock.systemUTC());
+    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventPacketCap cap,
+            DispatchAssignmentRepository assignments) {
+        this(locks, store, gate, cap, assignments, Clock.systemUTC());
     }
 
-    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, Clock clock) {
+    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventPacketCap cap,
+            DispatchAssignmentRepository assignments, Clock clock) {
         this.locks = locks;
         this.store = store;
         this.gate = gate;
+        this.cap = cap;
+        this.assignments = assignments;
         this.clock = clock;
     }
 
@@ -52,20 +59,21 @@ public class EventPacketService {
         } catch (EventFormatException e) {
             throw mapped(e);
         }
-        DispatchOrder order = locks.lock(orderId);
+        locks.lock(orderId);
         var existing = store.findPacket(parsed.packetId());
         if (existing != null) return existing(pilot, orderId, raw, parsed, existing);
-        authorizeNew(order, pilot, parsed.assignmentVersion());
+        DispatchAssignment assignment = authorize(orderId, pilot, parsed.assignmentVersion());
         var chain = store.findChain(parsed.chainId());
         var binding = store.findBinding(parsed);
         if (chain == null && binding != null) return conflict("CHAIN_BINDING", orderId, binding.chainId(), parsed, raw);
         if (chain != null && chain.pilotId() != pilot) throw denied();
         if (chain != null && !chain.sameIdentity(parsed)) return conflict("CHAIN_IDENTITY", orderId, chain.chainId(), parsed, raw);
-        if (chain != null && store.countPackets(chain.chainId()) >= EventLimits.MAX_PACKETS_PER_CHAIN) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.EVENT_PACKET_MALFORMED, "LIMIT");
-        }
         if (chain != null && store.packetAtHeight(chain.chainId(), parsed.height()) != null) {
             return conflict("HEIGHT_FORK", orderId, chain.chainId(), parsed, raw);
+        }
+        if (chain != null && !EventLimits.admitsAnotherPacket(store.countPackets(chain.chainId()),
+                chain.highestReceivedHeight(), parsed.height(), cap.max())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.EVENT_PACKET_MALFORMED, "LIMIT");
         }
         boolean created = false;
         if (chain == null) {
@@ -100,7 +108,7 @@ public class EventPacketService {
             throw e;
         }
         long decidedAt = store.findPacket(parsed.packetId()).decidedAt();
-        var decisions = decide(parsed);
+        var decisions = decide(parsed, assignment);
         for (int i = 0; i < parsed.events().size(); i++) {
             if (!"ACCEPTED".equals(decisions.get(i).outcome())) continue;
             try {
@@ -136,8 +144,9 @@ public class EventPacketService {
         return new EventDecider.Decision("REJECTED", "EVENT_ID_CONFLICT", null);
     }
 
-    private List<EventDecider.Decision> decide(ParsedPacket packet) {
+    private List<EventDecider.Decision> decide(ParsedPacket packet, DispatchAssignment assignment) {
         long now = clock.millis();
+        var window = AssignmentCaptureWindow.of(assignment.getAcceptedAt(), assignment.getEndedAt(), now);
         var decisions = new ArrayList<EventDecider.Decision>();
         var priors = new ArrayList<EventDecider.Prior>();
         for (ParsedEvent event : packet.events()) {
@@ -145,7 +154,7 @@ public class EventPacketService {
             var existing = fact == null ? null : new EventDecider.Existing(fact.packetId(), fact.attribution());
             boolean interval = EventPayloads.SENSOR.contains(event.type())
                     && store.intervalHit(packet.chainId(), event.type(), event.capturedAt(), event.eventId());
-            var decision = EventDecider.decide(event, attribution(packet, event), now, priors, existing, interval);
+            var decision = EventDecider.decide(event, attribution(packet, event), now, priors, existing, interval, window);
             decisions.add(decision);
             if ("ACCEPTED".equals(decision.outcome())) priors.add(new EventDecider.Prior(event.type(), event.capturedAt()));
         }
@@ -190,13 +199,11 @@ public class EventPacketService {
                 event.payloadCanonical());
     }
 
-    private static void authorizeNew(DispatchOrder order, long pilot, long assignmentVersion) {
-        if ("CANCELLED".equals(order.getStage())) {
-            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.ORDER_STATUS_INVALID);
-        }
-        if (!Objects.equals(order.getAssignedPilotId(), pilot) || assignmentVersion != order.getAssignmentVersion()) {
-            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.DISPATCH_ASSIGNMENT_CHANGED);
-        }
+    private DispatchAssignment authorize(String orderId, long pilot, long assignmentVersion) {
+        var assignment = assignments.findByOrderIdAndAssignmentVersion(orderId, assignmentVersion)
+                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.DISPATCH_ASSIGNMENT_CHANGED));
+        if (!Objects.equals(assignment.getPilotId(), pilot)) throw denied();
+        return assignment;
     }
 
     private static BusinessException mapped(EventFormatException e) {

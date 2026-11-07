@@ -78,4 +78,4 @@ for (const fixture of doc.canonicalFixtures) {
   }
 }
 console.log("node verified " + doc.vectors.length + " draft vectors and "
-    + doc.canonicalFixtures.length + " non-ASCII fixtures; Kotlin has not verified this contract");
+    + doc.canonicalFixtures.length + " non-ASCII fixtures; an offline vector match is not HTTP interop, and this contract is not frozen");

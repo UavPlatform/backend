@@ -2,25 +2,22 @@ package com.uav.flight.event;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.LocalDateTime;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AssignmentCaptureWindowTest {
     @Test
-    void closedRoundUsesEndedAtAndOpenRoundUsesTheServerClock() {
-        LocalDateTime accepted = LocalDateTime.of(2026, 11, 7, 9, 0);
-        LocalDateTime ended = accepted.plusMinutes(20);
-        long acceptedMs = AssignmentCaptureWindow.epoch(accepted);
-        long endedMs = AssignmentCaptureWindow.epoch(ended);
-        var closed = AssignmentCaptureWindow.of(accepted, ended, endedMs + 3_600_000);
-        assertThat(closed.contains(acceptedMs)).isTrue();
-        assertThat(closed.contains(acceptedMs - EventLimits.CAPTURED_FUTURE_MS)).isTrue();
-        assertThat(closed.contains(acceptedMs - EventLimits.CAPTURED_FUTURE_MS - 1)).isFalse();
-        assertThat(closed.contains(endedMs + EventLimits.CAPTURED_FUTURE_MS)).isTrue();
-        assertThat(closed.contains(endedMs + EventLimits.CAPTURED_FUTURE_MS + 1)).isFalse();
-        var open = AssignmentCaptureWindow.of(accepted, null, acceptedMs + 60_000);
-        assertThat(open.contains(acceptedMs + 60_000 + EventLimits.CAPTURED_FUTURE_MS)).isTrue();
-        assertThat(open.contains(acceptedMs + 60_000 + EventLimits.CAPTURED_FUTURE_MS + 1)).isFalse();
+    void closedRoundIsHalfOpenAndOpenRoundHasNoClockExpansion() {
+        long accepted = 1_700_000_000_000L;
+        long ended = accepted + 60_000;
+        var closed = AssignmentCaptureWindow.of(accepted, ended);
+        assertThat(closed.contains(accepted)).isTrue();
+        assertThat(closed.contains(accepted - 1)).isFalse();
+        assertThat(closed.contains(ended - 1)).isTrue();
+        assertThat(closed.contains(ended)).isFalse();
+        assertThat(closed.contains(ended + 60_000)).isFalse();
+        var open = AssignmentCaptureWindow.of(accepted, null);
+        assertThat(open.contains(accepted)).isTrue();
+        assertThat(open.contains(accepted - 1)).isFalse();
+        assertThat(open.contains(accepted + 8L * 24 * 60 * 60 * 1000)).isTrue();
     }
 }

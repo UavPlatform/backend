@@ -5,38 +5,34 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Continuation re-parses stored raw packet bytes. The client does not resend a successor body.
- * A broken link stops the contiguous prefix and leaves the stored packet and its receipt unchanged.
+ * Continuation uses the link columns checked when the packet was accepted.
+ * Stored raw bytes stay immutable and are not loaded again to advance the prefix.
  */
 public final class EventChainRepair {
-    public record Successor(String chainId, long height, String packetId, byte[] rawBytes, byte[] storedChainHash) { }
-    public record Tip(long contiguousHeight, byte[] contiguousHash, String tipPacketId, String integrity) { }
+    public record Link(long height, String packetId, String prevPacketId, byte[] prevChainHash, byte[] chainHash) { }
 
-    private static final EventPacketSchema SCHEMA = new EventPacketSchema();
+    public record Tip(long contiguousHeight, byte[] contiguousHash, String tipPacketId, String integrity, boolean fullPage) { }
 
     private EventChainRepair() { }
 
-    public static Tip walk(long contiguous, byte[] tipHash, String tipPacketId, List<Successor> ascending) {
-        for (Successor successor : ascending) {
-            if (successor.height() != contiguous + 1) break;
-            ParsedPacket parsed;
-            try {
-                parsed = SCHEMA.parse(successor.rawBytes(), null);
-            } catch (EventFormatException e) {
-                return new Tip(contiguous, tipHash, tipPacketId, "FORKED");
-            }
-            boolean self = successor.packetId().equals(parsed.packetId())
-                    && MessageDigest.isEqual(parsed.chainHash(), successor.storedChainHash());
-            boolean link = tipHash != null
-                    && parsed.chainId().equals(successor.chainId())
-                    && parsed.height() == successor.height()
-                    && Objects.equals(parsed.prevPacketId(), tipPacketId)
-                    && MessageDigest.isEqual(parsed.prevChainHash(), tipHash);
-            if (!self || !link) return new Tip(contiguous, tipHash, tipPacketId, "FORKED");
-            contiguous = successor.height();
-            tipHash = parsed.chainHash();
-            tipPacketId = parsed.packetId();
+    public static Tip advance(long contiguous, byte[] tipHash, String tipPacketId, List<Link> ascending, int pageSize) {
+        long height = contiguous;
+        byte[] hash = tipHash;
+        String tip = tipPacketId;
+        for (Link link : ascending) {
+            if (link.height() != height + 1) return tip(height, hash, tip, "OPEN", false);
+            boolean linked = hash != null && link.prevChainHash() != null
+                    && MessageDigest.isEqual(link.prevChainHash(), hash)
+                    && Objects.equals(link.prevPacketId(), tip);
+            if (!linked || link.chainHash() == null) return tip(height, hash, tip, "FORKED", false);
+            height = link.height();
+            hash = link.chainHash();
+            tip = link.packetId();
         }
-        return new Tip(contiguous, contiguous == 0 ? null : tipHash, tipPacketId, "OPEN");
+        return tip(height, hash, tip, "OPEN", pageSize > 0 && ascending.size() == pageSize);
+    }
+
+    private static Tip tip(long contiguous, byte[] hash, String packetId, String integrity, boolean fullPage) {
+        return new Tip(contiguous, contiguous == 0 ? null : hash, packetId, integrity, fullPage);
     }
 }

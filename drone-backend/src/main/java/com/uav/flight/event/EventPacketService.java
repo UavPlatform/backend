@@ -1,7 +1,5 @@
 package com.uav.flight.event;
 
-import com.uav.dispatch.mapper.DispatchAssignmentRepository;
-import com.uav.dispatch.pojo.entity.DispatchAssignment;
 import com.uav.flight.pojo.vo.EventPacketAckVO;
 import com.uav.flight.pojo.vo.EventProgressVO;
 import com.uav.flight.pojo.vo.EventReceiptVO;
@@ -21,7 +19,6 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /** Accepts a raw event packet. The receipt is fixed in the same commit as the raw bytes and per-event results. */
 @Service
@@ -30,24 +27,20 @@ public class EventPacketService {
     private final EventChainLock locks;
     private final EventPacketStore store;
     private final EventCommitGate gate;
-    private final EventPacketCap cap;
-    private final DispatchAssignmentRepository assignments;
+    private final EventRepairBudget budget;
     private final Clock clock;
     private final EventPacketSchema schema = new EventPacketSchema();
 
     @Autowired
-    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventPacketCap cap,
-            DispatchAssignmentRepository assignments) {
-        this(locks, store, gate, cap, assignments, Clock.systemUTC());
+    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget) {
+        this(locks, store, gate, budget, Clock.systemUTC());
     }
 
-    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventPacketCap cap,
-            DispatchAssignmentRepository assignments, Clock clock) {
+    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget, Clock clock) {
         this.locks = locks;
         this.store = store;
         this.gate = gate;
-        this.cap = cap;
-        this.assignments = assignments;
+        this.budget = budget;
         this.clock = clock;
     }
 
@@ -62,7 +55,7 @@ public class EventPacketService {
         locks.lock(orderId);
         var existing = store.findPacket(parsed.packetId());
         if (existing != null) return existing(pilot, orderId, raw, parsed, existing);
-        DispatchAssignment assignment = authorize(orderId, pilot, parsed.assignmentVersion());
+        var assignment = authorize(orderId, pilot, parsed.assignmentVersion());
         var chain = store.findChain(parsed.chainId());
         var binding = store.findBinding(parsed);
         if (chain == null && binding != null) return conflict("CHAIN_BINDING", orderId, binding.chainId(), parsed, raw);
@@ -71,10 +64,7 @@ public class EventPacketService {
         if (chain != null && store.packetAtHeight(chain.chainId(), parsed.height()) != null) {
             return conflict("HEIGHT_FORK", orderId, chain.chainId(), parsed, raw);
         }
-        if (chain != null && !EventLimits.admitsAnotherPacket(store.countPackets(chain.chainId()),
-                chain.highestReceivedHeight(), parsed.height(), cap.max())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.EVENT_PACKET_MALFORMED, "LIMIT");
-        }
+        reserve(chain, parsed.height());
         boolean created = false;
         if (chain == null) {
             try {
@@ -91,6 +81,7 @@ public class EventPacketService {
                 }
                 if (chain.pilotId() != pilot) throw denied();
                 if (!chain.sameIdentity(parsed)) return conflict("CHAIN_IDENTITY", orderId, chain.chainId(), parsed, raw);
+                reserve(chain, parsed.height());
             }
         }
         try {
@@ -144,32 +135,43 @@ public class EventPacketService {
         return new EventDecider.Decision("REJECTED", "EVENT_ID_CONFLICT", null);
     }
 
-    private List<EventDecider.Decision> decide(ParsedPacket packet, DispatchAssignment assignment) {
+    private List<EventDecider.Decision> decide(ParsedPacket packet, EventPacketStore.AssignmentEpoch assignment) {
         long now = clock.millis();
-        var window = AssignmentCaptureWindow.of(assignment.getAcceptedAt(), assignment.getEndedAt(), now);
+        var window = AssignmentCaptureWindow.of(assignment.acceptedAt(), assignment.endedAt());
         var decisions = new ArrayList<EventDecider.Decision>();
-        var priors = new ArrayList<EventDecider.Prior>();
         for (ParsedEvent event : packet.events()) {
             var fact = store.findFact(event.eventId());
             var existing = fact == null ? null : new EventDecider.Existing(fact.packetId(), fact.attribution());
-            boolean interval = EventPayloads.SENSOR.contains(event.type())
-                    && store.intervalHit(packet.chainId(), event.type(), event.capturedAt(), event.eventId());
-            var decision = EventDecider.decide(event, attribution(packet, event), now, priors, existing, interval, window);
-            decisions.add(decision);
-            if ("ACCEPTED".equals(decision.outcome())) priors.add(new EventDecider.Prior(event.type(), event.capturedAt()));
+            decisions.add(EventDecider.decide(event, attribution(packet, event), now, existing, window));
         }
         return decisions;
     }
 
+    private void reserve(EventPacketStore.ChainRow chain, long height) {
+        long contiguous = chain == null ? 0 : chain.contiguousHeight();
+        long highest = chain == null ? 0 : chain.highestReceivedHeight();
+        if (!EventLimits.admitsUnverified(contiguous, highest, height, budget.span())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.EVENT_PACKET_MALFORMED, "LIMIT");
+        }
+    }
+
     private EventPacketStore.ChainRow repair(ParsedPacket parsed, EventPacketStore.ChainRow previous) {
         long contiguous = previous == null ? 0 : previous.contiguousHeight();
-        byte[] tipHash = contiguous == 0 ? parsed.anchor() : previous.contiguousHash();
+        byte[] hash = contiguous == 0 ? parsed.anchor() : previous.contiguousHash();
         String tipId = contiguous == 0 ? null : store.packetIdAt(parsed.chainId(), contiguous);
-        var tip = EventChainRepair.walk(contiguous, tipHash, tipId, store.successors(parsed.chainId(), contiguous));
-        var heights = store.heights(parsed.chainId());
-        long highest = heights.isEmpty() ? 0 : heights.getLast();
+        String integrity = "OPEN";
+        int page = budget.pageSize();
+        int guard = budget.span() + 2;
+        while (guard-- > 0) {
+            var tip = EventChainRepair.advance(contiguous, hash, tipId, store.linksAfter(parsed.chainId(), contiguous, page), page);
+            contiguous = tip.contiguousHeight();
+            hash = tip.contiguousHash();
+            tipId = tip.tipPacketId();
+            integrity = tip.integrity();
+            if (!tip.fullPage()) break;
+        }
         long version = (previous == null ? 0 : previous.validationVersion()) + 1;
-        store.updateProgress(parsed.chainId(), tip.contiguousHeight(), tip.contiguousHash(), highest, tip.integrity(), version);
+        store.updateProgress(parsed.chainId(), contiguous, hash, store.maxHeight(parsed.chainId()), integrity, version);
         return store.findChain(parsed.chainId());
     }
 
@@ -183,7 +185,10 @@ public class EventPacketService {
         var receipt = store.receipt(packetId);
         var results = store.results(packetId).stream()
                 .map(row -> new EventResultVO(row.eventId(), row.outcome(), row.reason(), row.sourcePacketId())).toList();
-        var page = EventHeights.page(EventHeights.holes(store.heights(chain.chainId())), null, EventLimits.UPLOAD_MISSING_LIMIT);
+        var present = chain.highestReceivedHeight() <= chain.contiguousHeight() ? List.<Long>of()
+                : store.heightsBetween(chain.chainId(), chain.contiguousHeight() + 1, chain.highestReceivedHeight());
+        var page = EventHeights.page(EventHeights.holesAbove(chain.contiguousHeight(), present, chain.highestReceivedHeight()),
+                null, EventLimits.UPLOAD_MISSING_LIMIT);
         var progress = new EventProgressVO(chain.validationVersion(), chain.contiguousHeight(),
                 chain.contiguousHash() == null ? null : EventHex.encode(chain.contiguousHash()), chain.highestReceivedHeight(),
                 page.ranges().stream().map(range -> new MissingRangeVO(range.fromHeight(), range.toHeight())).toList(),
@@ -199,10 +204,12 @@ public class EventPacketService {
                 event.payloadCanonical());
     }
 
-    private DispatchAssignment authorize(String orderId, long pilot, long assignmentVersion) {
-        var assignment = assignments.findByOrderIdAndAssignmentVersion(orderId, assignmentVersion)
-                .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.DISPATCH_ASSIGNMENT_CHANGED));
-        if (!Objects.equals(assignment.getPilotId(), pilot)) throw denied();
+    private EventPacketStore.AssignmentEpoch authorize(String orderId, long pilot, long assignmentVersion) {
+        var assignment = store.assignmentEpoch(orderId, assignmentVersion);
+        if (assignment == null) {
+            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.DISPATCH_ASSIGNMENT_CHANGED);
+        }
+        if (assignment.pilotId() != pilot) throw denied();
         return assignment;
     }
 

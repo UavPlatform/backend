@@ -2,49 +2,38 @@ package com.uav.flight.event;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.List;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EventDeciderTest {
     @Test
-    void keepsAcceptedStableAndRejectsOnlyTheLaterCloseSample() {
+    void eligibilityIsTheAssignmentIntervalAndIdentityStaysIndependentOfArrival() {
         long now = 1_710_000_000_000L;
-        var first = event(0, "POSITION", null);
-        var close = event(1, "POSITION", null);
-        var spaced = event(2, "POSITION", null);
-        var attribution = attribution(first);
-        var accepted = EventDecider.decide(first, attribution, now, List.of(), null, false, window(now));
-        assertThat(accepted.outcome()).isEqualTo("ACCEPTED");
-        var prior = List.of(new EventDecider.Prior("POSITION", first.capturedAt()));
-        assertThat(EventDecider.decide(close, attribution(close), now, prior, null, false, window(now)).reason()).isEqualTo("SENSOR_INTERVAL");
-        assertThat(EventDecider.decide(spaced, attribution(spaced), now, prior, null, false, window(now)).outcome()).isEqualTo("ACCEPTED");
-        var same = new EventDecider.Existing("packet-1", attribution);
-        assertThat(EventDecider.decide(first, attribution, now, List.of(), same, true, window(now)).outcome()).isEqualTo("DUPLICATE");
-        var other = new EventDecider.Existing("packet-1", attribution(close));
-        assertThat(EventDecider.decide(first, attribution, now, List.of(), other, false, window(now)).reason()).isEqualTo("EVENT_ID_CONFLICT");
-        assertThat(EventDecider.decide(event(3, "ACTUAL_FLYING_STATE", null), attribution(event(3, "ACTUAL_FLYING_STATE", null)),
-                now, List.of(new EventDecider.Prior("ACTUAL_FLYING_STATE", now)), null, true, window(now)).outcome()).isEqualTo("ACCEPTED");
-        var early = new ParsedEvent(9, "55555555-5555-4555-8555-555555555559",
-                now - EventLimits.CAPTURED_FUTURE_MS - 1, "ACTUAL_FLYING_STATE", new byte[] {1}, null);
-        var opened = AssignmentCaptureWindow.of(Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDateTime(), null, now);
-        assertThat(EventDecider.decide(early, attribution(early), now, List.of(), null, false, opened).reason()).isEqualTo("ASSIGNMENT_WINDOW");
-        var ahead = new ParsedEvent(8, "55555555-5555-4555-8555-555555555558",
-                now + EventLimits.CAPTURED_FUTURE_MS + 1, "ACTUAL_FLYING_STATE", new byte[] {1}, null);
-        assertThat(EventDecider.decide(ahead, attribution(ahead), now, List.of(), null, false, opened).reason()).isEqualTo("EVENT_TIME_WINDOW");
+        var open = AssignmentCaptureWindow.of(now - 60_000, null);
+        var first = event(now, "POSITION");
+        var close = event(now + 1_000, "POSITION");
+        assertThat(EventDecider.decide(first, attribution(first), now, null, open).outcome()).isEqualTo("ACCEPTED");
+        assertThat(EventDecider.decide(close, attribution(close), now, null, open).outcome()).isEqualTo("ACCEPTED");
+        var same = new EventDecider.Existing("packet-1", attribution(first));
+        assertThat(EventDecider.decide(first, attribution(first), now, same, open).outcome()).isEqualTo("DUPLICATE");
+        assertThat(EventDecider.decide(first, attribution(close), now, same, open).reason()).isEqualTo("EVENT_ID_CONFLICT");
+        var flying = event(now, "ACTUAL_FLYING_STATE");
+        assertThat(EventDecider.decide(flying, attribution(flying), now, null, open).outcome()).isEqualTo("ACCEPTED");
+        var early = event(now - 60_001, "ACTUAL_FLYING_STATE");
+        assertThat(EventDecider.decide(early, attribution(early), now, null, open).reason()).isEqualTo("ASSIGNMENT_WINDOW");
+        var ahead = event(now + EventLimits.CAPTURED_FUTURE_MS + 1, "ACTUAL_FLYING_STATE");
+        assertThat(EventDecider.decide(ahead, attribution(ahead), now, null, open).reason()).isEqualTo("EVENT_TIME_WINDOW");
+        long accepted = now - 8L * 24 * 60 * 60 * 1000;
+        var historical = AssignmentCaptureWindow.of(accepted, accepted + 3_600_000);
+        var lateUpload = event(accepted + 1_000, "POSITION");
+        assertThat(EventDecider.decide(lateUpload, attribution(lateUpload), now, null, historical).outcome()).isEqualTo("ACCEPTED");
+        var outside = event(accepted - 1, "POSITION");
+        assertThat(EventDecider.decide(outside, attribution(outside), now, null, historical).reason()).isEqualTo("ASSIGNMENT_WINDOW");
+        var atEnd = event(accepted + 3_600_000, "POSITION");
+        assertThat(EventDecider.decide(atEnd, attribution(atEnd), now, null, historical).reason()).isEqualTo("ASSIGNMENT_WINDOW");
     }
 
-    private static AssignmentCaptureWindow.Span window(long now) {
-        return AssignmentCaptureWindow.of(
-                Instant.ofEpochMilli(now - 60_000).atZone(ZoneId.systemDefault()).toLocalDateTime(), null, now);
-    }
-
-    private static ParsedEvent event(int index, String type, String reject) {
-        long captured = 1_710_000_000_000L + index * 1_000L;
-        if (index == 2) captured = 1_710_000_000_000L + 2_000L;
-        return new ParsedEvent(index, "55555555-5555-4555-8555-55555555555" + index, captured, type, new byte[] {1}, reject);
+    private static ParsedEvent event(long capturedAt, String type) {
+        return new ParsedEvent(1, "55555555-5555-4555-8555-555555555551", capturedAt, type, new byte[] {1}, null);
     }
 
     private static EventAttribution attribution(ParsedEvent event) {

@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.List;
 
 /** Reads a fixed validationVersion. A changed version is an explicit error, not a torn page. */
 @Service
@@ -42,7 +43,10 @@ public class EventReconciliationService {
             throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.EVENT_RECONCILIATION_VERSION_CHANGED,
                     "RECONCILIATION_VERSION_CHANGED current=" + chain.validationVersion());
         }
-        var heights = store.heights(chain.chainId());
+        long highest = chain.highestReceivedHeight();
+        long endHeight = Math.min(request.toHeight(), highest);
+        var present = endHeight < request.fromHeight() ? List.<Long>of()
+                : store.heightsBetween(chain.chainId(), request.fromHeight(), endHeight);
         var visible = new ArrayList<EventPacketStore.HeightHash>();
         for (var row : store.hashes(chain.chainId(), request.fromHeight(), request.toHeight())) {
             if (request.cursor() == null || row.height() >= request.cursor()) visible.add(row);
@@ -54,7 +58,7 @@ public class EventReconciliationService {
             entries.add(new EventHeightVO(row.height(), row.packetId(), EventHex.encode(row.chainHash()), EventHex.encode(row.contentDigest())));
         }
         Long next = visible.size() > request.limit() ? visible.get(request.limit()).height() : null;
-        var holes = EventHeights.page(EventHeights.holesInside(heights, request.fromHeight(), request.toHeight()),
+        var holes = EventHeights.page(EventHeights.holesInSpan(highest, present, request.fromHeight(), request.toHeight()),
                 request.missingCursor(), request.limit());
         return new EventReconciliationVO(EventLimits.SCHEMA_VERSION, chain.validationVersion(), chain.chainId(),
                 request.fromHeight(), request.toHeight(), entries, next,
@@ -65,7 +69,7 @@ public class EventReconciliationService {
                 commonPrefix(chain, request.prefix()));
     }
 
-    private Long commonPrefix(EventPacketStore.ChainRow chain, java.util.List<EventReconciliationSchema.Request.Prefix> prefix) {
+    private Long commonPrefix(EventPacketStore.ChainRow chain, List<EventReconciliationSchema.Request.Prefix> prefix) {
         if (prefix == null) return null;
         long matched = 0;
         for (var entry : prefix) {

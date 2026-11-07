@@ -23,16 +23,28 @@ public final class EventHeights {
     /** Ranges are clipped to the closed comparison window and to heights that have already been received. */
     public static List<Range> holesInside(List<Long> ascendingHeights, long fromHeight, long toHeight) {
         if (ascendingHeights.isEmpty() || fromHeight > toHeight) return List.of();
-        long highest = ascendingHeights.getLast();
+        return holesInSpan(ascendingHeights.getLast(), ascendingHeights, fromHeight, toHeight);
+    }
+
+    /** Holes inside {@code [fromHeight, min(toHeight, highest)]}. {@code present} may be only that span. */
+    public static List<Range> holesInSpan(long highest, List<Long> present, long fromHeight, long toHeight) {
         long end = Math.min(toHeight, highest);
-        if (fromHeight > end) return List.of();
-        var clipped = new ArrayList<Range>();
-        for (Range hole : holes(ascendingHeights)) {
-            long from = Math.max(hole.fromHeight(), fromHeight);
-            long to = Math.min(hole.toHeight(), end);
-            if (from <= to) clipped.add(new Range(from, to));
+        if (highest <= 0 || fromHeight > end) return List.of();
+        var holes = new ArrayList<Range>();
+        long previous = fromHeight - 1;
+        for (long height : present) {
+            if (height < fromHeight || height > end) continue;
+            if (height > previous + 1) holes.add(new Range(previous + 1, height - 1));
+            previous = height;
         }
-        return List.copyOf(clipped);
+        if (end > previous) holes.add(new Range(previous + 1, end));
+        return List.copyOf(holes);
+    }
+
+    /** Holes strictly above the verified prefix and through the highest received height. */
+    public static List<Range> holesAbove(long contiguous, List<Long> presentAbove, long highest) {
+        if (highest <= contiguous) return List.of();
+        return holesInSpan(highest, presentAbove, contiguous + 1, highest);
     }
 
     public static Page page(List<Range> ranges, Long cursor, int limit) {

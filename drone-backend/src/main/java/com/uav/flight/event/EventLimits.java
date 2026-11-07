@@ -15,18 +15,22 @@ public final class EventLimits {
     public static final int MAX_OBJECT_KEYS = 32;
     public static final int MAX_ARRAY = 500;
     public static final long MAX_HEIGHT = 1_000_000L;
-    public static final int MAX_PACKETS_PER_CHAIN = 2_000;
+    /** How far a new height may sit ahead of the verified prefix. Not a lifetime packet count. */
+    public static final int UNVERIFIED_SPAN = 2_000;
+    /** Metadata rows read per repair step. The walk repeats until the suffix stops. */
+    public static final int REPAIR_PAGE = 64;
 
     /**
-     * At the cap, a height already inside the received range can still fill a hole.
-     * A height above the highest received height would grow the chain and is refused.
+     * A height inside the already received range is a reserved hole and stays fillable.
+     * A height above that range is accepted only when the unverified span can cover it.
      */
-    public static boolean admitsAnotherPacket(long storedCount, long highestReceivedHeight, long height, int maxPackets) {
-        return storedCount < maxPackets || height <= highestReceivedHeight;
+    public static boolean admitsUnverified(long contiguousHeight, long highestReceivedHeight, long height, int span) {
+        if (span < 1 || height < 1) return false;
+        if (highestReceivedHeight >= height) return true;
+        return height - contiguousHeight <= span;
     }
+
     public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
-    public static final long SENSOR_INTERVAL_MS = 2_000L;
-    public static final long CAPTURED_PAST_MS = 7L * 24 * 60 * 60 * 1000L;
     public static final long CAPTURED_FUTURE_MS = 10L * 60 * 1000L;
     public static final int RECON_MAX_SPAN = 500;
     public static final int RECON_MAX_LIMIT = 200;

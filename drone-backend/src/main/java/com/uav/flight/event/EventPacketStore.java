@@ -36,9 +36,19 @@ public class EventPacketStore {
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
-    public int countPackets(String chainId) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_packet WHERE chain_id = ?", Integer.class, chainId);
-        return count == null ? 0 : count;
+    public record AssignmentEpoch(long pilotId, long acceptedAt, Long endedAt) { }
+
+    public AssignmentEpoch assignmentEpoch(String orderId, long version) {
+        var rows = jdbc.query("SELECT pilot_id, accepted_at, ended_at FROM dispatch_assignment "
+                        + "WHERE order_id = ? AND assignment_version = ?",
+                (rs, n) -> {
+                    long pilotId = rs.getLong("pilot_id");
+                    long accepted = rs.getTimestamp("accepted_at").getTime();
+                    var ended = rs.getTimestamp("ended_at");
+                    boolean missing = rs.wasNull();
+                    return new AssignmentEpoch(pilotId, accepted, missing || ended == null ? null : ended.getTime());
+                }, orderId, version);
+        return rows.isEmpty() ? null : rows.getFirst();
     }
 
     public String packetAtHeight(String chainId, long height) {
@@ -104,14 +114,6 @@ public class EventPacketStore {
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
-    public boolean intervalHit(String chainId, String type, long capturedAt, String eventId) {
-        long span = EventLimits.SENSOR_INTERVAL_MS - 1;
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_fact WHERE chain_id = ? AND event_type = ? "
-                        + "AND captured_at_ms BETWEEN ? AND ? AND event_id <> ?",
-                Integer.class, chainId, type, capturedAt - span, capturedAt + span, eventId);
-        return count != null && count > 0;
-    }
-
     public void insertConflict(String kind, String orderId, String chainId, String packetId, byte[] raw, String detail) {
         jdbc.update("INSERT INTO flight_event_conflict (kind, order_id, chain_id, packet_id, raw_sha256, raw_bytes, detail, created_at_ms) "
                         + "VALUES (?,?,?,?,?,?,?,?)",
@@ -131,15 +133,23 @@ public class EventPacketStore {
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
-    public List<Long> heights(String chainId) {
-        return jdbc.queryForList("SELECT height FROM flight_event_packet WHERE chain_id = ? ORDER BY height", Long.class, chainId);
+    public List<Long> heightsBetween(String chainId, long fromHeight, long toHeight) {
+        return jdbc.queryForList("SELECT height FROM flight_event_packet WHERE chain_id = ? AND height >= ? AND height <= ? "
+                + "ORDER BY height", Long.class, chainId, fromHeight, toHeight);
     }
 
-    public List<EventChainRepair.Successor> successors(String chainId, long aboveHeight) {
-        return jdbc.query("SELECT packet_id, height, raw_bytes, chain_hash FROM flight_event_packet "
-                        + "WHERE chain_id = ? AND height > ? ORDER BY height",
-                (rs, n) -> new EventChainRepair.Successor(chainId, rs.getLong("height"), rs.getString("packet_id"),
-                        rs.getBytes("raw_bytes"), rs.getBytes("chain_hash")), chainId, aboveHeight);
+    public long maxHeight(String chainId) {
+        Long value = jdbc.queryForObject("SELECT COALESCE(MAX(height), 0) FROM flight_event_packet WHERE chain_id = ?",
+                Long.class, chainId);
+        return value == null ? 0 : value;
+    }
+
+    public List<EventChainRepair.Link> linksAfter(String chainId, long aboveHeight, int limit) {
+        return jdbc.query("SELECT height, packet_id, prev_packet_id, prev_chain_hash, chain_hash FROM flight_event_packet "
+                        + "WHERE chain_id = ? AND height > ? ORDER BY height LIMIT ?",
+                (rs, n) -> new EventChainRepair.Link(rs.getLong("height"), rs.getString("packet_id"),
+                        rs.getString("prev_packet_id"), rs.getBytes("prev_chain_hash"), rs.getBytes("chain_hash")),
+                chainId, aboveHeight, limit);
     }
 
     public String packetIdAt(String chainId, long height) {

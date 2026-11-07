@@ -1,6 +1,6 @@
 # 事件原包合同草案（未冻结）
 
-状态：PR1 草案。Kotlin / djifly **尚未**验证本文件与 `golden-vectors.json`。
+状态：PR1 草案，合同仍未冻结。Kotlin 离线核对过 `a11d931` 的四条包向量、九字段身份、H0、`chainHash`、`contentDigest` 与非 ASCII fixture，并报告 JCS 33 / 存储 17 通过。那是离线核验，没有 HTTP 联通。
 [djifly#19](https://github.com/UavPlatform/djifly/pull/19) 的 `96ea023` 只核对了一个合成夹具（`fixtureIdentity`），不能当作本身份、本载荷或本哈希的验收。
 
 服务端自行重算哈希，不信任客户端回显。收到的原始 bytes 原样保存。同包相等看规范内容的 `contentDigest`，原始 bytes 的 SHA-256 不是 `contentDigest`。
@@ -61,7 +61,11 @@
 
 缺值就不发该事件，不补 0 或 false。未知类型且 payload 为对象时，该条 `UNKNOWN_EVENT_TYPE`，包仍确认。可解析但语义不合法的事件逐条 `REJECTED`，留在原哈希里。
 
-`POSITION` / `ALTITUDE` / `VELOCITY` / `BATTERY` 同链同类型间隔必须 ≥ 2000ms，相等允许。实际状态与操作不限频。间隔按先入库者计算，不可交换，且不回写已发出的 receipt。`capturedAt` 须落在服务端当前时间的过去 7 天到未来 10 分钟内，这是技术窗口，不是产品规则。它还须落在该 `assignmentVersion` 的作业窗口内，否则该条 `REJECTED` / `ASSIGNMENT_WINDOW`，包和 receipt 仍固定。作业窗口见「授权」。
+未知根字段或事件字段由 `EventPacketSchema` 整包拒绝（`SCHEMA_FIELDS`），没有 receipt。已知类型的 payload 多了或少了字段，由 `EventPayloads` 把该条记为 `PAYLOAD_INVALID`，包和 receipt 仍固定。
+
+`capturedAt` 是绝对 epoch 毫秒。服务端不把它按 Asia/Shanghai 或别的本地时区重解释。对人展示的时区不进入哈希。晚于服务器当前时间 10 分钟的采集是 `EVENT_TIME_WINDOW`。这 10 分钟只校验未来时钟，不扩大 `accepted_at` / `ended_at`。作业资格只看该轮已经写下的区间。过去多久才第一次上传，本身不是拒绝理由；这里不设 7 天或 30 天离线上限。
+
+采样间隔是客户端的稀疏策略。服务端不按到达先后用 2 秒改写 receipt。状态跳变和操作同样不按这个间隔拒绝。若以后要降采样，只在可重算投影里做，不改原包和 receipt。
 
 ## receipt 与 progress
 
@@ -85,9 +89,11 @@ progress 动态：`validationVersion`, `contiguousHeight`, `contiguousHash`, `hi
 
 ## 技术上限
 
-这些是工程上限，不是价格：正文 262144 字节；事件与数组 500；深度 8；字符串 1024 个码元；对象键 32；高度 1..1000000；每链 2000 包；对账跨度 500；`limit` 1..200；前缀最多 64；上传响应里的缺洞最多 50 段；上传与对账各 600 次 / 60 秒。`schemaVersion`、`hashVersion`、`receiptVersion` 目前都是 1。
+这些是工程上限，不是价格，也不是作业时长：单请求正文 262144 字节；事件与数组 500；深度 8；字符串 1024 个码元；对象键 32；高度 1..1000000；对账跨度 500；`limit` 1..200；前缀最多 64；上传响应里的缺洞最多 50 段；上传与对账各 600 次 / 60 秒。`schemaVersion`、`hashVersion`、`receiptVersion` 目前都是 1。没有整单或整链累计包数上限。
 
-`limit` 先按 long 检查 1..200，再转成 int。`2147483648` 与 `4294967297` 都是 LIMIT，不能先窄化成 int。链上已有 2000 包时，高度不超过当前最高已收高度的缺洞仍可补入；超过该高度的新包是 LIMIT。容量不把已经收到的历史洞封死。
+`limit` 先按 long 检查 1..200，再转成 int。`2147483648` 与 `4294967297` 都是 LIMIT，不能先窄化成 int。
+
+未验证乱序跨度是 2000 个高度：新高度可以超前连续前缀，但超前距离不能超过这个跨度。这只限制还没接上的积压，连续链在前缀追上之后可以继续长过 2000 包。已经落在当前最高已收高度以内的洞始终可补，不因为积压已满而拒绝。高度 1000000 在前缀还是 0 时会留下补不上的空洞，拒绝。`(chain_id, height)` 唯一索引支撑按高度的有界读取。每次续链只读一页链元数据（高度、前后包、两个哈希），不把后继原包全文读进来；这一页接上之后继续下一页，直到遇到洞、分叉或后继读完。原包仍原样保存，续链不重写它。
 
 401 用原包重试。429 带 `Retry-After`（秒）后退避。408 与 5xx 保留原包重试。提交前失败会整笔回滚，不留下半份 receipt。
 
@@ -97,7 +103,7 @@ progress 动态：`validationVersion`, `contiguousHeight`, `contiguousHash`, `hi
 
 调用者必须是该行的 `pilot_id`。其他人是 403。不要求先到场，也不要求先 `connect`。
 
-作业窗口的起止是这一行的 `accepted_at` 与 `ended_at`。两端各允许现有技术钟差 10 分钟（`CAPTURED_FUTURE_MS`），用来吸收设备与服务器的时钟差，不是新产品时长。轮次尚未结束（`ended_at` 为空）时，上界是服务器当前时间加这 10 分钟。时间列是服务端 `LocalDateTime.now()`，按 JVM 默认时区换成 epoch 毫秒。窗口外的事件逐条 `ASSIGNMENT_WINDOW`，原包和 receipt 仍提交，不因后来的放单、改派或取消改写。窗口内的迟到包由当时的飞手补传，即使订单已经放单、改派或取消。
+作业窗口就是这一行的 `accepted_at` 与 `ended_at`，不再向两侧加 10 分钟。两端都按数据库时间列读出的 epoch 毫秒与包内 `capturedAt` 比较，不把 `capturedAt` 改写成某个时区的本地时间。已结束的轮次是 `[accepted_at, ended_at)`：起始包含，结束不包含，避免放单时刻同时属于新旧两名飞手。尚未结束的轮次没有作业上界；未来 10 分钟仍由独立的 `EVENT_TIME_WINDOW` 校验。窗口外的事件逐条 `ASSIGNMENT_WINDOW`，原包和 receipt 仍提交，不因后来的放单、改派或取消改写。窗口内的迟到包由当时的飞手补传，即使订单已经放单、改派或取消，也无论离线多久。
 
 已经确认的包，原链飞手在放单或取消后重放，拿到的是最初 receipt。换一轮 `assignmentVersion` 就是另一条链：旧飞手不能往新轮次写，新飞手不能往旧轮次写。
 
@@ -113,4 +119,4 @@ Flyway `V27`（Java 迁移）分开保存：`flight_event_chain`、`flight_event
 
 ## 本阶段明确不做
 
-不改 `DISTANCE_V1`、定金或抵扣。不把飞行时长做成价格。不删除 `/live/*`、设备 WS、`connect` / `close` / `activeSerial`。不扇出新事件，不更新 `executed_*`。不实现截止结单。轨迹、最新状态、遥测段和空中时长仍是以后的重算投影；空中时长只认实际飞行事实，电机累计时间、点击和首尾遥测都不能代替。
+不改 `DISTANCE_V1`、定金或抵扣。不把飞行时长做成价格。不删除 `/live/*`、设备 WS、`connect` / `close` / `activeSerial`。不扇出新事件，不更新 `executed_*`。不实现截止结单，也不实现丢记录清理。轨迹、最新状态、遥测段、降采样和空中时长仍是以后的重算投影；空中时长只认实际飞行事实，电机累计时间、点击和首尾遥测都不能代替。

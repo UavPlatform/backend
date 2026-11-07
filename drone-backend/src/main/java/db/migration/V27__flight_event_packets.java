@@ -33,7 +33,6 @@ public class V27__flight_event_packets extends BaseJavaMigration {
             statement.execute(fact(mysql, orderCollation));
             statement.execute(conflict(mysql, orderCollation));
             statement.execute("CREATE INDEX idx_flight_event_chain_order ON flight_event_chain(order_id, chain_id)");
-            statement.execute("CREATE INDEX idx_flight_event_fact_interval ON flight_event_fact(chain_id, event_type, captured_at_ms)");
         }
     }
 

@@ -36,7 +36,7 @@ RUN set -eux; \
     if [ -n "$PROXY" ]; then \
       export http_proxy="$PROXY" https_proxy="$PROXY"; \
     fi; \
-    mvn -B -ntp -DskipTests clean package \
+    mvn -B -ntp -Dskip.surefire.tests=true clean package \
     && find target -maxdepth 1 -type f -name "*.jar" ! -name "original-*.jar" \
        -exec cp {} target/app.jar \;
 

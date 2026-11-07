@@ -4,12 +4,16 @@
 	# 故此处将 /ws 前缀重写为 /api/ws 后转发，前端 URL 保持 ws://host/ws/... 不变。
 	# 鉴权头透传（1A-1 WS 协议）：Authorization: Bearer 请求头与 ?token= query
 	# 均默认原样转发（Caddy v2 不剥离 Authorization；rewrite 保留 query string）。
+	#
+	# 不要手写 header_up Connection/Upgrade：
+	#   1) Caddy 原生处理 WebSocket 升级，无需手工透传；
+	#   2) {>Header} 占位符简写需 Caddy >= 2.7，Ubuntu 源里的 2.6.2 会把字面量
+	#      "{>Upgrade}" 发给上游，Spring 握手直接返回
+	#      400 Can "Upgrade" only to "WebSocket"。
 	handle /ws/* {
 		rewrite * /api{uri}
 		reverse_proxy localhost:8081 {
 			flush_interval -1
-			header_up Connection {>Connection}
-			header_up Upgrade {>Upgrade}
 		}
 	}
 

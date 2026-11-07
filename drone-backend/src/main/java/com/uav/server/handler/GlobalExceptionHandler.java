@@ -6,6 +6,8 @@ import com.uav.server.exception.BusinessException;
 import com.uav.server.exception.PayNotifyException;
 import com.uav.server.exception.UnauthorizedException;
 import lombok.extern.slf4j.Slf4j;
+import com.uav.server.aspect.RateLimiterAspect;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -58,10 +60,15 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e) {
+    public ResponseEntity<Result<Void>> handleBusinessException(BusinessException e, HttpServletRequest request) {
         log.warn("BusinessException: {}", e.getMessage());
-        return ResponseEntity.status(e.getHttpStatus())
-                .body(Result.fail(e.getHttpStatus().value(), e.getCode(), e.getMessage()));
+        var body = Result.<Void>fail(e.getHttpStatus().value(), e.getCode(), e.getMessage());
+        if (e.getHttpStatus() == HttpStatus.TOO_MANY_REQUESTS) {
+            Object retryAfter = request.getAttribute(RateLimiterAspect.RETRY_AFTER_ATTRIBUTE);
+            int seconds = retryAfter instanceof Integer value && value > 0 ? value : 1;
+            return ResponseEntity.status(e.getHttpStatus()).header("Retry-After", Integer.toString(seconds)).body(body);
+        }
+        return ResponseEntity.status(e.getHttpStatus()).body(body);
     }
 
     @ExceptionHandler(PayNotifyException.class)

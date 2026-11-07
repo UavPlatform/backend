@@ -40,10 +40,25 @@ public class RateLimiterAspect {
             String maskedUser = username != null ? LogMaskUtil.maskUserName(username) : "anonymous";
             log.warn("限流触发，用户: {}, 接口: {}, {}秒内超过{}次",
                     maskedUser, method, windowSeconds, limit);
+            rememberRetryAfter(windowSeconds);
             throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS, ApiErrorCode.RATE_LIMITED);
         }
 
         return joinPoint.proceed();
+    }
+
+    public static final String RETRY_AFTER_ATTRIBUTE = "com.uav.rateLimit.retryAfter";
+
+    /** The exception handler copies this onto the 429 response. Clients keep the original body and back off. */
+    private static void rememberRetryAfter(int windowSeconds) {
+        try {
+            var attrs = RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof ServletRequestAttributes sa && sa.getRequest() != null) {
+                sa.getRequest().setAttribute(RETRY_AFTER_ATTRIBUTE, windowSeconds);
+            }
+        } catch (RuntimeException ignored) {
+            // A missing request still returns 429; the header is best-effort.
+        }
     }
 
     private String getClientIp() {

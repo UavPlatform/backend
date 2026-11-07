@@ -2233,6 +2233,312 @@
         },
         "type" : "object"
       },
+      "EventDraftDTO" : {
+        "description" : "单个事件。未知字段在包根和事件封套上会拒绝整包",
+        "properties" : {
+          "capturedAt" : {
+            "description" : "epoch 毫秒",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "eventId" : {
+            "type" : "string"
+          },
+          "payload" : { },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EventHeightVO" : {
+        "properties" : {
+          "chainHash" : {
+            "type" : "string"
+          },
+          "contentDigest" : {
+            "type" : "string"
+          },
+          "height" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "packetId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EventPacketAckVO" : {
+        "properties" : {
+          "progress" : {
+            "$ref" : "#/components/schemas/EventProgressVO"
+          },
+          "receipt" : {
+            "$ref" : "#/components/schemas/EventReceiptVO"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventPacketDraftDTO" : {
+        "description" : "未冻结事件包。缺字段不等于 null。整数不得用小数、指数或前导零。UUID 与哈希必须小写。",
+        "properties" : {
+          "assignmentVersion" : {
+            "description" : "现行接单轮次，禁止 null 当 0",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "chainHash" : {
+            "type" : "string"
+          },
+          "chainId" : {
+            "type" : "string"
+          },
+          "events" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EventDraftDTO"
+            },
+            "type" : "array"
+          },
+          "hashVersion" : {
+            "description" : "必须为 1",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "height" : {
+            "description" : "从 1 起",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "modelCode" : {
+            "description" : "稳定机型码。展示名不能出现在包里",
+            "type" : "string"
+          },
+          "orderId" : {
+            "type" : "string"
+          },
+          "packetId" : {
+            "type" : "string"
+          },
+          "prevChainHash" : {
+            "type" : "string"
+          },
+          "prevPacketId" : {
+            "description" : "首包必须是 null，且字段必须存在",
+            "type" : "string"
+          },
+          "recordingSourceId" : {
+            "type" : "string"
+          },
+          "schemaVersion" : {
+            "description" : "必须为 1",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "serialNumber" : {
+            "description" : "原样机身号，不大小写折叠",
+            "type" : "string"
+          },
+          "serialSource" : {
+            "description" : "序列号来源令牌。不同令牌不是同一机身，服务端不把飞控 SN 与产品 SN 视为相同",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "EventProgressVO" : {
+        "properties" : {
+          "contiguousHash" : {
+            "type" : "string"
+          },
+          "contiguousHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "highestReceivedHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "integrity" : {
+            "type" : "string"
+          },
+          "missingCursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "missingRanges" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MissingRangeVO"
+            },
+            "type" : "array"
+          },
+          "projectionRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "validationVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventReceiptVO" : {
+        "properties" : {
+          "chainHash" : {
+            "type" : "string"
+          },
+          "contentDigest" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "durability" : {
+            "type" : "string"
+          },
+          "packetId" : {
+            "type" : "string"
+          },
+          "receiptVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "results" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EventResultVO"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "EventReconciliationDraftDTO" : {
+        "description" : "未冻结对账请求。所有键都必须出现。",
+        "properties" : {
+          "chainId" : {
+            "type" : "string"
+          },
+          "cursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "fromHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "limit" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "missingCursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "prefix" : { },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "toHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "validationVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventReconciliationVO" : {
+        "properties" : {
+          "chainId" : {
+            "type" : "string"
+          },
+          "commonPrefixHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "contiguousHash" : {
+            "type" : "string"
+          },
+          "contiguousHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "entries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EventHeightVO"
+            },
+            "type" : "array"
+          },
+          "fromHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "highestReceivedHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "integrity" : {
+            "type" : "string"
+          },
+          "missingCursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "missingRanges" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MissingRangeVO"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "projectionRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "schemaVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "toHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "validationVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "EventResultVO" : {
+        "properties" : {
+          "eventId" : {
+            "type" : "string"
+          },
+          "outcome" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "sourcePacketId" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "FlightConnectDTO" : {
         "properties" : {
           "assignmentVersion" : {
@@ -2715,6 +3021,19 @@
           }
         },
         "required" : [ "content", "sessionId" ],
+        "type" : "object"
+      },
+      "MissingRangeVO" : {
+        "properties" : {
+          "fromHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "toHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
         "type" : "object"
       },
       "Model" : {
@@ -3998,6 +4317,60 @@
           },
           "data" : {
             "$ref" : "#/components/schemas/EquipmentNotificationPageVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultEventPacketAckVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/EventPacketAckVO",
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultEventReconciliationVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "$ref" : "#/components/schemas/EventReconciliationVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -9610,6 +9983,82 @@
         },
         "summary" : "立即接单",
         "tags" : [ "Dispatch Pilot API" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/event-packets" : {
+      "post" : {
+        "description" : "严格 UTF-8 与整数剖面解析后自行重算链式哈希。同 packetId 同规范内容返回最初 receipt，ACCEPTED 不会变成 DUPLICATE。同 ID 异内容 409 并保留冲突证据。格式、schema 或自哈希错误不落完整确认。401/408/429/5xx 可带原包重试；429 带 Retry-After。",
+        "operationId" : "upload",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EventPacketDraftDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultEventPacketAckVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "上传事件原包（草案，未冻结）",
+        "tags" : [ "event-packet-controller" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/event-reconciliation" : {
+      "post" : {
+        "description" : "按固定 validationVersion 返回区间内的高度哈希和有界缺洞。版本已变化时返回 RECONCILIATION_VERSION_CHANGED，不返回残页。正常路径直接给出区间，不必每次二分。",
+        "operationId" : "reconcile",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EventReconciliationDraftDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultEventReconciliationVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "对账事件链（草案，未冻结）",
+        "tags" : [ "event-packet-controller" ]
       }
     },
     "/dispatch/pilot/orders/{orderId}/flight-connections" : {

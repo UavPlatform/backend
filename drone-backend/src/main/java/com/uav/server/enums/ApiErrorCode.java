@@ -53,7 +53,11 @@ public enum ApiErrorCode {
     DOUBLE_CONFIRM_REQUIRED("DOUBLE_CONFIRM_REQUIRED", "双方尚未确认，任务不能开始执行"),
     DELIVERY_EVIDENCE_REQUIRED("DELIVERY_EVIDENCE_REQUIRED", "请先上传履约证据"),
     AMOUNT_MISMATCH("AMOUNT_MISMATCH", "订单金额与系统报价不一致，已拒绝支付"),
-    ENDPOINT_REMOVED("ENDPOINT_REMOVED", "该接口已下线，请升级客户端到最新版本");
+    ENDPOINT_REMOVED("ENDPOINT_REMOVED", "该接口已下线，请升级客户端到最新版本"),
+    EVENT_PACKET_MALFORMED("EVENT_PACKET_MALFORMED", "事件包格式或草案字段不合法"),
+    EVENT_PACKET_HASH("EVENT_PACKET_HASH", "事件包哈希校验失败"),
+    EVENT_PACKET_CONFLICT("EVENT_PACKET_CONFLICT", "事件包与已保存内容冲突"),
+    EVENT_RECONCILIATION_VERSION_CHANGED("EVENT_RECONCILIATION_VERSION_CHANGED", "对账版本已变化，请按当前版本重读");
 
     private final String code;
     private final String defaultMessage;

@@ -17,8 +17,8 @@ import java.util.List;
 /**
  * ADR-0009 retention: telemetry samples older than {@code flight.telemetry.retention-days} (default 180)
  * are removed by dropping whole monthly partitions on MySQL; future partitions are created ahead of time.
- * Connection records and the executed drone on the order are not in this table
- * and are never removed here.
+ * Connection records, the executed drone on the order, and flight_event_* raw packets,
+ * receipts, facts and conflict evidence are not in this table and are never removed here.
  */
 @Slf4j
 @Component

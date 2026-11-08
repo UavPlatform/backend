@@ -1181,6 +1181,29 @@
         },
         "type" : "object"
       },
+      "Aircraft" : {
+        "properties" : {
+          "latest" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/FlightEventVO"
+            },
+            "type" : "object"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
+          "serialNumber" : {
+            "type" : "string"
+          },
+          "serialSource" : {
+            "type" : "string"
+          },
+          "stale" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "AircraftModelEnabledDTO" : {
         "description" : "机型启用/停用",
         "properties" : {
@@ -1514,9 +1537,6 @@
       },
       "DispatchLiveCredentialsVO" : {
         "properties" : {
-          "connectionId" : {
-            "type" : "string"
-          },
           "expiresAt" : {
             "format" : "int64",
             "type" : "integer"
@@ -1576,9 +1596,6 @@
         "properties" : {
           "configured" : {
             "type" : "boolean"
-          },
-          "connectionId" : {
-            "type" : "string"
           },
           "leaseExpiresAt" : {
             "format" : "int64",
@@ -2287,11 +2304,6 @@
       "EventPacketDraftDTO" : {
         "description" : "未冻结事件包。缺字段不等于 null。整数不得用小数、指数或前导零。UUID 与哈希必须小写。",
         "properties" : {
-          "assignmentVersion" : {
-            "description" : "现行接单轮次，禁止 null 当 0",
-            "format" : "int64",
-            "type" : "integer"
-          },
           "chainHash" : {
             "type" : "string"
           },
@@ -2305,7 +2317,7 @@
             "type" : "array"
           },
           "hashVersion" : {
-            "description" : "必须为 1",
+            "description" : "必须为 2",
             "format" : "int32",
             "type" : "integer"
           },
@@ -2335,7 +2347,7 @@
             "type" : "string"
           },
           "schemaVersion" : {
-            "description" : "必须为 1",
+            "description" : "必须为 2",
             "format" : "int32",
             "type" : "integer"
           },
@@ -2539,283 +2551,91 @@
         },
         "type" : "object"
       },
-      "FlightConnectDTO" : {
-        "properties" : {
-          "assignmentVersion" : {
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "modelCode" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "modelName" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "requestKey" : {
-            "maxLength" : 64,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "serialNumber" : {
-            "maxLength" : 128,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "startedAt" : {
-            "description" : "设备本地记录连机的时间（毫秒）；离线先记录、联网后补报时填写，服务端限制在最近 24 小时内",
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "required" : [ "modelCode", "modelName", "requestKey", "serialNumber" ],
-        "type" : "object"
-      },
-      "FlightConnectionVO" : {
-        "properties" : {
-          "aircraftModelId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "assignmentVersion" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "connectionId" : {
-            "type" : "string"
-          },
-          "endReason" : {
-            "type" : "string"
-          },
-          "endedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "maxPayloadKg" : {
-            "type" : "number"
-          },
-          "modelCode" : {
-            "type" : "string"
-          },
-          "modelName" : {
-            "type" : "string"
-          },
-          "openedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "orderId" : {
-            "type" : "string"
-          },
-          "overweight" : {
-            "type" : "boolean"
-          },
-          "serialNumber" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "FlightHistoryVO" : {
-        "properties" : {
-          "connections" : {
-            "items" : {
-              "$ref" : "#/components/schemas/FlightConnectionVO"
-            },
-            "type" : "array"
-          },
-          "hasNext" : {
-            "type" : "boolean"
-          },
-          "items" : {
-            "items" : {
-              "$ref" : "#/components/schemas/FlightSampleVO"
-            },
-            "type" : "array"
-          },
-          "nextCapturedAt" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "nextSampleId" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "FlightSampleBatchDTO" : {
-        "properties" : {
-          "samples" : {
-            "items" : {
-              "$ref" : "#/components/schemas/FlightSampleDTO"
-            },
-            "maxItems" : 500,
-            "minItems" : 0,
-            "type" : "array"
-          }
-        },
-        "required" : [ "samples" ],
-        "type" : "object"
-      },
-      "FlightSampleBatchVO" : {
-        "properties" : {
-          "accepted" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "duplicates" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "rejected" : {
-            "format" : "int32",
-            "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "FlightSampleDTO" : {
-        "properties" : {
-          "altitude" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "battery" : {
-            "format" : "int32",
-            "maximum" : 100,
-            "minimum" : 0,
-            "type" : "integer"
-          },
-          "capturedAt" : {
-            "exclusiveMinimum" : 0,
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "flying" : {
-            "type" : "boolean"
-          },
-          "latitude" : {
-            "format" : "double",
-            "maximum" : 90,
-            "minimum" : -90,
-            "type" : "number"
-          },
-          "longitude" : {
-            "format" : "double",
-            "maximum" : 180,
-            "minimum" : -180,
-            "type" : "number"
-          },
-          "payloadKg" : {
-            "format" : "double",
-            "maximum" : 10000,
-            "minimum" : 0,
-            "type" : "number"
-          },
-          "sequence" : {
-            "format" : "int64",
-            "minimum" : 0,
-            "type" : "integer"
-          },
-          "speed" : {
-            "format" : "double",
-            "minimum" : 0,
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "FlightSampleVO" : {
-        "properties" : {
-          "altitude" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "battery" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "capturedAt" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "connectionId" : {
-            "type" : "string"
-          },
-          "flying" : {
-            "type" : "boolean"
-          },
-          "latitude" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "longitude" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "payloadKg" : {
-            "format" : "double",
-            "type" : "number"
-          },
-          "receivedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "sampleId" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "sequence" : {
-            "format" : "int64",
-            "type" : "integer"
-          },
-          "speed" : {
-            "format" : "double",
-            "type" : "number"
-          }
-        },
-        "type" : "object"
-      },
-      "FlightTrackVO" : {
+      "FlightEventPageVO" : {
         "properties" : {
           "hasNext" : {
             "type" : "boolean"
           },
           "items" : {
             "items" : {
-              "$ref" : "#/components/schemas/FlightSampleVO"
+              "$ref" : "#/components/schemas/FlightEventVO"
             },
             "type" : "array"
           },
           "nextAfter" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "nextCapturedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "nextEventId" : {
+            "type" : "string"
+          },
+          "projectionRevision" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
       },
-      "FlightViewVO" : {
+      "FlightEventVO" : {
         "properties" : {
-          "connection" : {
-            "$ref" : "#/components/schemas/FlightConnectionVO"
+          "capturedAt" : {
+            "format" : "int64",
+            "type" : "integer"
           },
-          "connectionHistory" : {
+          "changeSequence" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "eventId" : {
+            "type" : "string"
+          },
+          "modelCode" : {
+            "type" : "string"
+          },
+          "payload" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "receivedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "serialNumber" : {
+            "type" : "string"
+          },
+          "serialSource" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FlightProjectionVO" : {
+        "properties" : {
+          "aircraft" : {
             "items" : {
-              "$ref" : "#/components/schemas/FlightConnectionVO"
+              "$ref" : "#/components/schemas/Aircraft"
+            },
+            "type" : "array"
+          },
+          "flightPeriods" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Period"
             },
             "type" : "array"
           },
           "lastPosition" : {
-            "$ref" : "#/components/schemas/FlightSampleVO"
+            "$ref" : "#/components/schemas/FlightEventVO"
           },
-          "latest" : {
-            "$ref" : "#/components/schemas/FlightSampleVO"
+          "projectionRevision" : {
+            "format" : "int64",
+            "type" : "integer"
           },
           "stale" : {
             "type" : "boolean"
@@ -3210,6 +3030,25 @@
           },
           "prepayId" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Period" : {
+        "properties" : {
+          "landedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "serialNumber" : {
+            "type" : "string"
+          },
+          "serialSource" : {
+            "type" : "string"
+          },
+          "takeoffAt" : {
+            "format" : "int64",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -4388,7 +4227,7 @@
         },
         "type" : "object"
       },
-      "ResultFlightConnectionVO" : {
+      "ResultFlightEventPageVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
           "code" : {
@@ -4397,7 +4236,7 @@
             "type" : "integer"
           },
           "data" : {
-            "$ref" : "#/components/schemas/FlightConnectionVO",
+            "$ref" : "#/components/schemas/FlightEventPageVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -4415,7 +4254,7 @@
         },
         "type" : "object"
       },
-      "ResultFlightHistoryVO" : {
+      "ResultFlightProjectionVO" : {
         "description" : "统一响应结果封装",
         "properties" : {
           "code" : {
@@ -4424,115 +4263,7 @@
             "type" : "integer"
           },
           "data" : {
-            "$ref" : "#/components/schemas/FlightHistoryVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultFlightSampleBatchVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/FlightSampleBatchVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultFlightSampleVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/FlightSampleVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultFlightTrackVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/FlightTrackVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultFlightViewVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/FlightViewVO",
+            "$ref" : "#/components/schemas/FlightProjectionVO",
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
@@ -9303,7 +9034,7 @@
     },
     "/dispatch/orders/{orderId}/flight" : {
       "get" : {
-        "description" : "仅货主、当前飞手或管理员。无采样字段为null；30秒未收到数据或连接结束标记stale。最后位置保留接收时间。非官方飞行安全或空域判定。",
+        "description" : "仅货主、当前飞手或管理员。各类型读数保留独立采集时间，未知值不合成。仅使用 v2 已接受事件；连续性与投影分开。",
         "operationId" : "current_1",
         "parameters" : [ {
           "in" : "path",
@@ -9318,20 +9049,20 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightViewVO"
+                  "$ref" : "#/components/schemas/ResultFlightProjectionVO"
                 }
               }
             },
             "description" : "OK"
           }
         },
-        "summary" : "读取实际飞行状态",
+        "summary" : "读取订单事件投影",
         "tags" : [ "flight-record-controller" ]
       }
     },
     "/dispatch/orders/{orderId}/flight/history" : {
       "get" : {
-        "description" : "同飞行状态权限。按设备采集时间升序，可选from/to（毫秒，含端点）；续页传上页nextCapturedAt与nextSampleId；limit 1-1000，默认500。附带本单全部连机记录。遥测保留180天，超期采样不可查，连机记录与结算数据不受影响。",
+        "description" : "按 capturedAt,eventId 升序；nextCapturedAt,nextEventId 为双游标。飞机筛选必须同时传 serialNumber 和 serialSource。revision 变化后可重新加载历史。",
         "operationId" : "history",
         "parameters" : [ {
           "in" : "path",
@@ -9350,19 +9081,10 @@
           }
         }, {
           "in" : "query",
-          "name" : "afterSampleId",
+          "name" : "afterEventId",
           "required" : false,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
-          }
-        }, {
-          "in" : "query",
-          "name" : "from",
-          "required" : false,
-          "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
           }
         }, {
           "in" : "query",
@@ -9375,11 +9097,17 @@
           }
         }, {
           "in" : "query",
-          "name" : "to",
+          "name" : "serialNumber",
           "required" : false,
           "schema" : {
-            "format" : "int64",
-            "type" : "integer"
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serialSource",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
           }
         } ],
         "responses" : {
@@ -9387,20 +9115,20 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightHistoryVO"
+                  "$ref" : "#/components/schemas/ResultFlightEventPageVO"
                 }
               }
             },
             "description" : "OK"
           }
         },
-        "summary" : "按时间查询历史轨迹（回放）",
+        "summary" : "读取事件历史投影",
         "tags" : [ "flight-record-controller" ]
       }
     },
     "/dispatch/orders/{orderId}/flight/track" : {
       "get" : {
-        "description" : "同飞行状态权限，after为上页nextAfter；每页200条，保持服务端保存顺序；不插值补点。",
+        "description" : "只返回 POSITION，after 为上页 nextAfter；迟到位置仍有新的 changeSequence，不插值。",
         "operationId" : "track",
         "parameters" : [ {
           "in" : "path",
@@ -9416,7 +9144,15 @@
           "schema" : {
             "default" : 0,
             "format" : "int64",
-            "minimum" : 0,
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 200,
+            "format" : "int32",
             "type" : "integer"
           }
         } ],
@@ -9425,14 +9161,14 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightTrackVO"
+                  "$ref" : "#/components/schemas/ResultFlightEventPageVO"
                 }
               }
             },
             "description" : "OK"
           }
         },
-        "summary" : "读取本单实际采样轨迹",
+        "summary" : "增量读取位置投影",
         "tags" : [ "flight-record-controller" ]
       }
     },
@@ -10061,91 +9797,11 @@
         "tags" : [ "event-packet-controller" ]
       }
     },
-    "/dispatch/pilot/orders/{orderId}/flight-connections" : {
+    "/dispatch/pilot/orders/{orderId}/live" : {
       "post" : {
-        "description" : "当前到场或运输飞手及接单轮次；同请求幂等，换机结束旧连接。设备序列号同时只属于一个活动运单。未知机型不推测载重，不改变计价。断网先在本机记录的连接可在送达确认/结单阶段补登记（须带startedAt，仍限本人当前接单轮次）：存为已结束连接（结束于送达时刻），只用于补传采样，不替换活动连接。",
-        "operationId" : "connect",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "orderId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/FlightConnectDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightConnectionVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "登记本次实际设备连接",
-        "tags" : [ "flight-record-controller" ]
-      }
-    },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/close" : {
-      "post" : {
-        "description" : "原飞手可幂等结束自己的连接；历史请求不能结束新连接；不控制物理飞行，成功data=null。",
-        "operationId" : "close",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "path",
-          "name" : "orderId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "结束本人设备连接",
-        "tags" : [ "flight-record-controller" ]
-      }
-    },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live" : {
-      "post" : {
-        "description" : "当前飞手和接单轮次，到场/运输阶段；同requestKey幂等。新派单复用既有TRTC应用配置且需确认已启用房间权限，未配置503。此调用不代表首帧成功。",
+        "description" : "当前飞手按订单开启直播；同requestKey幂等，不依赖遥测连接。",
         "operationId" : "start",
         "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
           "in" : "path",
           "name" : "orderId",
           "required" : true,
@@ -10175,22 +9831,15 @@
             "description" : "OK"
           }
         },
-        "summary" : "飞手主动开启本次连接直播",
+        "summary" : "飞手主动开启本单直播",
         "tags" : [ "dispatch-live-controller" ]
       }
     },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/heartbeat" : {
+    "/dispatch/pilot/orders/{orderId}/live/{liveId}/heartbeat" : {
       "post" : {
         "description" : "SDK发出首帧且继续发送实际图传才报RUNNING，否则STARTING；有效期20秒，过期不允许续活旧房间。",
         "operationId" : "heartbeat",
         "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
           "in" : "path",
           "name" : "liveId",
           "required" : true,
@@ -10231,18 +9880,11 @@
         "tags" : [ "dispatch-live-controller" ]
       }
     },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/stop" : {
+    "/dispatch/pilot/orders/{orderId}/live/{liveId}/stop" : {
       "post" : {
         "description" : "本人历史房间可幂等关闭，不能关闭新房间；客户端同步停止实际推流，成功data=null。",
         "operationId" : "stop",
         "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
           "in" : "path",
           "name" : "liveId",
           "required" : true,
@@ -10271,96 +9913,6 @@
         },
         "summary" : "飞手关闭本次直播记录",
         "tags" : [ "dispatch-live-controller" ]
-      }
-    },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/samples" : {
-      "post" : {
-        "description" : "仅当前活动连接；未知值为null，禁止合成遥测；同序号同内容幂等，冲突409。乱序保存但不回退当前状态。capturedAt为设备毫秒时间，receivedAt为服务端时间。",
-        "operationId" : "sample",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "path",
-          "name" : "orderId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/FlightSampleDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightSampleVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "保存实际SDK采样",
-        "tags" : [ "flight-record-controller" ]
-      }
-    },
-    "/dispatch/pilot/orders/{orderId}/flight-connections/{connectionId}/samples/batch" : {
-      "post" : {
-        "description" : "djifly定时批量或断网恢复后补传，最多500条。按(连接,序号)与(机身号,采集时间)去重：已存在且内容一致计duplicates；非法、内容冲突或采集时间不在连接时段±10分钟内计rejected，客户端可丢弃；存储失败整批返回5xx，客户端保留缓存重试。连接结束后、送达确认或结单阶段仍可补传，但不更新实时状态。未知值为null。",
-        "operationId" : "batch",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "connectionId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "path",
-          "name" : "orderId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/FlightSampleBatchDTO"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultFlightSampleBatchVO"
-                }
-              }
-            },
-            "description" : "OK"
-          }
-        },
-        "summary" : "批量上报/补传实际SDK采样",
-        "tags" : [ "flight-record-controller" ]
       }
     },
     "/dispatch/pilot/orders/{orderId}/release" : {

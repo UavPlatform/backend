@@ -6,6 +6,7 @@ import org.flywaydb.core.api.migration.Context;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -26,12 +27,15 @@ public class V28__flight_event_v2 extends BaseJavaMigration {
         boolean mysql = connection.getMetaData().getDatabaseProductName().toLowerCase(Locale.ROOT).contains("mysql");
         String orderCollation = mysql ? orderCollation(connection) : "";
         try (Statement statement = connection.createStatement()) {
-            statement.execute(chain(mysql, orderCollation));
-            statement.execute(packet(mysql, orderCollation));
-            statement.execute(receipt(mysql));
-            statement.execute(result(mysql));
-            statement.execute(fact(mysql, orderCollation));
-            statement.execute(conflict(mysql, orderCollation));
+            for (String sql : List.of(
+                    chain(mysql, orderCollation),
+                    packet(mysql, orderCollation),
+                    receipt(mysql),
+                    result(mysql),
+                    fact(mysql, orderCollation),
+                    conflict(mysql, orderCollation))) {
+                statement.execute(sql);
+            }
             statement.execute("CREATE TABLE flight_projection_event (change_sequence BIGINT NOT NULL PRIMARY KEY,"
                     + "event_id " + uuid(mysql) + " NOT NULL UNIQUE,order_id " + orderId(mysql, orderCollation)
                     + " NOT NULL,serial_number VARBINARY(64) NOT NULL,serial_source VARBINARY(64) NOT NULL,"

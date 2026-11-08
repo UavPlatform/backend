@@ -2,8 +2,7 @@ package com.uav.flight.service;
 
 import com.uav.dispatch.mapper.DispatchOrderRepository;
 import com.uav.dispatch.pojo.entity.DispatchOrder;
-import com.uav.flight.pojo.entity.FlightConnection;
-import com.uav.flight.pojo.vo.FlightSampleVO;
+import com.uav.flight.pojo.vo.FlightEventVO;
 import com.uav.live.pojo.dto.WsEnvelope;
 import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.auth.WsAuthHandshakeInterceptor;
@@ -12,8 +11,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.socket.WebSocketSession;
-import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.*;
@@ -32,12 +31,9 @@ class FlightTelemetryBroadcasterTest {
         when(s.getAttributes()).thenReturn(attrs); when(s.isOpen()).thenReturn(true);
         return s;
     }
-    private static FlightConnection connection() {
-        var c = new FlightConnection(); c.setId("c1"); c.setOrderId("o1"); c.setSerialNumber("SN1"); c.setModelCode("FC30"); c.setModelName("DJI FlyCart 30");
-        return c;
-    }
-    private static FlightSampleVO sample() {
-        return new FlightSampleVO(5L, "c1", 3, 1_000L, LocalDateTime.now(), 30.0, 120.0, 50.0, null, 80, true, 12.5);
+    private static FlightEventVO event() {
+        return new FlightEventVO(7L, "e1", "SN1", "FLIGHT_CONTROLLER", "FC30", "POSITION", 1_000L, 1_500L,
+                Map.of("latitudeDegE7", 300_000_000L, "longitudeDegE7", 1_200_000_000L));
     }
 
     @Test void supervisorsSeeAllShippersOnlyTheirOrderOthersRejected() {
@@ -50,30 +46,38 @@ class FlightTelemetryBroadcasterTest {
         assertThat(broadcaster.register(stranger, "o1")).isFalse();
         assertThat(broadcaster.register(plain, "")).isTrue();
         assertThat(broadcaster.register(session(13, 0), "o2")).isFalse();
-        broadcaster.publish(connection(), sample());
+        broadcaster.publish("o1", List.of(event()));
         verify(messages).send(eq(supervisor), argThat(e -> WsMessageNames.FLIGHT_TELEMETRY.equals(e.getName())));
         verify(messages).send(eq(owner), any());
         verify(messages, never()).send(eq(stranger), any());
         verify(messages, never()).send(eq(plain), any());
         broadcaster.unregister(owner);
         when(supervisor.isOpen()).thenReturn(false);
-        broadcaster.publish(connection(), sample());
+        broadcaster.publish("o1", List.of(event()));
         verify(messages, times(1)).send(eq(owner), any());
         verify(messages, times(1)).send(eq(supervisor), any());
     }
 
-    @Test void envelopeCarriesNullableTelemetryAndPayload() {
-        WsEnvelope e = FlightTelemetryBroadcaster.envelope(connection(), sample());
+    @Test void envelopeCarriesTheEventWithItsOwnCaptureTime() {
+        WsEnvelope e = FlightTelemetryBroadcaster.envelope("o1", event());
         assertThat(e.getType()).isEqualTo("event"); assertThat(e.getDeviceId()).isEqualTo("SN1"); assertThat(e.getTimestamp()).isEqualTo(1_000L);
         @SuppressWarnings("unchecked") var data = (Map<String, Object>) e.getData();
-        assertThat(data).containsEntry("orderId", "o1").containsEntry("payloadKg", 12.5).containsEntry("speed", null);
+        assertThat(data).containsEntry("orderId", "o1").containsEntry("eventId", "e1")
+                .containsEntry("type", "POSITION").containsEntry("capturedAt", 1_000L)
+                .containsEntry("payload", Map.of("latitudeDegE7", 300_000_000L, "longitudeDegE7", 1_200_000_000L));
+    }
+
+    @Test void emptyPagesAreNotPushed() {
+        var supervisor = session(1, 2); broadcaster.register(supervisor, null);
+        broadcaster.publish("o1", List.of());
+        verifyNoInteractions(messages);
     }
 
     @Test void publishWaitsForCommitWhenTransactionIsActive() {
         var supervisor = session(1, 2); broadcaster.register(supervisor, null);
         TransactionSynchronizationManager.initSynchronization();
         try {
-            broadcaster.publish(connection(), sample());
+            broadcaster.publish("o1", List.of(event()));
             verifyNoInteractions(messages);
             TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
             verify(messages).send(eq(supervisor), any());

@@ -1,6 +1,5 @@
 package com.uav.flight.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.dispatch.mapper.DispatchOrderRepository;
 import com.uav.flight.pojo.vo.FlightEventPageVO;
@@ -32,12 +31,8 @@ public class FlightProjectionReader {
     public FlightProjectionVO current(Long caller, Integer role, String orderId) {
         readable(caller, role, orderId);
         long revision = revision(orderId);
-        var all = jdbc.query("SELECT change_sequence,event_id,serial_number,serial_source,model_code,event_type,"
-                + "captured_at_ms,received_at_ms,payload_canonical FROM flight_projection_event WHERE order_id=? "
-                + "ORDER BY captured_at_ms,event_id", (rs, n) -> new FlightEventVO(rs.getLong(1),rs.getString(2),
-                new String(rs.getBytes(3),StandardCharsets.UTF_8),new String(rs.getBytes(4),StandardCharsets.UTF_8),
-                new String(rs.getBytes(5),StandardCharsets.UTF_8),rs.getString(6),rs.getLong(7),rs.getLong(8),
-                payload(rs.getBytes(9))), orderId);
+        var all = jdbc.query("SELECT " + FlightEventRows.columns(null) + " FROM flight_projection_event WHERE order_id=? "
+                + "ORDER BY captured_at_ms,event_id", (rs, n) -> FlightEventRows.map(rs, json), orderId);
         long now = System.currentTimeMillis();
         var latestByAircraft = new LinkedHashMap<String, Map<String, FlightEventVO>>();
         var identity = new LinkedHashMap<String, FlightEventVO>();
@@ -83,27 +78,16 @@ public class FlightProjectionReader {
         if (serial != null) { args.add(serial.getBytes(StandardCharsets.UTF_8)); args.add(source.getBytes(StandardCharsets.UTF_8)); }
         if (afterAt != null) { args.add(afterAt); args.add(afterAt); args.add(afterId); }
         args.add(limit + 1);
-        var rows = jdbc.query("SELECT change_sequence,event_id,serial_number,serial_source,model_code,event_type,captured_at_ms,"
-                + "received_at_ms,payload_canonical FROM flight_projection_event WHERE order_id=?" + filter + cursor
-                + " ORDER BY captured_at_ms,event_id LIMIT ?", (rs,n) -> row(rs), args.toArray());
+        var rows = jdbc.query("SELECT " + FlightEventRows.columns(null) + " FROM flight_projection_event WHERE order_id=?" + filter + cursor
+                + " ORDER BY captured_at_ms,event_id LIMIT ?", (rs, n) -> FlightEventRows.map(rs, json), args.toArray());
         var items = rows.stream().limit(limit).toList(); var last = items.isEmpty() ? null : items.getLast();
         return new FlightEventPageVO(items, revision(orderId), items.isEmpty()?0:items.getLast().changeSequence(),
                 last==null?null:last.capturedAt(), last==null?null:last.eventId(), rows.size()>limit);
     }
 
     private List<FlightEventVO> pageByChange(String id, long after, int limit) {
-        return jdbc.query("SELECT change_sequence,event_id,serial_number,serial_source,model_code,event_type,captured_at_ms,"
-                + "received_at_ms,payload_canonical FROM flight_projection_event WHERE order_id=? AND event_type='POSITION' AND change_sequence>? "
-                + "ORDER BY change_sequence LIMIT ?", (rs,n)->row(rs), id, after, limit+1);
-    }
-    private FlightEventVO row(java.sql.ResultSet rs) throws java.sql.SQLException {
-        return new FlightEventVO(rs.getLong(1),rs.getString(2),new String(rs.getBytes(3),StandardCharsets.UTF_8),
-                new String(rs.getBytes(4),StandardCharsets.UTF_8),new String(rs.getBytes(5),StandardCharsets.UTF_8),
-                rs.getString(6),rs.getLong(7),rs.getLong(8),payload(rs.getBytes(9)));
-    }
-    private Map<String,Object> payload(byte[] bytes) {
-        try { return json.readValue(bytes, new TypeReference<>() {}); }
-        catch (Exception e) { throw new IllegalStateException("accepted event payload is not readable", e); }
+        return jdbc.query("SELECT " + FlightEventRows.columns(null) + " FROM flight_projection_event WHERE order_id=? AND event_type='POSITION' AND change_sequence>? "
+                + "ORDER BY change_sequence LIMIT ?", (rs, n) -> FlightEventRows.map(rs, json), id, after, limit+1);
     }
     private long revision(String orderId) {
         Long value=jdbc.queryForObject("SELECT COALESCE(MAX(change_sequence),0) FROM flight_projection_event WHERE order_id=?",Long.class,orderId);

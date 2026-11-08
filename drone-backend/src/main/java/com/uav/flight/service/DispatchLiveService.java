@@ -75,9 +75,6 @@ public class DispatchLiveService {
         return signer.issue(session, false);
     }
 
-    /** Kept source-compatible for order close flows; live sessions are now order-scoped. */
-    @Transactional public void closeConnection(String ignoredConnectionId) { }
-
     private void end(DispatchLiveSession s) {
         if (s.getEndedAt() != null) return;
         s.setState("STOPPED"); s.setEndedAt(LocalDateTime.now()); s.setLeaseExpiresAt(0); sessions.save(s);

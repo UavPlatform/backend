@@ -29,10 +29,10 @@ public class DispatchOrderService {
     private final EntityManager entityManager;
     private final DispatchAssignmentRepository assignments;
     private final DispatchNotificationService notifications;
-    private final com.uav.flight.service.FlightRecordService flight;
+    private final com.uav.flight.service.FlightConnections flight;
     public DispatchOrderService(DispatchOrderRepository orders, WaybillAssessmentService assessments,
             DispatchPaymentConfig config, DispatchSandboxPayment payment, EntityManager entityManager,
-            DispatchAssignmentRepository assignments, DispatchNotificationService notifications, com.uav.flight.service.FlightRecordService flight) {
+            DispatchAssignmentRepository assignments, DispatchNotificationService notifications, com.uav.flight.service.FlightConnections flight) {
         this.orders = orders;
         this.assessments = assessments;
         this.config = config;
@@ -134,7 +134,7 @@ public class DispatchOrderService {
             order.setRefundReference("sim-refund-" + order.getId());
             order.setFundsStatus("REFUNDED");
         }
-        flight.closeOrder(id, "CANCELLED");
+        flight.closeActive(id, "CANCELLED");
         order.setStage("CANCELLED");
         notifications.owner(order, "CANCELLED", order.getFundsStatus().equals("REFUNDED") ? "运单已取消，定金已模拟退还" : "运单已取消",
                 order.getFundsStatus().equals("REFUNDED") ? "定金已全额模拟退回，无真实资金变动。" : "本单未付款，无需退款。");

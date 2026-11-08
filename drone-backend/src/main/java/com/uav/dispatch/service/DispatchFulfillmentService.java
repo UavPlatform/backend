@@ -20,9 +20,9 @@ public class DispatchFulfillmentService {
     private final DispatchMaterialService materials;
     private final DispatchSandboxPayment payment;
     private final DispatchNotificationService notifications;
-    private final com.uav.flight.service.FlightRecordService flight;
+    private final com.uav.flight.service.FlightConnections flight;
     public DispatchFulfillmentService(DispatchOrderRepository orders, DispatchAssignmentRepository assignments,
-            DispatchMaterialService materials, DispatchSandboxPayment payment, DispatchNotificationService notifications, com.uav.flight.service.FlightRecordService flight) {
+            DispatchMaterialService materials, DispatchSandboxPayment payment, DispatchNotificationService notifications, com.uav.flight.service.FlightConnections flight) {
         this.orders = orders; this.assignments = assignments; this.materials = materials; this.payment = payment; this.notifications = notifications; this.flight = flight;
     }
     @Transactional
@@ -46,7 +46,7 @@ public class DispatchFulfillmentService {
         if (!order.getStage().equals("IN_TRANSIT")) throw state();
         materials.requireVerified(order, pilot, "PILOT_DELIVERY", ids);
         notifications.owner(order, "DELIVERED", "飞手已提交送达凭证，请确认收货", "请查看送达凭证，并上传本次收货材料后确认收货。");
-        flight.closeOrder(id, "DELIVERED");
+        flight.closeActive(id, "DELIVERED");
         order.setPilotMaterialIdsJson(canonical); order.setDeliveryNote(normalizedNote);
         order.setDeliveredAt(LocalDateTime.now());
         order.setUpdatedAt(order.getDeliveredAt()); order.setStage("DELIVERY_CONFIRMATION");

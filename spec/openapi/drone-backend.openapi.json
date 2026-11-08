@@ -2250,6 +2250,42 @@
         },
         "type" : "object"
       },
+      "EventChainRefVO" : {
+        "properties" : {
+          "chainId" : {
+            "type" : "string"
+          },
+          "contiguousHash" : {
+            "type" : "string"
+          },
+          "contiguousHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "highestReceivedHeight" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "integrity" : {
+            "type" : "string"
+          },
+          "projectionRevision" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recordingSourceId" : {
+            "type" : "string"
+          },
+          "terminalMismatch" : {
+            "type" : "boolean"
+          },
+          "validationVersion" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "EventDraftDTO" : {
         "description" : "单个事件。未知字段在包根和事件封套上会拒绝整包",
         "properties" : {
@@ -4354,6 +4390,36 @@
             "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
             "items" : {
               "$ref" : "#/components/schemas/DispatchOrderVO"
+            },
+            "type" : "array"
+          },
+          "errorCode" : {
+            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
+            "type" : "string"
+          },
+          "success" : {
+            "description" : "是否成功：true 成功 / false 失败",
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ResultListEventChainRefVO" : {
+        "description" : "统一响应结果封装",
+        "properties" : {
+          "code" : {
+            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "data" : {
+            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）",
+            "items" : {
+              "$ref" : "#/components/schemas/EventChainRefVO"
             },
             "type" : "array"
           },
@@ -9626,6 +9692,62 @@
         },
         "summary" : "立即接单",
         "tags" : [ "Dispatch Pilot API" ]
+      }
+    },
+    "/dispatch/pilot/orders/{orderId}/event-chains" : {
+      "get" : {
+        "description" : "按 orderId + 机身身份（serialNumber/serialSource/modelCode）列出已存在的链，与 recordingSourceId 无关，供重装或换机后续链。terminalMismatch=true 表示该链由其它 recordingSourceId 记录。只读，不返回包体。",
+        "operationId" : "chains",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "orderId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "modelCode",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "recordingSourceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serialNumber",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serialSource",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ResultListEventChainRefVO"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "查询订单与机身已绑定的事件链（草案，未冻结）",
+        "tags" : [ "event-packet-controller" ]
       }
     },
     "/dispatch/pilot/orders/{orderId}/event-packets" : {

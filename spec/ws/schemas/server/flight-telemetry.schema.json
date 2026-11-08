@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Persisted flight telemetry pushed to web (ADR-0009)",
+  "title": "Persisted flight event pushed to web (ADR-0009, ADR-0014)",
   "type": "object",
   "required": [
     "type",
@@ -26,76 +26,51 @@
     },
     "data": {
       "type": "object",
+      "description": "One accepted event from the committed projection. Sensor readings keep their own capture time; nothing is combined into a synthetic sample.",
       "required": [
         "orderId",
-        "connectionId",
-        "sampleId",
-        "sequence",
-        "capturedAt"
+        "eventId",
+        "changeSequence",
+        "serialNumber",
+        "serialSource",
+        "type",
+        "capturedAt",
+        "receivedAt",
+        "payload"
       ],
       "properties": {
         "orderId": {
           "type": "string"
         },
-        "connectionId": {
+        "eventId": {
           "type": "string"
+        },
+        "changeSequence": {
+          "type": "integer"
+        },
+        "serialNumber": {
+          "type": "string"
+        },
+        "serialSource": {
+          "type": "string",
+          "description": "identity source token, e.g. FLIGHT_CONTROLLER"
         },
         "modelCode": {
           "type": "string"
         },
-        "modelName": {
-          "type": "string"
-        },
-        "sampleId": {
-          "type": "integer"
-        },
-        "sequence": {
-          "type": "integer"
+        "type": {
+          "type": "string",
+          "description": "POSITION / ALTITUDE / VELOCITY / BATTERY / ACTUAL_FLYING_STATE / ACTUAL_MOTOR_STATE / OPERATION_INTENT / OPERATION_RESULT / RECORDING_CUTOFF"
         },
         "capturedAt": {
           "type": "integer"
         },
-        "latitude": {
-          "type": [
-            "number",
-            "null"
-          ]
+        "receivedAt": {
+          "type": "integer"
         },
-        "longitude": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "altitude": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "speed": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "battery": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "payloadKg": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "flying": {
-          "type": [
-            "boolean",
-            "null"
-          ]
+        "payload": {
+          "type": "object",
+          "description": "Event-specific fields in contract units, e.g. latitudeDegE7/longitudeDegE7 for POSITION."
         }
       }
     }

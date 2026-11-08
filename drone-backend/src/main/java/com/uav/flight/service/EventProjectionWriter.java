@@ -1,15 +1,20 @@
 package com.uav.flight.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uav.flight.event.EventChainLock;
+import com.uav.flight.pojo.vo.FlightEventVO;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /** REQ-PILOT-EXEC-007 / ADR-0014. Facts and their read projection commit atomically. */
 @Service
 public class EventProjectionWriter {
     private final JdbcTemplate jdbc;
     private final EventChainLock locks;
+    private final ObjectMapper json = new ObjectMapper();
 
     public EventProjectionWriter(JdbcTemplate jdbc, EventChainLock locks) {
         this.jdbc = jdbc; this.locks = locks;
@@ -18,6 +23,13 @@ public class EventProjectionWriter {
     public long projectPacket(String orderId, String packetId) {
         copy("f.order_id = ? AND f.packet_id = ?", orderId, packetId);
         return revision(orderId);
+    }
+
+    /** Events this packet contributed to the projection; empty for a replayed packet. */
+    public List<FlightEventVO> projectedBy(String packetId) {
+        return jdbc.query("SELECT " + FlightEventRows.columns("p") + " FROM flight_projection_event p "
+                        + "JOIN flight_event_v2_fact f ON f.event_id = p.event_id WHERE f.packet_id = ? "
+                        + "ORDER BY p.change_sequence", (rs, n) -> FlightEventRows.map(rs, json), packetId);
     }
 
     /** Internal maintenance entry point. Reproduces stable change sequences from immutable facts. */

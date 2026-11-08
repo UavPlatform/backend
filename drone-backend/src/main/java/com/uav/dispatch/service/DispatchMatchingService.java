@@ -23,8 +23,8 @@ public class DispatchMatchingService {
     private final DispatchOrderRepository orders;
     private final DispatchAssignmentRepository assignments;
     private final DispatchNotificationService notifications;
-    private final com.uav.flight.service.FlightRecordService flight;
-    public DispatchMatchingService(DispatchOrderRepository orders, DispatchAssignmentRepository assignments, DispatchNotificationService notifications, com.uav.flight.service.FlightRecordService flight) {
+    private final com.uav.flight.service.FlightConnections flight;
+    public DispatchMatchingService(DispatchOrderRepository orders, DispatchAssignmentRepository assignments, DispatchNotificationService notifications, com.uav.flight.service.FlightConnections flight) {
         this.orders = orders;
         this.assignments = assignments;
         this.notifications = notifications; this.flight = flight;
@@ -93,7 +93,7 @@ public class DispatchMatchingService {
         if ("PILOT_RELEASED".equals(assignment.getEndReason())) return;
         requireAssignment(order, pilot, version);
         if (!List.of("PILOT_PREPARING", "PILOT_ARRIVED").contains(order.getStage()) || assignment.getEndedAt() != null) throw stale();
-        flight.closeOrder(id, "PILOT_RELEASED");
+        flight.closeActive(id, "PILOT_RELEASED");
         assignment.setEndedAt(LocalDateTime.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
         assignment.setEndReason("PILOT_RELEASED");
         assignments.save(assignment);

@@ -1,8 +1,7 @@
 package com.uav.flight.service;
 
 import com.uav.dispatch.mapper.DispatchOrderRepository;
-import com.uav.flight.pojo.entity.FlightConnection;
-import com.uav.flight.pojo.vo.FlightSampleVO;
+import com.uav.flight.pojo.vo.FlightEventVO;
 import com.uav.live.pojo.dto.WsEnvelope;
 import com.uav.server.ws.WsMessageNames;
 import com.uav.server.ws.auth.WsAuthHandshakeInterceptor;
@@ -14,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -22,7 +22,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Web realtime push of persisted flight telemetry over {@code /ws/web} (REQ-SUP-MON-005/007, REQ-SHIP-EXEC-004).
  * Supervisors (role 2) without {@code orderId} receive every order; with {@code ?orderId=} a session receives one
- * order and must be its shipper or a supervisor. Only data already committed to the database is pushed.
+ * order and must be its shipper or a supervisor. Only events already committed to the projection are pushed, and
+ * each event keeps its own capture time: no combined sample is synthesized (ADR-0014).
  */
 @Slf4j
 @Service
@@ -58,9 +59,11 @@ public class FlightTelemetryBroadcaster {
     }
 
     /** Sends after the surrounding transaction commits (immediately when there is none). */
-    public void publish(FlightConnection connection, FlightSampleVO sample) {
-        WsEnvelope envelope = envelope(connection, sample);
-        Runnable send = () -> deliver(connection.getOrderId(), envelope);
+    public void publish(String orderId, List<FlightEventVO> events) {
+        if (events.isEmpty()) return;
+        Runnable send = () -> {
+            for (var event : events) deliver(orderId, envelope(orderId, event));
+        };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() { send.run(); }
@@ -70,18 +73,22 @@ public class FlightTelemetryBroadcaster {
         }
     }
 
-    static WsEnvelope envelope(FlightConnection c, FlightSampleVO s) {
+    static WsEnvelope envelope(String orderId, FlightEventVO event) {
         var data = new LinkedHashMap<String, Object>();
-        data.put("orderId", c.getOrderId()); data.put("connectionId", c.getId());
-        data.put("modelCode", c.getModelCode()); data.put("modelName", c.getModelName());
-        data.put("sampleId", s.sampleId()); data.put("sequence", s.sequence()); data.put("capturedAt", s.capturedAt());
-        data.put("latitude", s.latitude()); data.put("longitude", s.longitude()); data.put("altitude", s.altitude());
-        data.put("speed", s.speed()); data.put("battery", s.battery()); data.put("payloadKg", s.payloadKg());
-        data.put("flying", s.flying());
-        var e = new WsEnvelope();
-        e.setType(WsMessageNames.TYPE_EVENT); e.setName(WsMessageNames.FLIGHT_TELEMETRY);
-        e.setDeviceId(c.getSerialNumber()); e.setTimestamp(s.capturedAt()); e.setData(data);
-        return e;
+        data.put("orderId", orderId);
+        data.put("eventId", event.eventId());
+        data.put("changeSequence", event.changeSequence());
+        data.put("serialNumber", event.serialNumber());
+        data.put("serialSource", event.serialSource());
+        data.put("modelCode", event.modelCode());
+        data.put("type", event.type());
+        data.put("capturedAt", event.capturedAt());
+        data.put("receivedAt", event.receivedAt());
+        data.put("payload", event.payload());
+        var envelope = new WsEnvelope();
+        envelope.setType(WsMessageNames.TYPE_EVENT); envelope.setName(WsMessageNames.FLIGHT_TELEMETRY);
+        envelope.setDeviceId(event.serialNumber()); envelope.setTimestamp(event.capturedAt()); envelope.setData(data);
+        return envelope;
     }
 
     private void deliver(String orderId, WsEnvelope envelope) {

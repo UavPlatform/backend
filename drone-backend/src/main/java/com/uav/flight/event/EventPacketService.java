@@ -30,22 +30,30 @@ public class EventPacketService {
     private final EventRepairBudget budget;
     private final Clock clock;
     private final com.uav.flight.service.EventProjectionWriter projections;
+    private final com.uav.flight.service.FlightExecutedDrone executedDrone;
+    private final com.uav.flight.service.FlightTelemetryBroadcaster broadcaster;
     private final EventPacketSchema schema = new EventPacketSchema();
 
     @Autowired
     public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget,
-            com.uav.flight.service.EventProjectionWriter projections) {
-        this(locks, store, gate, budget, Clock.systemUTC(), projections);
+            com.uav.flight.service.EventProjectionWriter projections,
+            com.uav.flight.service.FlightExecutedDrone executedDrone,
+            com.uav.flight.service.FlightTelemetryBroadcaster broadcaster) {
+        this(locks, store, gate, budget, Clock.systemUTC(), projections, executedDrone, broadcaster);
     }
 
     EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget, Clock clock,
-            com.uav.flight.service.EventProjectionWriter projections) {
+            com.uav.flight.service.EventProjectionWriter projections,
+            com.uav.flight.service.FlightExecutedDrone executedDrone,
+            com.uav.flight.service.FlightTelemetryBroadcaster broadcaster) {
         this.locks = locks;
         this.store = store;
         this.gate = gate;
         this.budget = budget;
         this.clock = clock;
         this.projections = projections;
+        this.executedDrone = executedDrone;
+        this.broadcaster = broadcaster;
     }
 
     @Transactional
@@ -117,6 +125,10 @@ public class EventPacketService {
         store.insertReceipt(parsed, decidedAt);
         long revision = projections.projectPacket(orderId, parsed.packetId());
         var updated = repair(parsed, chain, revision);
+        // ADR-0007 #6/#9: the executed aircraft comes from accepted events, not from a registration step.
+        executedDrone.recordNewest(order, orderId);
+        // ADR-0014: only committed projection rows are pushed, each keeping its own capture time.
+        broadcaster.publish(orderId, projections.projectedBy(parsed.packetId()));
         gate.beforeCommit();
         log.info("event packet stored order={} packet={} height={} validation={}",
                 orderId, parsed.packetId(), parsed.height(), updated.validationVersion());

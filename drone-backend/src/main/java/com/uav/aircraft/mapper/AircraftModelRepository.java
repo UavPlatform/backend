@@ -17,6 +17,9 @@ public interface AircraftModelRepository extends JpaRepository<AircraftModel, Lo
 
     Optional<AircraftModel> findByModelCode(String modelCode);
 
+    /** Event packets carry the model code as the aircraft reported it; match without inventing an alias. */
+    Optional<AircraftModel> findByModelCodeIgnoreCase(String modelCode);
+
     /** 管理端列表：启用+停用，按型号代码升序。 */
     Page<AircraftModel> findAllByOrderByModelCodeAsc(Pageable pageable);
 

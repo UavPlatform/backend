@@ -10,9 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-final class DispatchTestData {
+public final class DispatchTestData {
     private DispatchTestData() { }
-    static Map<String, String> fields() {
+    public static Map<String, String> fields() {
         var f = new LinkedHashMap<String, String>();
         f.putAll(Map.of("category", "普通", "weightMin", "2", "length", "30", "width", "20",
                 "height", "10", "count", "1", "packaging", "纸箱", "lifting", "绑带", "timeMode", "now"));
@@ -23,11 +23,11 @@ final class DispatchTestData {
         }
         return f;
     }
-    static Map<String, Object> waybill(Map<String, String> fields) {
+    public static Map<String, Object> waybill(Map<String, String> fields) {
         return Map.of("schemaVersion", 1, "step", 4, "fields", fields);
     }
     @TestConfiguration(proxyBeanMethods = false)
-    static class AssessmentFixture {
+    public static class AssessmentFixture {
         @Bean @Primary DispatchAssessmentGateway testOnlyAssessment() {
             return new DispatchAssessmentGateway() {
                 public boolean available() { return true; }

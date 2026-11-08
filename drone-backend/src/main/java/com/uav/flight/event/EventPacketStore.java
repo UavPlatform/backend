@@ -129,6 +129,17 @@ public class EventPacketStore {
         return count != null && count > 0;
     }
 
+    /**
+     * Chains bound to one order and airframe regardless of which terminal recorded them. The binding key is the same
+     * one enforced by uk_flight_event_v2_binding, minus recording_source_id: a reinstalled or replaced device mints a
+     * new recording source and would otherwise be invisible here.
+     */
+    public List<ChainRow> findChainsByAirframe(String orderId, String serialNumber, String serialSource, String modelCode) {
+        return jdbc.query(chainSql() + " WHERE order_id = ? AND serial_number = ? AND serial_source = ? AND model_code = ? "
+                        + "ORDER BY created_at_ms, chain_id",
+                (rs, n) -> chain(rs), orderId, utf8(serialNumber), utf8(serialSource), utf8(modelCode));
+    }
+
     public long maxHeight(String chainId) {
         Long value = jdbc.queryForObject("SELECT COALESCE(MAX(height), 0) FROM flight_event_v2_packet WHERE chain_id = ?",
                 Long.class, chainId);

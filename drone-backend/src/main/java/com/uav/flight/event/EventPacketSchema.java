@@ -9,14 +9,14 @@ import java.util.Set;
 
 /**
  * Draft packet allowlist. chainIdentity is exactly:
- * assignmentVersion, chainId, hashVersion, modelCode, orderId, recordingSourceId,
+ * chainId, hashVersion, modelCode, orderId, recordingSourceId,
  * schemaVersion, serialNumber, serialSource.
  * schemaVersion and hashVersion are inside the anchor on purpose. Display names are not accepted.
  * A missing key is not the same as a present null. The first packet must send prevPacketId: null.
  */
 public final class EventPacketSchema {
     static final Set<String> ROOT = Set.of(
-            "schemaVersion", "hashVersion", "orderId", "assignmentVersion", "recordingSourceId", "chainId",
+            "schemaVersion", "hashVersion", "orderId", "recordingSourceId", "chainId",
             "serialNumber", "serialSource", "modelCode", "packetId", "prevPacketId", "height",
             "prevChainHash", "chainHash", "events");
     private static final Set<String> EVENT = Set.of("eventId", "capturedAt", "type", "payload");
@@ -29,7 +29,6 @@ public final class EventPacketSchema {
         int hashVersion = exactVersion(fields.get("hashVersion"), EventLimits.HASH_VERSION);
         String orderId = text(fields.get("orderId"), EventTokens::uuid, "SCHEMA_ORDER");
         if (pathOrderId != null && !pathOrderId.equals(orderId)) throw EventFormatException.malformed("SCHEMA_ORDER");
-        long assignmentVersion = positive(fields.get("assignmentVersion"), "SCHEMA_TYPE");
         String recordingSourceId = text(fields.get("recordingSourceId"), EventTokens::uuid, "SCHEMA_IDENTITY");
         String chainId = text(fields.get("chainId"), EventTokens::uuid, "SCHEMA_IDENTITY");
         String serialNumber = text(fields.get("serialNumber"), EventTokens::serial, "SCHEMA_IDENTITY");
@@ -42,7 +41,7 @@ public final class EventPacketSchema {
         byte[] prevChainHash = hash(fields.get("prevChainHash"));
         byte[] claimed = hash(fields.get("chainHash"));
         List<ParsedEvent> events = events(fields.get("events"));
-        byte[] identity = JsonCanon.canonical(identityOf(schemaVersion, hashVersion, orderId, assignmentVersion,
+        byte[] identity = JsonCanon.canonical(identityOf(schemaVersion, hashVersion, orderId,
                 recordingSourceId, chainId, serialNumber, serialSource, modelCode));
         byte[] anchor = EventChainHasher.anchor(identity);
         byte[] without = JsonCanon.canonical(JsonCanon.without(root, "chainHash"));
@@ -50,15 +49,14 @@ public final class EventPacketSchema {
         if (!MessageDigest.isEqual(chainHash, claimed)) throw EventFormatException.hash("HASH");
         if (height == 1 && !MessageDigest.isEqual(anchor, prevChainHash)) throw EventFormatException.hash("ANCHOR");
         byte[] full = JsonCanon.canonical(root);
-        return new ParsedPacket(schemaVersion, hashVersion, orderId, assignmentVersion, recordingSourceId, chainId,
+        return new ParsedPacket(schemaVersion, hashVersion, orderId, recordingSourceId, chainId,
                 serialNumber, serialSource, modelCode, packetId, prevPacketId, height, prevChainHash, chainHash,
                 full, without, EventChainHasher.content(full), anchor, events);
     }
 
-    private static JsonValue.Obj identityOf(int schemaVersion, int hashVersion, String orderId, long assignmentVersion,
+    private static JsonValue.Obj identityOf(int schemaVersion, int hashVersion, String orderId,
             String recordingSourceId, String chainId, String serialNumber, String serialSource, String modelCode) {
         var fields = new LinkedHashMap<String, JsonValue>();
-        fields.put("assignmentVersion", new JsonValue.Int(assignmentVersion));
         fields.put("chainId", new JsonValue.Str(chainId));
         fields.put("hashVersion", new JsonValue.Int(hashVersion));
         fields.put("modelCode", new JsonValue.Str(modelCode));

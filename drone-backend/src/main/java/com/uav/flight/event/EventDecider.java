@@ -2,7 +2,7 @@ package com.uav.flight.event;
 
 /**
  * Fixed per-event result. A later gap fill does not rewrite it.
- * Identity and the recorded assignment interval are independent of arrival order.
+ * Capture time and identity are independent of arrival order.
  */
 public final class EventDecider {
     public record Existing(String packetId, EventAttribution attribution) { }
@@ -11,10 +11,9 @@ public final class EventDecider {
     private EventDecider() { }
 
     public static Decision decide(ParsedEvent event, EventAttribution attribution, long now,
-            Existing existing, AssignmentCaptureWindow.Span assignmentWindow) {
+            Existing existing) {
         if (event.semanticReject() != null) return rejected(event.semanticReject());
         if (event.capturedAt() > now + EventLimits.CAPTURED_FUTURE_MS) return rejected("EVENT_TIME_WINDOW");
-        if (assignmentWindow == null || !assignmentWindow.contains(event.capturedAt())) return rejected("ASSIGNMENT_WINDOW");
         if (existing != null) {
             if (existing.attribution().same(attribution)) return new Decision("DUPLICATE", "DUPLICATE", existing.packetId());
             return rejected("EVENT_ID_CONFLICT");

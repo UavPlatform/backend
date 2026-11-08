@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const doc = JSON.parse(readFileSync(new URL("./golden-vectors.json", import.meta.url), "utf8"));
-const anchorDomain = Buffer.from("UAV-EVENT-ANCHOR-v1\n", "utf8");
-const packetDomain = Buffer.from("UAV-EVENT-PACKET-v1\n", "utf8");
+const anchorDomain = Buffer.from("UAV-EVENT-ANCHOR-v2\n", "utf8");
+const packetDomain = Buffer.from("UAV-EVENT-PACKET-v2\n", "utf8");
 
 function sha(...parts) {
   const hash = createHash("sha256");

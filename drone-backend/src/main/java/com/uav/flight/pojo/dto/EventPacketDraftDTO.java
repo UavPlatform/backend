@@ -8,10 +8,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "未冻结事件包。缺字段不等于 null。整数不得用小数、指数或前导零。UUID 与哈希必须小写。")
 public record EventPacketDraftDTO(
-        @Schema(description = "必须为 1") int schemaVersion,
-        @Schema(description = "必须为 1") int hashVersion,
+        @Schema(description = "必须为 2") int schemaVersion,
+        @Schema(description = "必须为 2") int hashVersion,
         String orderId,
-        @Schema(description = "现行接单轮次，禁止 null 当 0") long assignmentVersion,
         String recordingSourceId,
         String chainId,
         @Schema(description = "原样机身号，不大小写折叠") String serialNumber,

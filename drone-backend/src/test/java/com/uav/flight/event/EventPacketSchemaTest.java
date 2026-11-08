@@ -29,16 +29,14 @@ class EventPacketSchemaTest {
     }
 
     @Test
-    void missingPreviousPacketIsNotNullAndZeroAssignmentIsNotCoerced() {
+    void missingPreviousPacketIsNotNullAndV1IsRejected() {
         String json = new String(packet(), StandardCharsets.UTF_8).replace("\"prevPacketId\":null", "\"prevPacketId\":0");
         assertThatThrownBy(() -> schema.parse(json.getBytes(StandardCharsets.UTF_8), ID.orderId()))
                 .isInstanceOf(EventFormatException.class);
         String removed = json.replace(",\"prevPacketId\":0", "");
         assertThatThrownBy(() -> schema.parse(removed.getBytes(StandardCharsets.UTF_8), ID.orderId())).hasMessage("SCHEMA_FIELDS");
-        String zero = new String(packet(), StandardCharsets.UTF_8).replace("\"assignmentVersion\":1", "\"assignmentVersion\":0");
-        assertThatThrownBy(() -> schema.parse(zero.getBytes(StandardCharsets.UTF_8), ID.orderId())).hasMessage("SCHEMA_TYPE");
-        String absent = new String(packet(), StandardCharsets.UTF_8).replace("\"assignmentVersion\":1,", "");
-        assertThatThrownBy(() -> schema.parse(absent.getBytes(StandardCharsets.UTF_8), ID.orderId())).hasMessage("SCHEMA_FIELDS");
+        String oldVersion = new String(packet(), StandardCharsets.UTF_8).replace("schemaVersion" + (char) 34 + ":2", "schemaVersion" + (char) 34 + ":1");
+        assertThatThrownBy(() -> schema.parse(oldVersion.getBytes(StandardCharsets.UTF_8), ID.orderId())).hasMessage("SCHEMA_TYPE");
     }
 
     @Test

@@ -48,7 +48,7 @@ public final class TimelineMigrationFixture {
                         + "pilot_id BIGINT NOT NULL, request_key VARCHAR(64) NOT NULL, borrowed_at TIMESTAMP(6) NOT NULL, returned_at TIMESTAMP(6))");
             }
             var result = Flyway.configure().dataSource(url, user, password).locations("filesystem:src/main/resources/db/migration")
-                    .baselineOnMigrate(true).baselineVersion("25").load().migrate();
+                    .baselineOnMigrate(true).baselineVersion("25").target("26").load().migrate();
             assertThat(result.migrationsExecuted).isEqualTo(1);
             assertTime(connection, "first", "deposit_paid_at", "2026-10-24T11:00:00");
             assertTime(connection, "first", "waiting_since", "2026-10-24T11:00:00");

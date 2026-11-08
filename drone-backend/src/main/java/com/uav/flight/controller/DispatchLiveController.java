@@ -25,20 +25,20 @@ public class DispatchLiveController {
         response.setHeader("Cache-Control", "no-store");
         return Result.success(live.watch(UserContext.getUserId(), UserContext.getRole(), orderId, liveId));
     }
-    @PostMapping("/pilot/orders/{orderId}/flight-connections/{connectionId}/live") @RequireRole(1)
-    @Operation(summary = "飞手主动开启本次连接直播", description = "当前飞手和接单轮次，到场/运输阶段；同requestKey幂等。新派单复用既有TRTC应用配置且需确认已启用房间权限，未配置503。此调用不代表首帧成功。")
-    public Result<DispatchLiveCredentialsVO> start(@PathVariable String orderId, @PathVariable String connectionId, @Valid @RequestBody DispatchLiveStartDTO input, jakarta.servlet.http.HttpServletResponse response) {
+    @PostMapping("/pilot/orders/{orderId}/live") @RequireRole(1)
+    @Operation(summary = "飞手主动开启本单直播", description = "当前飞手按订单开启直播；同requestKey幂等，不依赖遥测连接。")
+    public Result<DispatchLiveCredentialsVO> start(@PathVariable String orderId, @Valid @RequestBody DispatchLiveStartDTO input, jakarta.servlet.http.HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        return Result.success(live.start(UserContext.getUserId(), orderId, connectionId, input.requestKey()));
+        return Result.success(live.start(UserContext.getUserId(), orderId, input.requestKey()));
     }
-    @PostMapping("/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/heartbeat") @RequireRole(1)
+    @PostMapping("/pilot/orders/{orderId}/live/{liveId}/heartbeat") @RequireRole(1)
     @Operation(summary = "上报本单真实推流状态", description = "SDK发出首帧且继续发送实际图传才报RUNNING，否则STARTING；有效期20秒，过期不允许续活旧房间。")
-    public Result<DispatchLiveStatusVO> heartbeat(@PathVariable String orderId, @PathVariable String connectionId, @PathVariable String liveId, @Valid @RequestBody DispatchLiveHeartbeatDTO input) {
-        return Result.success(live.heartbeat(UserContext.getUserId(), orderId, connectionId, liveId, input.state()));
+    public Result<DispatchLiveStatusVO> heartbeat(@PathVariable String orderId, @PathVariable String liveId, @Valid @RequestBody DispatchLiveHeartbeatDTO input) {
+        return Result.success(live.heartbeat(UserContext.getUserId(), orderId, liveId, input.state()));
     }
-    @PostMapping("/pilot/orders/{orderId}/flight-connections/{connectionId}/live/{liveId}/stop") @RequireRole(1)
+    @PostMapping("/pilot/orders/{orderId}/live/{liveId}/stop") @RequireRole(1)
     @Operation(summary = "飞手关闭本次直播记录", description = "本人历史房间可幂等关闭，不能关闭新房间；客户端同步停止实际推流，成功data=null。")
-    public Result<Void> stop(@PathVariable String orderId, @PathVariable String connectionId, @PathVariable String liveId) {
-        live.stop(UserContext.getUserId(), orderId, connectionId, liveId); return Result.success();
+    public Result<Void> stop(@PathVariable String orderId, @PathVariable String liveId) {
+        live.stop(UserContext.getUserId(), orderId, liveId); return Result.success();
     }
 }

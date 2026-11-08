@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** H2 proves V27 boots. Acceptance of durability is the MySQL E2E, not this class. */
+/** H2 proves V28 boots. Acceptance of durability is the MySQL E2E, not this class. */
 @TestPropertySource(properties = {"wechat.pay.mock-enabled=true", "dispatch.demo.enabled=true"})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class EventPacketIT extends IntegrationTestBase {
@@ -42,7 +42,7 @@ class EventPacketIT extends IntegrationTestBase {
                 .header("Authorization", "Bearer " + pilot.token()).contentType(MediaType.APPLICATION_JSON).content(raw))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String packetId = stored.path("data").path("receipt").path("packetId").asText();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", Integer.class, packetId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_v2_packet WHERE packet_id = ?", Integer.class, packetId)).isEqualTo(1);
         var replay = json.readTree(mockMvc.perform(post("/dispatch/pilot/orders/" + id + "/event-packets")
                 .header("Authorization", "Bearer " + pilot.token()).contentType(MediaType.APPLICATION_JSON).content(raw))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
@@ -53,7 +53,7 @@ class EventPacketIT extends IntegrationTestBase {
         mockMvc.perform(post("/dispatch/pilot/orders/" + id + "/event-packets")
                 .header("Authorization", "Bearer " + pilot.token()).contentType(MediaType.APPLICATION_JSON).content(structural))
                 .andExpect(status().isBadRequest());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_packet WHERE packet_id = ?", Integer.class, structuralId)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flight_event_v2_packet WHERE packet_id = ?", Integer.class, structuralId)).isZero();
     }
 
     private String prepare(Account owner, Account pilot) throws Exception {

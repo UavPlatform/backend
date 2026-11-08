@@ -32,10 +32,9 @@ public final class EventPacketSamples {
 
     public static byte[] packet(Identity identity, String packetId, String prevPacketId, long height, byte[] prevHash, List<Ev> events) {
         var fields = new LinkedHashMap<String, JsonValue>();
-        fields.put("schemaVersion", new JsonValue.Int(1));
-        fields.put("hashVersion", new JsonValue.Int(1));
+        fields.put("schemaVersion", new JsonValue.Int(2));
+        fields.put("hashVersion", new JsonValue.Int(2));
         fields.put("orderId", new JsonValue.Str(identity.orderId()));
-        fields.put("assignmentVersion", new JsonValue.Int(identity.assignmentVersion()));
         fields.put("recordingSourceId", new JsonValue.Str(identity.recordingSourceId()));
         fields.put("chainId", new JsonValue.Str(identity.chainId()));
         fields.put("serialNumber", new JsonValue.Str(identity.serialNumber()));
@@ -72,13 +71,12 @@ public final class EventPacketSamples {
 
     private static JsonValue.Obj identityOf(Identity identity) {
         var fields = new LinkedHashMap<String, JsonValue>();
-        fields.put("assignmentVersion", new JsonValue.Int(identity.assignmentVersion()));
         fields.put("chainId", new JsonValue.Str(identity.chainId()));
-        fields.put("hashVersion", new JsonValue.Int(1));
+        fields.put("hashVersion", new JsonValue.Int(2));
         fields.put("modelCode", new JsonValue.Str(identity.modelCode()));
         fields.put("orderId", new JsonValue.Str(identity.orderId()));
         fields.put("recordingSourceId", new JsonValue.Str(identity.recordingSourceId()));
-        fields.put("schemaVersion", new JsonValue.Int(1));
+        fields.put("schemaVersion", new JsonValue.Int(2));
         fields.put("serialNumber", new JsonValue.Str(identity.serialNumber()));
         fields.put("serialSource", new JsonValue.Str(identity.serialSource()));
         return new JsonValue.Obj(fields);

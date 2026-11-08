@@ -5,8 +5,8 @@ package com.uav.flight.event;
  * or verified DJI SDK ranges.
  */
 public final class EventLimits {
-    public static final int SCHEMA_VERSION = 1;
-    public static final int HASH_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
+    public static final int HASH_VERSION = 2;
     public static final int RECEIPT_VERSION = 1;
     public static final int MAX_BODY_BYTES = 262_144;
     public static final int MAX_EVENTS = 500;
@@ -39,8 +39,8 @@ public final class EventLimits {
     public static final int RATE_LIMIT = 600;
     public static final int RATE_WINDOW_SECONDS = 60;
     public static final String DURABILITY = "RAW_AND_RESULTS_COMMITTED";
-    public static final String ANCHOR_DOMAIN = "UAV-EVENT-ANCHOR-v1\n";
-    public static final String PACKET_DOMAIN = "UAV-EVENT-PACKET-v1\n";
+    public static final String ANCHOR_DOMAIN = "UAV-EVENT-ANCHOR-v2\n";
+    public static final String PACKET_DOMAIN = "UAV-EVENT-PACKET-v2\n";
 
     private EventLimits() { }
 }

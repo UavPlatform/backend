@@ -5,7 +5,6 @@ import java.util.Arrays;
 /** Equality for cross-packet eventId reuse. Different chain or payload is not the same fact. */
 public record EventAttribution(
         String orderId,
-        long assignmentVersion,
         String recordingSourceId,
         String chainId,
         String serialNumber,
@@ -18,7 +17,6 @@ public record EventAttribution(
     public boolean same(EventAttribution other) {
         return other != null
                 && orderId.equals(other.orderId)
-                && assignmentVersion == other.assignmentVersion
                 && recordingSourceId.equals(other.recordingSourceId)
                 && chainId.equals(other.chainId)
                 && serialNumber.equals(other.serialNumber)

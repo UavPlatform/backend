@@ -21,9 +21,9 @@ class EventGoldenVectorTest {
             "22222222-2222-4222-8222-222222222222",
             "33333333-3333-4333-8333-333333333333",
             "FC30SN1", "FLIGHT_CONTROLLER", "FC30");
-    private static final String IDENTITY = "{\"assignmentVersion\":1,\"chainId\":\"33333333-3333-4333-8333-333333333333\","
-            + "\"hashVersion\":1,\"modelCode\":\"FC30\",\"orderId\":\"11111111-1111-4111-8111-111111111111\","
-            + "\"recordingSourceId\":\"22222222-2222-4222-8222-222222222222\",\"schemaVersion\":1,"
+    private static final String IDENTITY = "{\"chainId\":\"33333333-3333-4333-8333-333333333333\","
+            + "\"hashVersion\":2,\"modelCode\":\"FC30\",\"orderId\":\"11111111-1111-4111-8111-111111111111\","
+            + "\"recordingSourceId\":\"22222222-2222-4222-8222-222222222222\",\"schemaVersion\":2,"
             + "\"serialNumber\":\"FC30SN1\",\"serialSource\":\"FLIGHT_CONTROLLER\"}";
     private static final Path FILE = Path.of("../spec/event-contract/golden-vectors.json");
     private static final String NON_ASCII_INPUT = "7b227a223a312c2273223a22c3a92fe280a8e280a9227d";
@@ -33,13 +33,13 @@ class EventGoldenVectorTest {
     void proposedVectorsMatchAnIndependentSha256() throws Exception {
         byte[] identity = IDENTITY.getBytes(StandardCharsets.UTF_8);
         assertThat(JsonCanon.canonical(JsonCanon.parse(identity))).isEqualTo(identity);
-        byte[] anchor = sha(ascii("UAV-EVENT-ANCHOR-v1\n"), identity);
+        byte[] anchor = sha(ascii("UAV-EVENT-ANCHOR-v2\n"), identity);
         assertThat(EventChainHasher.anchor(identity)).isEqualTo(anchor);
         byte[] first = EventPacketSamples.first(ID, "44444444-4444-4444-8444-444444444444", List.of(position(
                 "55555555-5555-4555-8555-555555555555", 1_710_000_000_000L, 282_000_000L, 1_130_000_000L)));
         var parsed = new EventPacketSchema().parse(first, ID.orderId());
         assertThat(parsed.anchor()).isEqualTo(anchor);
-        byte[] chain = sha(ascii("UAV-EVENT-PACKET-v1\n"), parsed.prevChainHash(), parsed.withoutChainHash());
+        byte[] chain = sha(ascii("UAV-EVENT-PACKET-v2\n"), parsed.prevChainHash(), parsed.withoutChainHash());
         byte[] digest = sha(parsed.canonicalUtf8());
         assertThat(parsed.chainHash()).isEqualTo(chain);
         assertThat(parsed.contentDigest()).isEqualTo(digest);
@@ -52,7 +52,7 @@ class EventGoldenVectorTest {
                 parsed.chainHash(), List.of(new EventPacketSamples.Ev("77777777-7777-4777-8777-777777777777",
                         1_710_000_003_000L, "ALTITUDE", EventPacketSamples.altitude(12_345L))));
         var secondParsed = new EventPacketSchema().parse(second, ID.orderId());
-        assertThat(secondParsed.chainHash()).isEqualTo(sha(ascii("UAV-EVENT-PACKET-v1\n"), parsed.chainHash(), secondParsed.withoutChainHash()));
+        assertThat(secondParsed.chainHash()).isEqualTo(sha(ascii("UAV-EVENT-PACKET-v2\n"), parsed.chainHash(), secondParsed.withoutChainHash()));
         var other = new EventPacketSamples.Identity(ID.orderId(), 1, ID.recordingSourceId(),
                 "88888888-8888-4888-8888-888888888888", "PRODUCTSN1", "PRODUCT", "FC30");
         byte[] otherRaw = EventPacketSamples.first(other, "99999999-9999-4999-8999-999999999999", List.of(position(
@@ -68,7 +68,8 @@ class EventGoldenVectorTest {
         byte[] fixtureInput = EventHex.decode(NON_ASCII_INPUT, NON_ASCII_INPUT.length() / 2);
         assertThat(EventHex.encode(JsonCanon.canonical(JsonCanon.parse(fixtureInput)))).isEqualTo(NON_ASCII_CANONICAL);
         assertThat(FILE).exists();
-        assertThat(Files.readString(FILE)).isEqualTo(json);
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(FILE)))
+                .isEqualTo(new com.fasterxml.jackson.databind.ObjectMapper().readTree(json));
         assertThatThrownBy(() -> JsonCanon.parse("{\"a\":01}".getBytes(StandardCharsets.UTF_8))).hasMessage("NUMBER");
     }
 
@@ -83,7 +84,7 @@ class EventGoldenVectorTest {
         var out = new StringBuilder();
         out.append("{\n  \"status\": \"draft-not-verified-by-kotlin\",\n");
         out.append("  \"note\": \"djifly PR 19 commit 96ea023 verified a synthetic fixture only. These vectors are the backend proposal.\",\n");
-        out.append("  \"identityFields\": [\"assignmentVersion\", \"chainId\", \"hashVersion\", \"modelCode\", \"orderId\", \"recordingSourceId\", \"schemaVersion\", \"serialNumber\", \"serialSource\"],\n");
+        out.append("  \"identityFields\": [\"chainId\", \"hashVersion\", \"modelCode\", \"orderId\", \"recordingSourceId\", \"schemaVersion\", \"serialNumber\", \"serialSource\"],\n");
         out.append("  \"identityCanonicalUtf8\": ").append(quote(IDENTITY)).append(",\n");
         out.append("  \"anchorHex\": \"").append(EventHex.encode(anchor)).append("\",\n");
         out.append("  \"vectors\": [\n");

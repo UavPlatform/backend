@@ -33,12 +33,16 @@ public class EventReconciliationService {
         } catch (EventFormatException e) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, ApiErrorCode.EVENT_PACKET_MALFORMED, e.getMessage());
         }
-        locks.lock(orderId);
+        var order = locks.lock(orderId);
         var chain = store.findChain(request.chainId());
         if (chain == null || !chain.orderId().equals(orderId)) {
             throw new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND);
         }
-        if (chain.pilotId() != pilot) throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION);
+        if (!store.hasUploader(chain.chainId(), pilot)) {
+            if (!java.util.Objects.equals(order.getAssignedPilotId(), pilot)) {
+                throw new BusinessException(HttpStatus.FORBIDDEN, ApiErrorCode.NO_PERMISSION);
+            }
+        }
         if (request.validationVersion() != null && request.validationVersion() != chain.validationVersion()) {
             throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.EVENT_RECONCILIATION_VERSION_CHANGED,
                     "RECONCILIATION_VERSION_CHANGED current=" + chain.validationVersion());

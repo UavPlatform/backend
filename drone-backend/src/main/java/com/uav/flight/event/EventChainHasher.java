@@ -6,8 +6,8 @@ import java.security.NoSuchAlgorithmException;
 
 /**
  * Draft chain formula. The domain strings are ASCII, so UTF-8 is a byte copy.
- * H0 = SHA256(UTF8("UAV-EVENT-ANCHOR-v1\n") || JCS(chainIdentity))
- * Hn = SHA256(UTF8("UAV-EVENT-PACKET-v1\n") || raw32(prevChainHash) || C)
+ * H0 = SHA256(UTF8("UAV-EVENT-ANCHOR-v2\n") || JCS(chainIdentity))
+ * Hn = SHA256(UTF8("UAV-EVENT-PACKET-v2\n") || raw32(prevChainHash) || C)
  * contentDigest = SHA256(JCS(full packet, including chainHash))
  */
 public final class EventChainHasher {

@@ -29,19 +29,23 @@ public class EventPacketService {
     private final EventCommitGate gate;
     private final EventRepairBudget budget;
     private final Clock clock;
+    private final com.uav.flight.service.EventProjectionWriter projections;
     private final EventPacketSchema schema = new EventPacketSchema();
 
     @Autowired
-    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget) {
-        this(locks, store, gate, budget, Clock.systemUTC());
+    public EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget,
+            com.uav.flight.service.EventProjectionWriter projections) {
+        this(locks, store, gate, budget, Clock.systemUTC(), projections);
     }
 
-    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget, Clock clock) {
+    EventPacketService(EventChainLock locks, EventPacketStore store, EventCommitGate gate, EventRepairBudget budget, Clock clock,
+            com.uav.flight.service.EventProjectionWriter projections) {
         this.locks = locks;
         this.store = store;
         this.gate = gate;
         this.budget = budget;
         this.clock = clock;
+        this.projections = projections;
     }
 
     @Transactional
@@ -52,14 +56,13 @@ public class EventPacketService {
         } catch (EventFormatException e) {
             throw mapped(e);
         }
-        locks.lock(orderId);
+        var order = locks.lock(orderId);
         var existing = store.findPacket(parsed.packetId());
         if (existing != null) return existing(pilot, orderId, raw, parsed, existing);
-        var assignment = authorize(orderId, pilot, parsed.assignmentVersion());
+        if (!java.util.Objects.equals(order.getAssignedPilotId(), pilot)) throw denied();
         var chain = store.findChain(parsed.chainId());
         var binding = store.findBinding(parsed);
         if (chain == null && binding != null) return conflict("CHAIN_BINDING", orderId, binding.chainId(), parsed, raw);
-        if (chain != null && chain.pilotId() != pilot) throw denied();
         if (chain != null && !chain.sameIdentity(parsed)) return conflict("CHAIN_IDENTITY", orderId, chain.chainId(), parsed, raw);
         if (chain != null && store.packetAtHeight(chain.chainId(), parsed.height()) != null) {
             return conflict("HEIGHT_FORK", orderId, chain.chainId(), parsed, raw);
@@ -68,7 +71,7 @@ public class EventPacketService {
         boolean created = false;
         if (chain == null) {
             try {
-                store.insertChain(pilot, parsed, clock.millis());
+                store.insertChain(parsed, clock.millis());
                 created = true;
             } catch (DataIntegrityViolationException race) {
                 // Two commits of the same first packet serialize on the chain primary key.
@@ -79,13 +82,15 @@ public class EventPacketService {
                     if (bound != null) return conflict("CHAIN_BINDING", orderId, bound.chainId(), parsed, raw);
                     throw race;
                 }
-                if (chain.pilotId() != pilot) throw denied();
                 if (!chain.sameIdentity(parsed)) return conflict("CHAIN_IDENTITY", orderId, chain.chainId(), parsed, raw);
+                if (store.hasUploader(chain.chainId(), pilot)) {
+                    // A race may have inserted this pilot's packet; replay is allowed below.
+                }
                 reserve(chain, parsed.height());
             }
         }
         try {
-            store.insertPacket(parsed, raw, clock.millis());
+            store.insertPacket(pilot, parsed, raw, clock.millis());
         } catch (DataIntegrityViolationException e) {
             if (created) store.deleteChainIfEmpty(parsed.chainId());
             var winner = store.findPacket(parsed.packetId());
@@ -99,7 +104,7 @@ public class EventPacketService {
             throw e;
         }
         long decidedAt = store.findPacket(parsed.packetId()).decidedAt();
-        var decisions = decide(parsed, assignment);
+        var decisions = decide(parsed);
         for (int i = 0; i < parsed.events().size(); i++) {
             if (!"ACCEPTED".equals(decisions.get(i).outcome())) continue;
             try {
@@ -110,7 +115,8 @@ public class EventPacketService {
         }
         for (int i = 0; i < parsed.events().size(); i++) store.insertResult(parsed.packetId(), parsed.events().get(i), decisions.get(i));
         store.insertReceipt(parsed, decidedAt);
-        var updated = repair(parsed, chain);
+        long revision = projections.projectPacket(orderId, parsed.packetId());
+        var updated = repair(parsed, chain, revision);
         gate.beforeCommit();
         log.info("event packet stored order={} packet={} height={} validation={}",
                 orderId, parsed.packetId(), parsed.height(), updated.validationVersion());
@@ -119,10 +125,10 @@ public class EventPacketService {
 
     private UploadOutcome existing(long pilot, String orderId, byte[] raw, ParsedPacket parsed, EventPacketStore.PacketRow row) {
         var chain = store.findChain(row.chainId());
-        if (chain == null || chain.pilotId() != pilot) throw denied();
         if (!row.orderId().equals(orderId) || !MessageDigest.isEqual(row.contentDigest(), parsed.contentDigest())) {
             return conflict("PACKET_CONTENT", orderId, row.chainId(), parsed, raw);
         }
+        if (row.uploaderPilotId() != pilot) throw denied();
         return new UploadOutcome.Stored(ack(row.packetId(), chain));
     }
 
@@ -135,14 +141,13 @@ public class EventPacketService {
         return new EventDecider.Decision("REJECTED", "EVENT_ID_CONFLICT", null);
     }
 
-    private List<EventDecider.Decision> decide(ParsedPacket packet, EventPacketStore.AssignmentEpoch assignment) {
+    private List<EventDecider.Decision> decide(ParsedPacket packet) {
         long now = clock.millis();
-        var window = AssignmentCaptureWindow.of(assignment.acceptedAt(), assignment.endedAt());
         var decisions = new ArrayList<EventDecider.Decision>();
         for (ParsedEvent event : packet.events()) {
             var fact = store.findFact(event.eventId());
             var existing = fact == null ? null : new EventDecider.Existing(fact.packetId(), fact.attribution());
-            decisions.add(EventDecider.decide(event, attribution(packet, event), now, existing, window));
+            decisions.add(EventDecider.decide(event, attribution(packet, event), now, existing));
         }
         return decisions;
     }
@@ -155,7 +160,7 @@ public class EventPacketService {
         }
     }
 
-    private EventPacketStore.ChainRow repair(ParsedPacket parsed, EventPacketStore.ChainRow previous) {
+    private EventPacketStore.ChainRow repair(ParsedPacket parsed, EventPacketStore.ChainRow previous, long revision) {
         long contiguous = previous == null ? 0 : previous.contiguousHeight();
         byte[] hash = contiguous == 0 ? parsed.anchor() : previous.contiguousHash();
         String tipId = contiguous == 0 ? null : store.packetIdAt(parsed.chainId(), contiguous);
@@ -171,7 +176,7 @@ public class EventPacketService {
             if (!tip.fullPage()) break;
         }
         long version = (previous == null ? 0 : previous.validationVersion()) + 1;
-        store.updateProgress(parsed.chainId(), contiguous, hash, store.maxHeight(parsed.chainId()), integrity, version);
+        store.updateProgress(parsed.chainId(), contiguous, hash, store.maxHeight(parsed.chainId()), integrity, version, revision);
         return store.findChain(parsed.chainId());
     }
 
@@ -199,18 +204,9 @@ public class EventPacketService {
     }
 
     private static EventAttribution attribution(ParsedPacket packet, ParsedEvent event) {
-        return new EventAttribution(packet.orderId(), packet.assignmentVersion(), packet.recordingSourceId(), packet.chainId(),
+        return new EventAttribution(packet.orderId(), packet.recordingSourceId(), packet.chainId(),
                 packet.serialNumber(), packet.serialSource(), packet.modelCode(), event.type(), event.capturedAt(),
                 event.payloadCanonical());
-    }
-
-    private EventPacketStore.AssignmentEpoch authorize(String orderId, long pilot, long assignmentVersion) {
-        var assignment = store.assignmentEpoch(orderId, assignmentVersion);
-        if (assignment == null) {
-            throw new BusinessException(HttpStatus.CONFLICT, ApiErrorCode.DISPATCH_ASSIGNMENT_CHANGED);
-        }
-        if (assignment.pilotId() != pilot) throw denied();
-        return assignment;
     }
 
     private static BusinessException mapped(EventFormatException e) {

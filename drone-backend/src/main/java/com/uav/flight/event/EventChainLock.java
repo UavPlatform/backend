@@ -9,7 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /**
- * Every event append, gap repair, reconciliation read, and later settlement must take this lock:
+ * Every event append, gap repair, reconciliation read, and projection rebuild must take this lock:
  * the order row first, then that order's chains in chain_id order. Do not lock a chain on its own.
  */
 @Component
@@ -25,7 +25,7 @@ public class EventChainLock {
     public DispatchOrder lock(String orderId) {
         var order = orders.lockOrder(orderId).orElseThrow(
                 () -> new BusinessException(HttpStatus.NOT_FOUND, ApiErrorCode.ORDER_NOT_FOUND));
-        jdbc.queryForList("SELECT chain_id FROM flight_event_chain WHERE order_id = ? ORDER BY chain_id FOR UPDATE",
+        jdbc.queryForList("SELECT chain_id FROM flight_event_v2_chain WHERE order_id = ? ORDER BY chain_id FOR UPDATE",
                 String.class, orderId);
         return order;
     }

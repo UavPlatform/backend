@@ -20,22 +20,26 @@ class EventPacketMigrationMysqlE2EIT {
             "flight_event_result", "flight_event_fact", "flight_event_conflict");
 
     @Test
-    void emptyDatabaseInitializesAtVersion27() throws Exception {
+    void emptyDatabaseInitializesAtVersion29() throws Exception {
         var db = EventMysql.empty();
         EventMysql.wipe(db);
         var flyway = flyway(db, null);
         assertThat(flyway.migrate().success).isTrue();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("27");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("29");
         assertThat(flyway.info().pending()).isEmpty();
         assertThat(flyway(db, null).migrate().success).isTrue();
         try (Connection connection = connect(db)) {
             assertMysql(connection);
             var installed = history(connection);
-            assertThat(installed).containsKeys("1", "21", "26", "27");
+            assertThat(installed).containsKeys("1", "21", "26", "27", "28", "29");
             assertSqlChecksums(installed);
             assertThat(installed.get("21")).isEqualTo(new Installed("21", "JDBC", null, 1));
             assertThat(installed.get("27")).isEqualTo(new Installed("27", "JDBC", null, 1));
+            assertThat(installed.get("28")).isEqualTo(new Installed("28", "JDBC", null, 1));
             for (String table : EVENT_TABLES) assertThat(tableCount(connection, table)).isEqualTo(1);
+            for (String table : List.of("flight_event_v2_chain", "flight_event_v2_packet", "flight_event_v2_receipt",
+                    "flight_event_v2_result", "flight_event_v2_fact", "flight_event_v2_conflict", "flight_projection_event",
+                    "dispatch_live_session_v2")) assertThat(tableCount(connection, table)).isEqualTo(1);
             assertThat(tableCount(connection, "dispatch_flight_sample")).isEqualTo(1);
             assertColumn(connection);
         }
@@ -65,13 +69,17 @@ class EventPacketMigrationMysqlE2EIT {
             before.forEach((version, row) -> assertThat(after.get(version)).isEqualTo(row));
             assertSqlChecksums(after);
             assertThat(after.get("27")).isEqualTo(new Installed("27", "JDBC", null, 1));
-            assertThat(flyway(db, null).info().current().getVersion().getVersion()).isEqualTo("27");
+            assertThat(after.get("28")).isEqualTo(new Installed("28", "JDBC", null, 1));
+            assertThat(after.get("29").type()).isEqualTo("SQL");
+            assertThat(flyway(db, null).info().current().getVersion().getVersion()).isEqualTo("29");
             try (Statement statement = connection.createStatement();
                  ResultSet rs = statement.executeQuery("SELECT captured_at FROM dispatch_flight_sample WHERE fingerprint = 'keep-f'")) {
                 assertThat(rs.next()).isTrue();
                 assertThat(rs.getLong(1)).isEqualTo(123456L);
             }
             for (String table : EVENT_TABLES) assertThat(tableCount(connection, table)).isEqualTo(1);
+            for (String table : List.of("flight_event_v2_chain", "flight_event_v2_packet", "flight_projection_event",
+                    "dispatch_live_session_v2")) assertThat(tableCount(connection, table)).isEqualTo(1);
             assertColumn(connection);
             try (Statement statement = connection.createStatement();
                  ResultSet rs = statement.executeQuery("SELECT COUNT(*) FROM flight_event_packet")) {

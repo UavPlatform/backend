@@ -32,7 +32,7 @@ public class DispatchLiveSigner {
         String user = publisher ? anchor : "v_" + UUID.randomUUID().toString().replace("-", "").substring(0, 28);
         var signer = new TLSSigAPIv2(appId, secret);
         // Tencent room privileges: anchor=create+enter+send video; viewer=enter+receive video. No audio.
-        return new DispatchLiveCredentialsVO(s.getId(), s.getConnectionId(), appId, room, user, anchor,
+        return new DispatchLiveCredentialsVO(s.getId(), appId, room, user, anchor,
                 signer.genUserSig(user, 120), signer.genPrivateMapKeyWithStringRoomID(user, 120, room, publisher ? 19 : 34),
                 System.currentTimeMillis() + 120_000, s.getLeaseExpiresAt());
     }

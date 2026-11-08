@@ -7,7 +7,6 @@ public record ParsedPacket(
         int schemaVersion,
         int hashVersion,
         String orderId,
-        long assignmentVersion,
         String recordingSourceId,
         String chainId,
         String serialNumber,

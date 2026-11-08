@@ -27,7 +27,7 @@ class EventReconciliationSchemaTest {
     }
 
     private static byte[] body(String limit) {
-        String json = "{\"schemaVersion\":1,\"chainId\":\"33333333-3333-4333-8333-333333333333\","
+        String json = "{\"schemaVersion\":2,\"chainId\":\"33333333-3333-4333-8333-333333333333\","
                 + "\"validationVersion\":null,\"fromHeight\":1,\"toHeight\":1,\"cursor\":null,"
                 + "\"missingCursor\":null,\"limit\":" + limit + ",\"prefix\":null}";
         return json.getBytes(StandardCharsets.UTF_8);

@@ -18,7 +18,7 @@ class DispatchLiveSignerTest {
         assertThat(new DispatchLiveSigner(100, "dummy-test-key", true).available()).isTrue();
     }
     @Test void viewerTicketIsReceiveOnlyAndBothTicketsAreBoundToSessionRoom() throws Exception {
-        var session = new DispatchLiveSession(); session.setId("12345678-1234-1234-1234-123456789abc"); session.setConnectionId("connection");
+        var session = new DispatchLiveSession(); session.setId("12345678-1234-1234-1234-123456789abc");
         var signer = new DispatchLiveSigner(101, "dummy-test-key", true);
         var publisher = signer.issue(session, true); var viewer = signer.issue(session, false);
         assertThat(viewer.userId()).isNotEqualTo(publisher.userId());

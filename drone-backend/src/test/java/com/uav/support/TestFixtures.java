@@ -141,7 +141,7 @@ public class TestFixtures {
     }
 
     /**
-     * 测试夹具：写入一台平台机 + 已批准借用，使 {@code PilotDeviceAccess#mayUse} 通过。
+     * 测试夹具：写入一台平台机 + 已批准借用，成为该飞手可用的设备。
      * {@code serial} 会规范化为大写；{@code aircraftModelId} 为空时用 FC30。
      */
     public String bindDrone(long userId, String serial, Long aircraftModelId) {

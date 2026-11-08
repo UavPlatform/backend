@@ -2717,32 +2717,6 @@
         },
         "type" : "object"
       },
-      "LiveStartVO" : {
-        "description" : "开播（启动图传）结果",
-        "properties" : {
-          "ackConfirmed" : {
-            "description" : "设备是否已确认启动图传（false 表示命令已发送、等待设备确认）",
-            "type" : "boolean"
-          },
-          "code" : {
-            "description" : "结果码（LIVE_STARTED 设备已确认启动 / LIVE_START_PENDING 等待设备确认 / LIVE_ALREADY_RUNNING 图传已在运行中）",
-            "type" : "string"
-          },
-          "liveState" : {
-            "description" : "直播会话状态（IDLE 空闲 / STARTING 启动中 / RUNNING 运行中）",
-            "type" : "string"
-          },
-          "requestId" : {
-            "description" : "开播命令请求ID（图传已在运行时为 null）",
-            "type" : "string"
-          },
-          "roomId" : {
-            "description" : "TRTC 房间号",
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
       "LiveUavVO" : {
         "properties" : {
           "deviceId" : {
@@ -4653,33 +4627,6 @@
               "$ref" : "#/components/schemas/UavVo"
             },
             "type" : "array"
-          },
-          "errorCode" : {
-            "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
-            "type" : "string"
-          },
-          "message" : {
-            "description" : "提示信息（成功为“操作成功”，失败为具体失败原因）",
-            "type" : "string"
-          },
-          "success" : {
-            "description" : "是否成功：true 成功 / false 失败",
-            "type" : "boolean"
-          }
-        },
-        "type" : "object"
-      },
-      "ResultLiveStartVO" : {
-        "description" : "统一响应结果封装",
-        "properties" : {
-          "code" : {
-            "description" : "响应状态码（200 成功；400 参数或业务错误；401 未登录；404 资源不存在；409 状态冲突；500 服务端错误）",
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "data" : {
-            "$ref" : "#/components/schemas/LiveStartVO",
-            "description" : "业务数据（泛型；成功且有返回值时非空，无数据时为 null）"
           },
           "errorCode" : {
             "description" : "业务错误码（失败时非空，取值见 ApiErrorCode 枚举，如 UAV_NOT_CONNECTED；成功时为 null）",
@@ -8295,46 +8242,6 @@
         "tags" : [ "Aircraft Model API" ]
       }
     },
-    "/api/ws/request" : {
-      "post" : {
-        "description" : "设备申请建立WebSocket连接（须为当前飞手派单连机或已批准借用机）",
-        "operationId" : "requestConnection",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "deviceId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "additionalProperties" : { },
-                  "type" : "object"
-                }
-              }
-            },
-            "description" : "申请成功"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "additionalProperties" : { },
-                  "type" : "object"
-                }
-              }
-            },
-            "description" : "申请失败"
-          }
-        },
-        "summary" : "申请WebSocket连接",
-        "tags" : [ "APP WebSocket API" ]
-      }
-    },
     "/appUav/add" : {
       "post" : {
         "description" : "添加新的无人机信息（需登录）",
@@ -10306,55 +10213,6 @@
         "tags" : [ "Drone Borrowing API" ]
       }
     },
-    "/live/close" : {
-      "post" : {
-        "description" : "运营端结束观看语义：先补齐当前用户观看记录 end_time；若设备在线且直播在运行，则向设备下发 STOP_LIVE 命令（复用 START_LIVE 的 ACK/超时模式），确认后结束直播会话并补齐该设备全体观众的观看记录；设备离线则直接补终态。协议详见 DroneCommandService#sendStopLiveCommand javadoc。",
-        "operationId" : "closeLive",
-        "parameters" : [ {
-          "description" : "无人机设备ID",
-          "in" : "query",
-          "name" : "deviceId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "已停止 / 等待设备确认 / 离线补终态"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "设备未注册"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultVoid"
-                }
-              }
-            },
-            "description" : "设备拒绝停止推流（LIVE_STOP_REJECTED）"
-          }
-        },
-        "summary" : "结束观看并请求停止推流（1A-5a）",
-        "tags" : [ "Web Live API" ]
-      }
-    },
     "/live/get" : {
       "post" : {
         "description" : "Web端获取视频流的凭证；TRTC 身份由服务端从登录态生成，客户端不可指定",
@@ -10396,7 +10254,7 @@
     },
     "/live/leave" : {
       "post" : {
-        "description" : "仅结束当前登录用户在该设备的未关闭观看记录（end_time=now），完全不动推流与直播状态；幂等（无开放记录也返回 200）。与停止链路（LIVE_STOPPED 统一补齐）叠加后，正常退出与异常退出口径完整。",
+        "description" : "仅结束当前登录用户在该设备的未关闭观看记录（end_time=now），完全不动推流与直播状态；幂等（无开放记录也返回 200）。",
         "operationId" : "leaveLive",
         "parameters" : [ {
           "description" : "无人机设备ID",
@@ -10430,124 +10288,6 @@
           }
         },
         "summary" : "退出观看（1B-4b 微端点）",
-        "tags" : [ "Web Live API" ]
-      }
-    },
-    "/live/req" : {
-      "post" : {
-        "description" : "Web端向指定无人机发送开播请求",
-        "operationId" : "startLive",
-        "parameters" : [ {
-          "description" : "无人机设备ID",
-          "in" : "query",
-          "name" : "deviceId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "发送成功 / 已运行 / 等待确认"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "未登录"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "设备未连接 / 正在启动中"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "触发限流"
-          }
-        },
-        "summary" : "发送开播请求",
-        "tags" : [ "Web Live API" ]
-      }
-    },
-    "/live/rider/req" : {
-      "post" : {
-        "description" : "飞手对在线设备发送开播请求（1B-4b / ADR-0007）：设备须为本人派单任务当前连机的无人机，或本人已批准借用的平台无人机",
-        "operationId" : "riderStartLive",
-        "parameters" : [ {
-          "description" : "无人机设备ID",
-          "in" : "query",
-          "name" : "deviceId",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "发送成功 / 已运行 / 等待确认"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "设备不是本人当前派单连机的无人机，也非本人当前连机/借用机"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "设备未注册"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ResultLiveStartVO"
-                }
-              }
-            },
-            "description" : "设备未连接 / 正在启动中"
-          }
-        },
-        "summary" : "飞手主动开播",
         "tags" : [ "Web Live API" ]
       }
     },

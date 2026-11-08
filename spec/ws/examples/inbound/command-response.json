@@ -1,7 +1,0 @@
-{
-  "type": "response",
-  "replyTo": "req-1",
-  "success": true,
-  "code": "0",
-  "message": "ok"
-}

@@ -11,33 +11,26 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiPredicate;
 
 /**
- * WebSocket 握手鉴权。DEVICE_CHANNEL 用注入的 deviceAccess（派单连机或已批准借用），不再默认 rider_uav。
+ * WebSocket 握手鉴权：令牌必须有效且带用户身份。
+ * {@code CHAT} 额外要求路径身份与令牌一致（{@code /ws/{sid}}）。
  */
 @Slf4j
 public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
 
-    public static final int ROLE_RIDER = 1;
     public static final String ATTR_USER_ID = "wsUserId";
     public static final String ATTR_USERNAME = "wsUsername";
     public static final String ATTR_ROLE = "wsRole";
 
-    public enum Mode { DEVICE_CHANNEL, WEB_CHANNEL, CHAT }
+    public enum Mode { WEB_CHANNEL, CHAT }
 
     private final JwtUtil jwtUtil;
     private final Mode mode;
-    private final BiPredicate<Long, String> deviceAccess;
 
     public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, Mode mode) {
-        this(jwtUtil, mode, (pilot, device) -> false);
-    }
-
-    public WsAuthHandshakeInterceptor(JwtUtil jwtUtil, Mode mode, BiPredicate<Long, String> deviceAccess) {
         this.jwtUtil = jwtUtil;
         this.mode = mode;
-        this.deviceAccess = deviceAccess == null ? (p, d) -> false : deviceAccess;
     }
 
     @Override
@@ -69,20 +62,6 @@ public class WsAuthHandshakeInterceptor implements HandshakeInterceptor {
             String sid = lastPathSegment(request);
             if (sid == null || !sid.equals(String.valueOf(userId))) {
                 log.warn("拒绝 WebSocket 握手（聊天）：连接身份与令牌不符, userId={}, path={}", userId, request.getURI());
-                return false;
-            }
-        } else if (mode == Mode.DEVICE_CHANNEL) {
-            String deviceId = queryParam(request, "deviceId");
-            if (!StringUtils.hasText(deviceId)) {
-                log.warn("拒绝 WebSocket 握手（设备通道）：缺少 deviceId, uri={}", request.getURI());
-                return false;
-            }
-            if (role == null || role != ROLE_RIDER) {
-                log.warn("拒绝 WebSocket 握手（设备通道）：非飞手身份连接设备通道, userId={}, role={}", userId, role);
-                return false;
-            }
-            if (!deviceAccess.test(userId, deviceId)) {
-                log.warn("拒绝 WebSocket 握手（设备通道）：设备不是该飞手派单连机或已批准借用机, userId={}, deviceId={}", userId, deviceId);
                 return false;
             }
         }

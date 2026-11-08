@@ -43,7 +43,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class HttpAccessControlIT extends IntegrationTestBase {
 
-
     @Autowired
     UavRepository uavRepository;
 
@@ -288,28 +287,5 @@ class HttpAccessControlIT extends IntegrationTestBase {
                 .andExpect(jsonPath("$.data.userSig").isNotEmpty())
                 .andExpect(jsonPath("$.data.privateMapKey").isNotEmpty())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"));
-    }
-
-    // ---------- /api/ws/request 需登录 + 设备归属 ----------
-
-    @Test
-    @DisplayName("/api/ws/request：匿名 401、无借用飞手 403、已批准借用飞手 200")
-    void wsRequestRequiresLoginAndOwnership() throws Exception {
-        mockMvc.perform(post("/api/ws/request").param("deviceId", UniqueNames.unique("req-a")))
-                .andExpect(status().isUnauthorized());
-
-        TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rq"), null);
-        mockMvc.perform(post("/api/ws/request")
-                        .param("deviceId", UniqueNames.unique("req-b"))
-                        .header("Authorization", rider.authorization()))
-                .andExpect(status().isForbidden());
-
-        TestAccounts.Account boundRider = accounts().registerRider(UniqueNames.userName("rq2"), null);
-        String boundDevice = fixtures.bindDrone(boundRider.id(), UniqueNames.djiId());
-
-        mockMvc.perform(post("/api/ws/request")
-                        .param("deviceId", boundDevice)
-                        .header("Authorization", boundRider.authorization()))
-                .andExpect(status().isOk());
     }
 }

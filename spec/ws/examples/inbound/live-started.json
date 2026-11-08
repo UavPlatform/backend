@@ -1,9 +1,0 @@
-{
-  "type": "event",
-  "name": "LIVE_STARTED",
-  "deviceId": "DJI-001",
-  "replyTo": "req-1",
-  "data": {
-    "roomId": "room-1"
-  }
-}

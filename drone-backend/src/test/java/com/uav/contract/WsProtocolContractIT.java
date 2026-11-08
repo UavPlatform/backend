@@ -4,11 +4,9 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.uav.server.ws.WsMessageNames;
-import com.uav.server.ws.handler.WsMessageHandler;
 import com.uav.support.IntegrationTestBase;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -29,55 +27,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * WebSocket protocol contract gate.
  *
  * <p>Keeps {@code backend/spec/ws/} (manifest, schemas, examples, SHA256SUMS) in
- * sync with the handlers and constants. Additive-only: the wire format must not
+ * sync with the handler vocabulary. Additive-only: the wire format must not
  * change without a downstream coordination task.
+ *
+ * <p>ADR-0014 retired the device channel ({@code /ws/drone}) and its handlers, so
+ * the manifest now carries no inbound entries; only {@code /ws/web} outbound
+ * messages remain to be checked.
  */
 class WsProtocolContractIT extends IntegrationTestBase {
 
     private static final Path SPEC = Path.of("..", "spec", "ws");
     private static final Path SHA256SUMS = SPEC.resolve("SHA256SUMS");
-
-    @Autowired
-    private List<WsMessageHandler> handlers;
-
-    @Test
-    @DisplayName("每个 WsMessageHandler 都在清单中登记")
-    void everyHandlerIsRegistered() {
-        JSONObject manifest = manifest();
-        Set<String> registered = new TreeSet<>();
-        for (String channel : manifest.getJSONObject("channels").keySet()) {
-            JSONArray inbound = manifest.getJSONObject("channels").getJSONObject(channel).getJSONArray("inbound");
-            for (int index = 0; index < inbound.size(); index++) {
-                registered.add(inbound.getJSONObject(index).getString("handler"));
-            }
-        }
-        assertThat(handlers).as("Spring 上下文必须发现 handler").isNotEmpty();
-        for (WsMessageHandler handler : handlers) {
-            assertThat(registered)
-                    .as("handler %s 缺少 spec/ws 清单条目", handler.getClass().getSimpleName())
-                    .contains(handler.getClass().getSimpleName());
-        }
-    }
-
-    @Test
-    @DisplayName("清单中的每个入站消息都由对应 handler 支持")
-    void everyInboundEntryHasHandler() {
-        JSONObject manifest = manifest();
-        Map<String, WsMessageHandler> byName = new LinkedHashMap<>();
-        handlers.forEach(handler -> byName.put(handler.getClass().getSimpleName(), handler));
-        for (String channel : manifest.getJSONObject("channels").keySet()) {
-            JSONArray inbound = manifest.getJSONObject("channels").getJSONObject(channel).getJSONArray("inbound");
-            for (int index = 0; index < inbound.size(); index++) {
-                JSONObject entry = inbound.getJSONObject(index);
-                String handlerName = entry.getString("handler");
-                assertThat(byName).as("%s 引用了不存在的 handler %s", channel, handlerName).containsKey(handlerName);
-                WsMessageHandler handler = byName.get(handlerName);
-                assertThat(handler.supports(entry.getString("type"), entry.getString("name")))
-                        .as("%s/%s/%s 未被 %s 支持", channel, entry.getString("type"), entry.getString("name"), handlerName)
-                        .isTrue();
-            }
-        }
-    }
 
     @Test
     @DisplayName("schema 与示例文件存在且可解析，示例的 type/name 与清单一致")

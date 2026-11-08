@@ -124,7 +124,9 @@ def check(root: Path, update_sha: bool) -> int:
                 problems.extend(check_example(entry, root / example))
 
     handlers = java_handlers()
-    if not handlers:
+    # Inbound entries exist only while a device channel is declared. ADR-0014 retired
+    # /ws/drone, so a manifest with no inbound handler must not demand implementations.
+    if manifest_handlers and not handlers:
         problems.append(f"no WsMessageHandler implementations found under {SOURCE}")
     for handler in sorted(handlers - manifest_handlers):
         problems.append(f"handler {handler} has no inbound manifest entry")

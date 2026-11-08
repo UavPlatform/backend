@@ -26,11 +26,10 @@ class JwtContextCleanupIT extends IntegrationTestBase {
         assertAnonymousContext();
     }
     @Test void pilotBusinessRejectionClearsAllIdentityFields() throws Exception {
-        // The bind-drone gate is gone (start live no longer requires a bound drone); an unknown device is rejected
-        // by the business layer instead, and the identity must still be cleared afterwards.
+        // A 404 business rejection (unknown task) must still clear the identity afterwards.
         var pilot = accounts().registerRider(UniqueNames.userName("ctx"), null);
-        mockMvc.perform(post("/live/rider/req").param("deviceId", UniqueNames.djiId())
-                .header("Authorization", pilot.authorization())).andExpect(status().is4xxClientError());
+        mockMvc.perform(post("/rider/complete").param("taskNum", UniqueNames.unique("TN"))
+                .header("Authorization", pilot.authorization())).andExpect(status().isNotFound());
         assertAnonymousContext();
     }
     @Test void anonymousRequestDiscardsAnIdentityLeftOnTheThread() throws Exception {

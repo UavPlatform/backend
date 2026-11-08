@@ -41,8 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>两种环境下 {@link Account#token()} 都是服务端真实签发的 accessToken，可直接用于：
  * REST 的 {@code Authorization: Bearer <token>}、WebSocket 握手 {@code ws://host:port/ws/...?token=<token>}
- * （{@code WsAuthHandshakeInterceptor} 支持 query 令牌；{@code /ws/drone} 还要求 role=1 且
- * {@code deviceId} 为该飞手派单连机或已批准借用机，需另用 {@code TestFixtures#bindDrone} 授予）。
+ * （{@code WsAuthHandshakeInterceptor} 支持 query 令牌；{@code /ws/web} 只按令牌取登录身份）。
  *
  * <p><b>限流身份隔离</b>：{@code RateLimiterAspect} 的 key 退化为 X-Forwarded-For/remoteAddr 时，
  * MockMvc 与真实 TCP 下客户端地址恒定，第 4 次注册、第 6 次登录起必然 429。这里为**每次调用**

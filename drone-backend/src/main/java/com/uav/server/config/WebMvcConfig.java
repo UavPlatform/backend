@@ -23,7 +23,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/swagger-resources/**",
                         "/webjars/**",
                         // WS 握手（Boot 4 起握手请求会先经过 MVC handler mapping）：
-                        // 鉴权统一由 WsAuthHandshakeInterceptor / WsJwtHandshakeConfigurator 负责，
+                        // 鉴权统一由 WsAuthHandshakeInterceptor 负责，
                         // 支持查询参数传 token，避免 JWT 拦截器按 REST 规则误拒（P0-1）
                         "/ws/**"
                 );

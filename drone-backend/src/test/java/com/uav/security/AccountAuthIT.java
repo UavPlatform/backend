@@ -78,21 +78,18 @@ class AccountAuthIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("ADR-0007：未手动绑定无人机的飞手也能取消、完成、开播，不再被「请先绑定」拦截")
+    @DisplayName("ADR-0007：未手动绑定无人机的飞手也能取消、完成，不再被「请先绑定」拦截")
     void riderWithoutDroneIsNoLongerBlockedByBindGate() throws Exception {
         TestAccounts.Account rider = accounts().registerRider(UniqueNames.userName("rider"), null);
         // 404（任务不存在）证明身份与角色通过，且没有绑机门槛。
         for (String path : new String[]{"/rider/complete", "/rider/cancel"}) {
-            mockMvc.perform(post(path)
+            String body = mockMvc.perform(post(path)
                             .param("taskNum", UniqueNames.unique("TN"))
                             .header("Authorization", rider.authorization()))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isNotFound())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(body).doesNotContain("请先绑定至少一台无人机");
         }
-        String body = mockMvc.perform(post("/live/rider/req")
-                        .param("deviceId", UniqueNames.djiId())
-                        .header("Authorization", rider.authorization()))
-                .andReturn().getResponse().getContentAsString();
-        assertThat(body).doesNotContain("请先绑定至少一台无人机");
     }
 
     @Test

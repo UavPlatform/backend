@@ -1,96 +1,11 @@
 {
-  "version": 1,
-  "description": "WebSocket protocol source of truth for the drone backend. Values must match WsMessageNames.",
+  "version": 2,
+  "description": "WebSocket protocol source of truth for the drone backend. Values must match WsMessageNames. The DJI device channel (/ws/drone) was retired with ADR-0014: devices no longer hold a server long connection, and the server no longer issues start/stop-live commands.",
   "channels": {
-    "/ws/drone": {
-      "description": "DJI device connection; device authenticates over HTTP before connecting.",
-      "inbound": [
-        {
-          "type": "event",
-          "name": "PING",
-          "handler": "PingHandler",
-          "schema": "schemas/device/ping.schema.json",
-          "example": "examples/inbound/ping.json"
-        },
-        {
-          "type": "event",
-          "name": "UAV_STATUS",
-          "handler": "UavStatusHandler",
-          "schema": "schemas/device/uav-status.schema.json",
-          "example": "examples/inbound/uav-status.json"
-        },
-        {
-          "type": "event",
-          "name": "LIVE_STARTED",
-          "handler": "LiveEventHandler",
-          "schema": "schemas/device/live-started.schema.json",
-          "example": "examples/inbound/live-started.json"
-        },
-        {
-          "type": "event",
-          "name": "LIVE_STOPPED",
-          "handler": "LiveEventHandler",
-          "schema": "schemas/device/live-stopped.schema.json",
-          "example": "examples/inbound/live-stopped.json"
-        },
-        {
-          "type": "response",
-          "name": null,
-          "handler": "WsCommandResponseHandler",
-          "schema": "schemas/device/command-response.schema.json",
-          "example": "examples/inbound/command-response.json"
-        },
-        {
-          "type": "error",
-          "name": null,
-          "handler": "WsCommandResponseHandler",
-          "schema": "schemas/device/command-error.schema.json",
-          "example": "examples/inbound/command-error.json"
-        }
-      ],
-      "outbound": [
-        {
-          "type": "event",
-          "name": "CONNECT_SUCCESS",
-          "schema": "schemas/server/connect-success.schema.json",
-          "example": "examples/outbound/connect-success.json"
-        },
-        {
-          "type": "event",
-          "name": "PONG",
-          "schema": "schemas/server/pong.schema.json",
-          "example": "examples/outbound/pong.json"
-        },
-        {
-          "type": "error",
-          "name": "ERROR",
-          "schema": "schemas/server/error.schema.json",
-          "example": "examples/outbound/error.json"
-        },
-        {
-          "type": "command",
-          "name": "START_LIVE",
-          "schema": "schemas/server/start-live.schema.json",
-          "example": "examples/outbound/start-live.json"
-        },
-        {
-          "type": "command",
-          "name": "STOP_LIVE",
-          "schema": "schemas/server/stop-live.schema.json",
-          "example": "examples/outbound/stop-live.json"
-        }
-      ]
-    },
     "/ws/web": {
       "description": "Supervision/shipper web client. Supervisors (role 2) receive all orders' FLIGHT_TELEMETRY; ?orderId= restricts to one order (owner or supervisor, otherwise closed with 1008).",
       "inbound": [],
       "outbound": [
-        {
-          "type": "event",
-          "name": "UAV_STATUS_UPDATE",
-          "schema": "schemas/server/uav-status-update.schema.json",
-          "example": "examples/outbound/uav-status-update.json"
-        },
         {
           "type": "event",
           "name": "FLIGHT_TELEMETRY",
@@ -99,8 +14,5 @@
         }
       ]
     }
-  },
-  "deferred": {
-    "/ws/{sid}": "Chat IM uses a separate Jakarta WebSocket protocol; it is not part of this manifest yet."
   }
 }

@@ -20,7 +20,7 @@ public class DispatchSandboxPayment {
     }
     public boolean available() {
         String[] profiles = environment.getActiveProfiles();
-        return profiles.length > 0 && Arrays.stream(profiles).allMatch(Set.of("dev", "test")::contains)
+        return profiles.length > 0 && Arrays.stream(profiles).allMatch(Set.of("dev", "test", "it")::contains)
                 && guard.isMockPayActive();
     }
     public void requireAvailable() {

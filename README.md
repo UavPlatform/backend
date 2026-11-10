@@ -13,6 +13,25 @@ Web backend code for the drone platform.
 | 跑全量测试（`*Test` + `*IT`/`*E2EIT`，含契约门禁） | `cd drone-backend && sh mvnw -B verify` |
 | 检查测试分层与执行层命名（只读） | `bash tools/check-test-layers.sh`（自证：`bash tools/check-test-layers.sh --selftest`） |
 
+## IT 集成测试环境（profile=`it`）
+
+给 app / 前端对接真实后端的一次性环境：**全新 MySQL + LocalStack S3 + `SPRING_PROFILES_ACTIVE=it`**，用完即拆，不污染共享开发库。
+
+```bash
+bash tools/it/up.sh     # 起栈；默认 backend :8082、MySQL :13307、S3 :4567
+bash tools/it/down.sh   # 停 backend 并 docker compose down -v
+```
+
+固定种子（仅 it profile；`AdminSeedInitializer` + `ItSeedInitializer`）：
+
+| 账号 | 角色 | 密码 |
+| --- | --- | --- |
+| `it-admin` | 监管/管理端 | `It@123456` |
+| `it-pilot` | 飞手（role=1） | `It@123456` |
+| `it-customer` | 需求方（role=0） | `It@123456` |
+
+另登记机身号 `IT-DRONE-001`（机型 FC30，默认机场 id=1）。mock 支付与演示评估已在 `application-it.yml` 打开；`MockPayGuard` 白名单含 `it`。
+
 ## 本地演示环境
 
 用于客户演示/联调的一套可复现数据（**仅开发与演示环境，禁止对生产库执行**）：

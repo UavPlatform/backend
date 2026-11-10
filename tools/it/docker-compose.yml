@@ -1,0 +1,49 @@
+# IT 一次性环境：全新 MySQL + LocalStack(S3) + backend(profile=it, mock 支付)。
+# 用法见同目录 up.sh / down.sh。勿用于生产。
+name: uav-it
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-drone_it}
+      MYSQL_USER: ${MYSQL_USER:-drone}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-it-only-pass}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-it-only-root}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${MYSQL_PORT:-13307}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - it_mysql_data:/var/lib/mysql
+
+  s3:
+    image: localstack/localstack:4.3
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+    ports:
+      - "${S3_PORT:-4567}:4566"
+    volumes:
+      - it_s3_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # 可选：在 compose 内跑 jar（up.sh 默认在宿主机起 backend，更易调试）。
+  # backend:
+  #   ...
+
+volumes:
+  it_mysql_data:
+  it_s3_data:

@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class DispatchSandboxPaymentTest {
     @ParameterizedTest
-    @CsvSource({"test,true,true", "dev,true,true", "prod,true,false", "test+prod,true,false", "test,false,false", "none,true,false"})
+    @CsvSource({"test,true,true", "dev,true,true", "it,true,true", "prod,true,false", "test+prod,true,false", "it+prod,true,false", "test,false,false", "none,true,false"})
     void sandboxCannotBeActivatedInProductionOrMixedProfiles(String profiles, boolean enabled, boolean expected) {
         var environment = new MockEnvironment();
         if (!profiles.equals("none")) environment.setActiveProfiles(profiles.split("\\+"));

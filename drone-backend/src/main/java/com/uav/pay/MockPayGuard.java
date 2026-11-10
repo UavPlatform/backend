@@ -16,7 +16,7 @@ import java.util.List;
  * <p><b>双重生效条件</b>（缺一不可，生产环境双保险禁用）：
  * <ol>
  *   <li>属性显式开启；</li>
- *   <li>当前激活 profile 仅含 dev 或 test（生产 profile 不在白名单，即使误配属性也拒绝）。</li>
+ *   <li>当前激活 profile 含 dev / test / it（生产 profile 不在白名单，即使误配属性也拒绝）。</li>
  * </ol>
  * mock 通道复用真实 handleNotify 状态机（PENDING→PAID，含金额比对），仅替代微信统一下单环节。
  */
@@ -25,7 +25,7 @@ import java.util.List;
 public class MockPayGuard {
 
     /** 允许 mock 支付的 profile 白名单（生产不在列，显式禁用） */
-    static final List<String> ALLOWED_PROFILES = List.of("dev", "test");
+    static final List<String> ALLOWED_PROFILES = List.of("dev", "test", "it");
 
     private final Environment environment;
     private final boolean mockEnabledProperty;

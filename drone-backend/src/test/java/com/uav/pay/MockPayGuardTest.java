@@ -7,7 +7,7 @@ import org.springframework.mock.env.MockEnvironment;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 1B-1a 守卫单元测试：mock 支付开关仅 dev/test profile 生效；
+ * 1B-1a 守卫单元测试：mock 支付开关仅 dev/test/it profile 生效；
  * 生产 profile 即使误配属性也必须拒绝（双重门禁的生产禁用证明）。
  */
 class MockPayGuardTest {
@@ -40,6 +40,12 @@ class MockPayGuardTest {
     @DisplayName("test profile + 属性开启 → 生效")
     void testProfileEnabled() {
         assertThat(guard("test", true).isMockPayActive()).isTrue();
+    }
+
+    @Test
+    @DisplayName("it profile + 属性开启 → 生效")
+    void itProfileEnabled() {
+        assertThat(guard("it", true).isMockPayActive()).isTrue();
     }
 
     @Test
